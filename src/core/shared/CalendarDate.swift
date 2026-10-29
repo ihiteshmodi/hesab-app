@@ -8,6 +8,18 @@ public struct CalendarDate: Hashable, Comparable, Sendable {
         public let year: Int
         public let month: Int
 
+        public init(year: Int, month: Int) {
+            self.year = year
+            self.month = month
+        }
+
+        /// For example "October 2026".
+        public var title: String {
+            let names = ["January", "February", "March", "April", "May", "June",
+                         "July", "August", "September", "October", "November", "December"]
+            return "\(names[month - 1]) \(year)"
+        }
+
         public static func < (lhs: YearMonth, rhs: YearMonth) -> Bool {
             (lhs.year, lhs.month) < (rhs.year, rhs.month)
         }

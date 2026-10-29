@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 @testable import HisaabCore
 
@@ -42,5 +43,26 @@ struct CalendarDateTests {
         let later = try CalendarDate(isoString: "2026-10-01")
 
         #expect(earlier < later)
+    }
+
+    @Test(arguments: [(2026, 1, "January 2026"), (2026, 10, "October 2026"), (2027, 12, "December 2027")])
+    func aMonthHasAReadableTitle(year: Int, month: Int, title: String) {
+        #expect(CalendarDate.YearMonth(year: year, month: month).title == title)
+    }
+
+    @Test(arguments: [("2026-10-30", "30 Oct"), ("2026-01-05", "5 Jan"), ("2026-12-31", "31 Dec")])
+    func aDayHasAShortTitleForLists(iso: String, title: String) throws {
+        #expect(try CalendarDate(isoString: iso).shortTitle == title)
+    }
+
+    @Test func isReadFromAnInstantUsingTheGivenCalendar() throws {
+        var india = Calendar(identifier: .gregorian)
+        india.timeZone = TimeZone(identifier: "Asia/Kolkata")!
+        var utc = Calendar(identifier: .gregorian)
+        utc.timeZone = TimeZone(identifier: "UTC")!
+        let justAfterMidnightInIndia = india.date(from: DateComponents(year: 2026, month: 10, day: 30, hour: 0, minute: 30))!
+
+        #expect(CalendarDate(justAfterMidnightInIndia, calendar: india).isoString == "2026-10-30")
+        #expect(CalendarDate(justAfterMidnightInIndia, calendar: utc).isoString == "2026-10-29")
     }
 }
