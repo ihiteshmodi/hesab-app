@@ -1,0 +1,27 @@
+# Personal data and source spreadsheets never enter the repo
+internal-artifacts/
+current_artifacts/
+output/
+*.ods
+*.xlsx
+*.csv
+*.sqlite
+*.sqlite3
+*.db
+*.ipa
+
+# Personal mapping/config for the one-time spreadsheet importer
+tools/**/personal/
+tools/**/*.personal.*
+
+# Builds and generated project files
+build/
+DerivedData/
+*.xcodeproj/
+*.xcworkspace/
+.build/
+
+# Secrets and OS noise
+.env
+.env.*
+.DS_Store
