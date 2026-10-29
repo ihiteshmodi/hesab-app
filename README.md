@@ -1,0 +1,145 @@
+# Hisaab: a private, offline budget app for iPhone
+
+![Platform](https://img.shields.io/badge/platform-iOS%2017%2B-blue)
+![Swift](https://img.shields.io/badge/Swift-6-orange)
+![Data](https://img.shields.io/badge/data-stays%20on%20your%20phone-green)
+
+> Track what is left to spend, where your money went and what you own, in one native app that never goes online. Your data lives in a single SQLite file on your phone.
+
+**Status: early.** The first slice works end to end: add an expense and see what is left to spend this month. The rest is specified in [`tests/`](tests) as Gherkin scenarios and will be built feature by feature (see [Roadmap](#roadmap)).
+
+## Why it exists
+
+Budget apps want accounts, sync and subscriptions. Hisaab is for one person on one phone: no account, no server, no tracking. You can export the database file whenever you like and keep it wherever you choose.
+
+## Quick Start
+
+You need a Mac with Xcode 16 or later (built and tested with Xcode 27) and [XcodeGen](https://github.com/yonaskolb/XcodeGen) (`brew install xcodegen`).
+
+```bash
+git clone https://github.com/ihiteshmodi/hesab-app.git
+cd hesab-app
+swift test                # runs the core tests, no simulator needed
+./scripts/build-ipa.sh    # builds an unsigned IPA for sideloading
+```
+
+Expected output:
+
+```text
+✔ Test run with 25 tests in 8 suites passed after 0.01 seconds.
+...
+Built build/Hisaab.ipa
+```
+
+Install `build/Hisaab.ipa` with any sideloading tool (for example LiveContainer or AltStore). The app starts empty: no data is shipped with the source.
+
+To run the simulator UI tests as well:
+
+```bash
+SIMULATOR_NAME="iPhone 16" ./scripts/test.sh --ui
+```
+
+## Usage
+
+The core is a Swift package (`HisaabCore`) with no UI code. The app talks to it only through `BudgetApp`.
+
+### Add an expense and read the month
+
+```swift
+import HisaabCore
+
+let database = try AppDatabase.inMemory()   // or AppDatabase.file(at: someURL)
+let app = BudgetApp(database: database, clock: SystemDayClock())
+
+try app.addExpense(NewExpense(
+    description: "Weekly groceries",
+    amount: .rupees(1250),
+    category: "Home & Utilities"
+))
+
+let month = try app.monthBudget()
+print(month.expenses.map(\.description))            // ["Weekly groceries"]
+print(IndianMoneyFormat.string(month.spentThisMonth)) // ₹1,250.00
+print(IndianMoneyFormat.string(month.leftToSpend))    // −₹1,250.00 (income comes in a later slice)
+```
+
+### Incomplete input is refused with a message you can show
+
+```swift
+do {
+    try app.addExpense(NewExpense(description: "Tea", amount: nil, category: "Food & Dining"))
+} catch let error as ExpenseValidationError {
+    print(error.message)   // Enter an amount above 0
+}
+```
+
+### Read an amount as typed
+
+```swift
+MoneyInput.parse("₹ 1,23,456.78")   // Money(paise: 12_345_678)
+MoneyInput.parse("12.345")          // nil: more than two decimals
+```
+
+## Configuration
+
+Hisaab needs no environment variables, keys or accounts.
+
+| Setting | Description | Default | Required |
+|---|---|---|---|
+| Database file | `Application Support/Hisaab/hisaab.sqlite` inside the app's own storage | created on first launch | No |
+| Launch argument `-ui-testing` | Uses an empty in-memory database (used by the UI tests) | off | No |
+| Bundle identifier | Set in `project.yml` (`app.hisaab.Hisaab`); change it if you sign the app yourself | `app.hisaab.Hisaab` | No |
+| Minimum iOS | Set in `project.yml` and `Package.swift` | 17.0 | No |
+
+If the database cannot be opened the app stops at launch instead of running on empty data.
+
+## Core API
+
+### `BudgetApp.addExpense(_ new: NewExpense) throws -> Expense`
+
+| Field | Meaning |
+|---|---|
+| `date` | Day of the expense; defaults to today |
+| `description` | Required, trimmed |
+| `amount` | `Money?`; must be above 0 |
+| `category` | Required |
+
+Errors (`ExpenseValidationError`, each with a human-readable `message`):
+
+- `amountMissingOrZero`: "Enter an amount above 0"
+- `amountNegative`: "Enter an amount above 0. To record money received, add it under Income."
+- `descriptionMissing`: "Enter a description"
+- `categoryMissing`: "Choose a category"
+
+### `BudgetApp.monthBudget(for:) throws -> MonthBudget`
+
+Defaults to the month containing today. Returns `leftToSpend` (everything ever recorded), `spentThisMonth`, and that month's `expenses`, newest first.
+
+## Privacy
+
+- No network code and no network permission.
+- No analytics, accounts or secrets.
+- The repository contains no personal data. A fresh install is empty.
+- Backup and restore is one file you control (planned: export and import in the app).
+
+## How it is built
+
+- SwiftUI app, a pure Swift core, SQLite through [GRDB](https://github.com/groue/GRDB.swift).
+- Amounts are whole paise (integers), dates are calendar days, and totals are computed from entries rather than stored.
+- Feature-first folders: code in `src/core/modules/<capability>/<feature>`, specs and tests in `tests/<capability>/<feature>`.
+
+```text
+src/core/        domain rules, use cases, SQLite repositories (Swift package, no UI)
+src/app/         SwiftUI screens and the composition root
+tests/           Gherkin specs (.feature) beside the Swift tests; tests/e2e has simulator UI tests
+docs/design/     impact map, architecture, test strategy
+scripts/         test and IPA build scripts
+```
+
+Design notes: [impact map](docs/design/budget-app/impact-map.md), [architecture](docs/design/budget-app/architecture.md), [test strategy](docs/design/budget-app/test-strategy.md).
+
+## Roadmap
+
+Built: record an expense, this month's budget.
+
+Specified next (see the `.feature` files): income and savings, refunds and reimbursements, recurring and upcoming expenses, card bills, people ledgers, portfolio and net worth, payout schemes with reminders, spending insights, cash in hand, backup and restore, and a one-time importer for existing spreadsheets.
