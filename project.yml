@@ -1,0 +1,50 @@
+name: Hisaab
+options:
+  bundleIdPrefix: app.hisaab
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+packages:
+  HisaabCore:
+    path: .
+targets:
+  Hisaab:
+    type: application
+    platform: iOS
+    sources:
+      - path: src/app
+    dependencies:
+      - package: HisaabCore
+        product: HisaabCore
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.hisaab.Hisaab
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: Hisaab
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone: UIInterfaceOrientationPortrait
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        TARGETED_DEVICE_FAMILY: "1"
+  HisaabUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: tests/e2e
+    dependencies:
+      - target: Hisaab
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.hisaab.HisaabUITests
+        GENERATE_INFOPLIST_FILE: YES
+schemes:
+  Hisaab:
+    build:
+      targets:
+        Hisaab: all
+    test:
+      targets:
+        - HisaabUITests

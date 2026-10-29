@@ -1,6 +1,27 @@
 // swift-tools-version: 6.0
 import PackageDescription
 
+// The Gherkin specs live beside their tests but are documentation, not code;
+// e2e holds the simulator UI tests, which only Xcode can run.
+let testExclusions = [
+    "e2e",
+    "budget/borrowing/amount-to-repay.feature",
+    "budget/cards/card-bills.feature",
+    "budget/cash-in-hand/cash-in-hand.feature",
+    "budget/expenses/record-expense.feature",
+    "budget/expenses/refunds.feature",
+    "budget/income/record-income.feature",
+    "budget/month-budget/month-budget.feature",
+    "budget/planning/recurring-expenses.feature",
+    "budget/planning/upcoming-expenses.feature",
+    "data/backup-and-restore/backup-and-restore.feature",
+    "data/spreadsheet-import/spreadsheet-import.feature",
+    "insights/spending-breakdown/spending-breakdown.feature",
+    "networth/ledgers/ledgers.feature",
+    "networth/payout-schemes/payout-schemes.feature",
+    "networth/portfolio/portfolio.feature",
+]
+
 let package = Package(
     name: "Hisaab",
     platforms: [.iOS(.v17), .macOS(.v14)],
@@ -19,7 +40,8 @@ let package = Package(
         .testTarget(
             name: "HisaabCoreTests",
             dependencies: ["HisaabCore"],
-            path: "tests"
+            path: "tests",
+            exclude: testExclusions
         ),
     ],
     swiftLanguageModes: [.v6]
