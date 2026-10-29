@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  commit-phase:
+    name: Core tests
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run core tests
+        run: swift test
+
+  acceptance-phase:
+    name: Simulator UI tests
+    needs: commit-phase
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Run UI tests
+        run: |
+          SIMULATOR_NAME=$(xcrun simctl list devices available | grep -m1 -oE 'iPhone [^(]+' | sed 's/ *$//')
+          echo "Using simulator: $SIMULATOR_NAME"
+          SIMULATOR_NAME="$SIMULATOR_NAME" ./scripts/test.sh --ui
+
+  build-ipa:
+    name: Build unsigned IPA
+    needs: acceptance-phase
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Build IPA
+        run: ./scripts/build-ipa.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Hisaab.ipa
+          path: build/Hisaab.ipa
