@@ -158,8 +158,27 @@ struct BorrowingTests {
         #expect(try app.monthBudget().incomeEntries.isEmpty)
     }
 
+    @Test func deletingARepaymentPutsTheMoneyBackAsOwed() throws {
+        let app = try appWithTwentyThousand()
+        let loan = try borrow(app, 10_000, from: "Savings")
+        let repayment = try app.recordRepayment(loan.id, .rupees(4_000))
+
+        try app.deleteRepayment(repayment.id)
+
+        #expect(try app.amountToRepay().total == .rupees(10_000))
+        #expect(try app.monthBudget().leftToSpend == .rupees(30_000))
+        #expect(try line(app, loan).repayments.isEmpty)
+    }
+
+    @Test func deletingARepaymentThatIsGoneSaysSo() throws {
+        let app = try makeApp()
+
+        #expect(throws: BorrowingError.repaymentNotFound(999)) { try app.deleteRepayment(999) }
+    }
+
     @Test func errorsReadInPlainWords() {
         #expect(BorrowingError.notABorrowing.message == "Only borrowed money can be repaid.")
         #expect(BorrowingError.notFound(1).message == "That borrowing no longer exists.")
+        #expect(BorrowingError.repaymentNotFound(1).message == "That repayment no longer exists.")
     }
 }

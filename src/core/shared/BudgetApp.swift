@@ -28,6 +28,54 @@ public final class BudgetApp: Sendable {
     public let confirmImport: ConfirmImport
     public let recordRepayment: RecordRepayment
     public let amountToRepay: GetAmountToRepay
+    public let deleteRepayment: DeleteRepayment
+    public let preferences: GetPreferences
+    public let updatePreferences: UpdatePreferences
+    public let categories: GetCategories
+    public let addCategory: AddCategory
+    public let addSubCategory: AddSubCategory
+    public let renameCategory: RenameCategory
+    public let renameSubCategory: RenameSubCategory
+    public let mergeSubCategories: MergeSubCategories
+    public let deleteCategory: DeleteCategory
+    public let deleteSubCategory: DeleteSubCategory
+    public let recentCategories: GetRecentCategories
+    public let suggestCategory: SuggestCategory
+    public let searchCategories: SearchCategories
+    public let entities: GetEntities
+    public let suggestEntities: SuggestEntities
+    public let addEntity: AddEntity
+    public let renameEntity: RenameEntity
+    public let mergeEntities: MergeEntities
+    public let deleteEntity: DeleteEntity
+    public let entityLastUse: GetEntityLastUse
+    public let entityHistory: GetEntityHistory
+    public let addPlannedItem: AddPlannedItem
+    public let plannedItems: GetPlannedItems
+    public let deletePlannedItem: DeletePlannedItem
+    public let addPlannedAsExpense: AddPlannedAsExpense
+    public let addBill: AddBill
+    public let updateBill: UpdateBill
+    public let deleteBill: DeleteBill
+    public let changeBillPlan: ChangeBillPlan
+    public let bills: GetBills
+    public let upcoming: GetUpcoming
+    public let billDraft: GetBillDraft
+    public let addBillOccurrence: AddBillOccurrence
+    public let billsToAdd: GetBillsToAdd
+    public let addSeveralBills: AddSeveralBills
+    public let runAutomaticBills: RunAutomaticBills
+    public let autoAdded: GetAutoAdded
+    public let markAutoAddedSeen: MarkAutoAddedSeen
+    public let undoAutoAdded: UndoAutoAdded
+    public let billsAttention: GetBillsAttention
+    public let searchExpenses: SearchExpenses
+    public let spendingBreakdown: GetSpendingBreakdown
+    public let categoryBreakdown: GetCategoryBreakdown
+    public let currencies: GetCurrencies
+    public let addCurrency: AddCurrency
+    public let lastRate: GetLastRate
+    public let setHomeCurrency: SetHomeCurrency
 
     public init(database: AppDatabase, clock: any DayClock) {
         let expenses = ExpenseRepository(database: database)
@@ -35,6 +83,7 @@ public final class BudgetApp: Sendable {
         let ledgerBook = LedgerRepository(database: database)
         let cash = CashAdjustmentRepository(database: database)
         let borrowingBook = BorrowingRepository(database: database)
+        let settingsBook = SettingsRepository(database: database)
         addLedger = AddLedger(ledgers: ledgerBook)
         deleteLedger = DeleteLedger(ledgers: ledgerBook, expenses: expenses)
         addLedgerEntry = AddLedgerEntry(ledgers: ledgerBook, expenses: expenses, clock: clock)
@@ -52,7 +101,7 @@ public final class BudgetApp: Sendable {
         pendingRefunds = GetPendingRefunds(expenses: expenses)
         addIncome = AddIncome(income: income, clock: clock)
         deleteIncome = DeleteIncome(income: income)
-        monthBudget = GetMonthBudget(expenses: expenses, income: income, repayments: borrowingBook, clock: clock)
+        monthBudget = GetMonthBudget(expenses: expenses, income: income, repayments: borrowingBook, settings: settingsBook, clock: clock)
         let cardBook = CardRepository(database: database)
         addCard = AddCard(cards: cardBook)
         cards = GetCards(cards: cardBook)
@@ -64,5 +113,59 @@ public final class BudgetApp: Sendable {
         confirmImport = ConfirmImport(database: database, clock: clock)
         recordRepayment = RecordRepayment(income: income, borrowings: borrowingBook, clock: clock)
         amountToRepay = GetAmountToRepay(income: income, borrowings: borrowingBook)
+        deleteRepayment = DeleteRepayment(borrowings: borrowingBook)
+        preferences = GetPreferences(settings: settingsBook)
+        updatePreferences = UpdatePreferences(settings: settingsBook)
+        let categoryBook = CategoryRepository(database: database)
+        categories = GetCategories(categories: categoryBook)
+        addCategory = AddCategory(categories: categoryBook)
+        addSubCategory = AddSubCategory(categories: categoryBook)
+        renameCategory = RenameCategory(categories: categoryBook)
+        renameSubCategory = RenameSubCategory(categories: categoryBook)
+        mergeSubCategories = MergeSubCategories(categories: categoryBook)
+        deleteCategory = DeleteCategory(categories: categoryBook)
+        deleteSubCategory = DeleteSubCategory(categories: categoryBook)
+        recentCategories = GetRecentCategories(categories: categoryBook)
+        suggestCategory = SuggestCategory(categories: categoryBook)
+        searchCategories = SearchCategories(categories: categoryBook)
+        let entityBook = EntityRepository(database: database)
+        entities = GetEntities(entities: entityBook)
+        suggestEntities = SuggestEntities(entities: entityBook)
+        addEntity = AddEntity(entities: entityBook)
+        renameEntity = RenameEntity(entities: entityBook)
+        mergeEntities = MergeEntities(entities: entityBook)
+        deleteEntity = DeleteEntity(entities: entityBook)
+        entityLastUse = GetEntityLastUse(entities: entityBook)
+        entityHistory = GetEntityHistory(entities: entityBook, expenses: expenses)
+        let plannedBook = PlannedRepository(database: database)
+        addPlannedItem = AddPlannedItem(planned: plannedBook)
+        plannedItems = GetPlannedItems(planned: plannedBook)
+        deletePlannedItem = DeletePlannedItem(planned: plannedBook)
+        addPlannedAsExpense = AddPlannedAsExpense(planned: plannedBook, addExpense: addExpense)
+        let billBook = BillRepository(database: database)
+        let billStore = BillStore(bills: billBook, settings: settingsBook, clock: clock)
+        addBill = AddBill(bills: billBook)
+        updateBill = UpdateBill(bills: billBook)
+        deleteBill = DeleteBill(bills: billBook)
+        changeBillPlan = ChangeBillPlan(bills: billBook)
+        bills = GetBills(store: billStore)
+        upcoming = GetUpcoming(store: billStore)
+        billDraft = GetBillDraft(store: billStore)
+        addBillOccurrence = AddBillOccurrence(store: billStore, addExpense: addExpense)
+        billsToAdd = GetBillsToAdd(store: billStore)
+        addSeveralBills = AddSeveralBills(store: billStore, addExpense: addExpense)
+        runAutomaticBills = RunAutomaticBills(store: billStore, addExpense: addExpense)
+        autoAdded = GetAutoAdded(store: billStore, expenses: expenses)
+        markAutoAddedSeen = MarkAutoAddedSeen(bills: billBook)
+        undoAutoAdded = UndoAutoAdded(store: billStore, expenses: expenses)
+        billsAttention = GetBillsAttention(store: billStore)
+        searchExpenses = SearchExpenses(expenses: expenses)
+        spendingBreakdown = GetSpendingBreakdown(expenses: expenses)
+        categoryBreakdown = GetCategoryBreakdown(expenses: expenses)
+        let currencyBook = CurrencyRepository(database: database)
+        currencies = GetCurrencies(currencies: currencyBook)
+        addCurrency = AddCurrency(currencies: currencyBook)
+        lastRate = GetLastRate(expenses: expenses)
+        setHomeCurrency = SetHomeCurrency(expenses: expenses, income: income, settings: settingsBook)
     }
 }

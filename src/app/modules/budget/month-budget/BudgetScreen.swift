@@ -6,6 +6,7 @@ struct BudgetScreen: View {
     @State private var addingExpense = false
     @State private var addingIncome = false
     @State private var openedExpense: Int64?
+    @State private var errorMessage: String?
     var body: some View {
         NavigationStack {
             List {
@@ -13,76 +14,56 @@ struct BudgetScreen: View {
                     Text(loadError).foregroundStyle(.red)
                 }
                 if let budget = model.budget {
+                    if !model.notices.isEmpty {
+                        Section {
+                            ForEach(model.notices, id: \.self) { notice in
+                                Text(notice).accessibilityIdentifier("autoNotice")
+                            }
+                            Button("Dismiss") { model.dismissNotices() }
+                        }
+                    }
                     Section {
                         LeftToSpendCard(budget: budget)
-                        NavigationLink {
-                            PendingRefundsScreen(model: model)
-                        } label: {
-                            HStack {
-                                Text("Pending refunds")
-                                Spacer()
-                                Text("\(budget.pendingRefundsEverywhere.count) · \(IndianMoneyFormat.string(budget.pendingRefundsEverywhere.stillToCome))")
-                                    .foregroundStyle(.secondary)
-                                    .monospacedDigit()
+                        HStack {
+                            Button("Previous Month", systemImage: "chevron.left") {
+                                model.showMonth(budget.month.shifted(by: -1))
                             }
-                        }
-                        .accessibilityIdentifier("pendingRefundsLink")
-                        if let cash = model.cash {
-                            NavigationLink {
-                                CashInHandScreen(model: model)
-                            } label: {
-                                HStack {
-                                    Text("Cash in hand")
-                                    Spacer()
-                                    Text(IndianMoneyFormat.string(cash.balance)).foregroundStyle(.secondary).monospacedDigit()
-                                }
+                            .labelStyle(.iconOnly)
+                            .accessibilityIdentifier("previousMonthButton")
+                            Spacer()
+                            Text(budget.month.title).font(.headline)
+                                .accessibilityIdentifier("monthTitle")
+                            Spacer()
+                            Button("Next Month", systemImage: "chevron.right") {
+                                model.showMonth(budget.month.shifted(by: 1))
                             }
-                            .accessibilityIdentifier("cashInHandLink")
+                            .labelStyle(.iconOnly)
+                            .accessibilityIdentifier("nextMonthButton")
                         }
-                        NavigationLink {
-                            LedgersScreen(model: model)
-                        } label: {
-                            HStack {
-                                Text("Ledgers")
-                                Spacer()
-                                Text(IndianMoneyFormat.string(model.ledgers?.total ?? .zero)).foregroundStyle(.secondary).monospacedDigit()
-                            }
-                        }
-                        .accessibilityIdentifier("ledgersLink")
-                        NavigationLink {
-                            CardBillsScreen(model: model)
-                        } label: {
-                            HStack {
-                                Text("Card bills")
-                                Spacer()
-                                Text(IndianMoneyFormat.string(model.cardBills?.totalDue ?? .zero)).foregroundStyle(.secondary).monospacedDigit()
-                            }
-                        }
-                        .accessibilityIdentifier("cardBillsLink")
-                        NavigationLink {
-                            AmountToRepayScreen(model: model)
-                        } label: {
-                            HStack {
-                                Text("Amount to repay")
-                                Spacer()
-                                Text(IndianMoneyFormat.string(model.amountToRepay?.total ?? .zero)).foregroundStyle(.secondary).monospacedDigit()
-                            }
-                        }
-                        .accessibilityIdentifier("amountToRepayLink")
-                        NavigationLink {
-                            BackupScreen(model: model)
-                        } label: {
-                            Text("Backup")
-                        }
-                        .accessibilityIdentifier("backupLink")
+                        .buttonStyle(.borderless)
                     }
-                    Section(budget.month.title) {
-                        if budget.hasNoEntriesAtAll {
-                            Text("No entries yet. Add your first expense or income.")
-                                .foregroundStyle(.secondary)
+                    if budget.hasNoEntriesAtAll {
+                        Text("No entries yet. Add your first expense or income.")
+                            .foregroundStyle(.secondary)
+                    }
+                    if !budget.incomeEntries.isEmpty {
+                        Section("Income") {
+                            ForEach(budget.incomeEntries, id: \.id) { entry in
+                                IncomeRow(entry: entry)
+                                    .accessibilityElement(children: .combine)
+                                    .accessibilityIdentifier("incomeRow")
+                                    .swipeActions {
+                                        Button("Delete", role: .destructive) { errorMessage = model.deleteIncome(entry.id) }
+                                    }
+                            }
+                        }
+                    }
+                    Section("Expenses") {
+                        if let errorMessage {
+                            Text(errorMessage).foregroundStyle(.red)
                         }
                         ForEach(budget.expenses, id: \.id) { expense in
-                            Button { openedExpense = expense.id } label: { ExpenseRow(expense: expense) }
+                            Button { openedExpense = expense.id } label: { ExpenseRow(expense: expense, foreignText: expense.foreign.map(model.text)) }
                                 .buttonStyle(.plain)
                                 .accessibilityIdentifier("expenseRow")
                         }
@@ -91,6 +72,14 @@ struct BudgetScreen: View {
             }
             .navigationTitle("Budget")
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    NavigationLink {
+                        MoreScreen(model: model)
+                    } label: {
+                        Image(systemName: "person.crop.circle")
+                    }
+                    .accessibilityIdentifier("profileButton")
+                }
                 ToolbarItem(placement: .primaryAction) {
                     Menu {
                         Button("Add Expense", systemImage: "minus.circle") { addingExpense = true }
@@ -151,8 +140,30 @@ private struct LeftToSpendCard: View {
     }
 }
 
+private struct IncomeRow: View {
+    let entry: IncomeEntry
+
+    var body: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(entry.kind.title)
+                Text([entry.note.nilIfEmpty, entry.date.shortTitle].compactMap { $0 }.joined(separator: " · "))
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            Text(IndianMoneyFormat.string(entry.amount)).monospacedDigit()
+        }
+    }
+}
+
+private extension String {
+    var nilIfEmpty: String? { isEmpty ? nil : self }
+}
+
 private struct ExpenseRow: View {
     let expense: Expense
+    var foreignText: String?
 
     var body: some View {
         HStack {
@@ -167,6 +178,9 @@ private struct ExpenseRow: View {
             VStack(alignment: .trailing, spacing: 2) {
                 Text(IndianMoneyFormat.string(expense.amount))
                     .monospacedDigit()
+                if let foreignText {
+                    Text(foreignText).font(.footnote).foregroundStyle(.secondary)
+                }
                 switch expense.refund {
                 case .notRefundable: EmptyView()
                 case .pending: Text("Pending refund").font(.footnote).foregroundStyle(.orange)

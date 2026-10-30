@@ -7,6 +7,7 @@ struct ExpenseDetailSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var receivedText = ""
     @State private var confirmingDelete = false
+    @State private var editingID: Int64?
     @State private var errorMessage: String?
 
     var body: some View {
@@ -17,6 +18,10 @@ struct ExpenseDetailSheet: View {
                         row("Description", expense.description)
                         row("Amount", IndianMoneyFormat.string(expense.amount))
                         row("Costs you", IndianMoneyFormat.string(expense.netAmount))
+                        if let foreign = expense.foreign {
+                            row("Paid", model.text(foreign))
+                            row("Rate", "\(foreign.rate) per 1 \(foreign.currency)")
+                        }
                         row("Category", [expense.category, expense.subCategory].compactMap { $0 }.joined(separator: " › "))
                         if let entity = expense.entity { row("Shop or person", entity) }
                         if let spentFor = expense.spentFor { row("Spent for", spentFor) }
@@ -37,8 +42,17 @@ struct ExpenseDetailSheet: View {
             .navigationTitle("Expense")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Edit") { editingID = expenseID }
+                        .accessibilityIdentifier("editExpenseButton")
+                }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }.accessibilityIdentifier("doneButton")
+                }
+            }
+            .sheet(item: $editingID) { id in
+                if let expense = model.expense(id: id) {
+                    NewExpenseSheet(model: model, editing: expense)
                 }
             }
             .confirmationDialog("Delete this expense?", isPresented: $confirmingDelete, titleVisibility: .visible) {

@@ -16,6 +16,14 @@ public struct RecordRepayment: Sendable {
     }
 }
 
+public struct DeleteRepayment: Sendable {
+    let borrowings: BorrowingRepository
+
+    public func callAsFunction(_ id: Int64) throws {
+        try borrowings.delete(id)
+    }
+}
+
 public struct GetAmountToRepay: Sendable {
     let income: IncomeRepository
     let borrowings: BorrowingRepository

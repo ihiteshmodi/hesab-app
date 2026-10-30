@@ -16,6 +16,8 @@ public struct Expense: Equatable, Sendable {
     public let refund: RefundState
     /// A cash withdrawal the owner keeps as cash in hand; false for everything else.
     public let keptAsCash: Bool
+    /// Set when it was paid in another currency; `amount` is then the home amount.
+    public let foreign: ForeignAmount?
 
     /// What the expense really cost: the amount minus what came back.
     public var netAmount: Money {
@@ -25,9 +27,17 @@ public struct Expense: Equatable, Sendable {
 
     /// Checks the rules for an expense; the first broken rule is reported.
     static func validated(_ new: NewExpense, today: CalendarDate, id: Int64? = nil) throws -> Expense {
-        guard let amount = new.amount, amount > .zero else {
-            if let amount = new.amount, amount < .zero { throw ExpenseValidationError.amountNegative }
-            throw ExpenseValidationError.amountMissingOrZero
+        let amount: Money
+        let foreign: ForeignAmount?
+        if let spend = new.foreign {
+            let resolved = try spend.resolved()
+            (amount, foreign) = (resolved.home, resolved.foreign)
+        } else {
+            guard let typed = new.amount, typed > .zero else {
+                if let typed = new.amount, typed < .zero { throw ExpenseValidationError.amountNegative }
+                throw ExpenseValidationError.amountMissingOrZero
+            }
+            (amount, foreign) = (typed, nil)
         }
         let description = new.description.trimmed
         guard !description.isEmpty else { throw ExpenseValidationError.descriptionMissing }
@@ -38,7 +48,7 @@ public struct Expense: Equatable, Sendable {
             entity: new.entity.trimmed.nilIfEmpty, spentFor: new.spentFor.trimmed.nilIfEmpty,
             tags: Self.cleaned(tags: new.tags), paymentMethod: new.paymentMethod,
             notes: new.notes.trimmed, refund: .notRefundable,
-            keptAsCash: new.keepAsCash && new.paymentMethod == .cashWithdrawal
+            keptAsCash: new.keepAsCash && new.paymentMethod == .cashWithdrawal, foreign: foreign
         )
     }
 
@@ -62,12 +72,15 @@ public struct NewExpense: Sendable {
     public var paymentMethod: PaymentMethod
     public var notes: String
     public var keepAsCash: Bool
+    /// Set for an expense paid in another currency; `amount` is then ignored.
+    public var foreign: ForeignSpend?
 
     public init(
         date: CalendarDate? = nil, description: String, amount: Money?, category: String,
         subCategory: String = "", entity: String = "", spentFor: String = "", tags: [String] = [],
-        paymentMethod: PaymentMethod = .upi, notes: String = "", keepAsCash: Bool = false
+        paymentMethod: PaymentMethod = .upi, notes: String = "", keepAsCash: Bool = false, foreign: ForeignSpend? = nil
     ) {
+        self.foreign = foreign
         self.keepAsCash = keepAsCash
         self.date = date
         self.description = description
@@ -87,9 +100,13 @@ public enum ExpenseValidationError: Error, Equatable, Sendable {
     case amountNegative
     case descriptionMissing
     case categoryMissing
+    case rateMissing
+    case rateNotPositive
 
     public var message: String {
         switch self {
+        case .rateMissing: "Enter the exchange rate"
+        case .rateNotPositive: "Enter an exchange rate above 0"
         case .amountMissingOrZero: "Enter an amount above 0"
         case .amountNegative: "Enter an amount above 0. To record money received, add it under Income."
         case .descriptionMissing: "Enter a description"

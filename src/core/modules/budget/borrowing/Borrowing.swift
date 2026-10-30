@@ -57,6 +57,7 @@ public enum BorrowingError: Error, Equatable, Sendable {
     case moreThanOwed(Money)
     case notABorrowing
     case notFound(Int64)
+    case repaymentNotFound(Int64)
 
     public var message: String {
         switch self {
@@ -64,6 +65,7 @@ public enum BorrowingError: Error, Equatable, Sendable {
         case .moreThanOwed(let owed): "Repayment can't be more than the \(IndianMoneyFormat.plain(owed)) still to repay"
         case .notABorrowing: "Only borrowed money can be repaid."
         case .notFound: "That borrowing no longer exists."
+        case .repaymentNotFound: "That repayment no longer exists."
         }
     }
 }

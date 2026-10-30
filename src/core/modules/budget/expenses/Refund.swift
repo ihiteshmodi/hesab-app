@@ -60,7 +60,7 @@ extension Expense {
         Expense(
             id: id, date: date, description: description, amount: amount, category: category,
             subCategory: subCategory, entity: entity, spentFor: spentFor, tags: tags,
-            paymentMethod: paymentMethod, notes: notes, refund: refund, keptAsCash: keptAsCash
+            paymentMethod: paymentMethod, notes: notes, refund: refund, keptAsCash: keptAsCash, foreign: foreign
         )
     }
 }
