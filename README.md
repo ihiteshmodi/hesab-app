@@ -26,7 +26,7 @@ swift test                # runs the core tests, no simulator needed
 Expected output:
 
 ```text
-✔ Test run with 121 tests in 16 suites passed after 0.04 seconds.
+✔ Test run with 140 tests in 17 suites passed after 0.04 seconds.
 ...
 Built build/Hisaab.ipa
 ```
@@ -79,6 +79,24 @@ do {
 MoneyInput.parse("₹ 1,23,456.78")   // Money(paise: 12_345_678)
 MoneyInput.parse("12.345")          // nil: more than two decimals
 ```
+
+### Back up and restore
+
+In the app, open **Backup**: **Export Data** saves `budget-<date>.sqlite`, and **Import Data** replaces the current data with a file exported from the app (a copy of the previous data is kept first as `before-import-<date>.sqlite`). The same from code:
+
+```swift
+let file = try app.exportData(into: folderURL)                  // budget-2026-10-30.sqlite
+let preview = try app.prepareImport(file)                       // preview.message: "This replaces 2 entries with 3 entries."
+try app.confirmImport(preview, keepingPreviousIn: folderURL)
+```
+
+### Convert a spreadsheet export into a database (Mac, one time)
+
+```bash
+swift run hisaab-import expenses.csv hisaab.sqlite --aliases aliases.csv --card "Visa Card" [--dry-run]
+```
+
+`expenses.csv` needs the columns `date` (YYYY-MM-DD), `description`, `amount`, `payment`, `category`; `new_description`, `sub_category`, `entity`, `spent_for`, `tags`, `route` and `my_note` are optional. Negative amounts and `route=income` rows become Money Received entries, zero rows are skipped and listed. The tool prints the expense total and Left to spend so you can check them against the sheet, and refuses to overwrite an existing file. Keep your CSV, aliases and the resulting database outside the repository, then import the database in the app under Backup.
 
 ## Configuration
 
