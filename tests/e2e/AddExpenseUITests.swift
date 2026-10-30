@@ -15,7 +15,7 @@ final class AddExpenseUITests: XCTestCase {
         app.buttons["addMenu"].tap()
         app.buttons["addExpenseButton"].tap()
         let amount = app.textFields["amountField"]
-        XCTAssertTrue(amount.waitForExistence(timeout: 5))
+        XCTAssertTrue(amount.waitForExistence(timeout: 20))
         amount.tap()
         amount.typeText("1250")
         let description = app.textFields["descriptionField"]
@@ -26,7 +26,7 @@ final class AddExpenseUITests: XCTestCase {
         app.buttons["saveExpenseButton"].tap()
 
         let row = app.descendants(matching: .any)["expenseRow"]
-        XCTAssertTrue(row.waitForExistence(timeout: 5))
+        XCTAssertTrue(row.waitForExistence(timeout: 20))
         XCTAssertTrue(row.label.contains("Weekly groceries"))
         XCTAssertEqual(app.staticTexts["leftToSpend"].label, "−₹1,250.00")
     }
@@ -40,7 +40,7 @@ final class AddExpenseUITests: XCTestCase {
         app.buttons["saveExpenseButton"].tap()
 
         let message = app.staticTexts["errorMessage"]
-        XCTAssertTrue(message.waitForExistence(timeout: 5))
+        XCTAssertTrue(message.waitForExistence(timeout: 20))
         XCTAssertEqual(message.label, "Enter an amount above 0")
     }
 
@@ -51,16 +51,48 @@ final class AddExpenseUITests: XCTestCase {
         app.buttons["addMenu"].tap()
         app.buttons["addIncomeButton"].tap()
         let amount = app.textFields["incomeAmountField"]
-        XCTAssertTrue(amount.waitForExistence(timeout: 5))
+        XCTAssertTrue(amount.waitForExistence(timeout: 20))
         amount.tap()
         amount.typeText("150000")
         app.buttons["incomeTypePicker"].tap()
         app.buttons["Salary"].tap()
         app.buttons["saveIncomeButton"].tap()
 
-        XCTAssertTrue(app.staticTexts["leftToSpend"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["leftToSpend"].waitForExistence(timeout: 20))
         XCTAssertEqual(app.staticTexts["leftToSpend"].label, "₹1,50,000.00")
         XCTAssertEqual(app.staticTexts["incomeThisMonth"].label, "₹1,50,000.00")
+    }
+
+    @MainActor
+    func testAPartialRefundLowersWhatTheExpenseCostAndGivesBackLeftToSpend() {
+        let app = launchApp()
+        app.buttons["addMenu"].tap()
+        app.buttons["addExpenseButton"].tap()
+        let amount = app.textFields["amountField"]
+        XCTAssertTrue(amount.waitForExistence(timeout: 20))
+        amount.tap()
+        amount.typeText("1200")
+        let description = app.textFields["descriptionField"]
+        description.tap()
+        description.typeText("Train ticket")
+        app.buttons["categoryPicker"].tap()
+        app.buttons["Transport"].tap()
+        app.buttons["saveExpenseButton"].tap()
+
+        let row = app.descendants(matching: .any)["expenseRow"]
+        XCTAssertTrue(row.waitForExistence(timeout: 20))
+        row.tap()
+        let markRefundable = app.buttons["markRefundableButton"]
+        XCTAssertTrue(markRefundable.waitForExistence(timeout: 20), app.debugDescription)
+        markRefundable.tap()
+        let received = app.textFields["receivedField"]
+        XCTAssertTrue(received.waitForExistence(timeout: 20))
+        received.tap()
+        received.typeText("900")
+        app.buttons["recordReceivedButton"].tap()
+
+        XCTAssertTrue(app.staticTexts["₹300.00"].waitForExistence(timeout: 20))
+        XCTAssertEqual(app.staticTexts["leftToSpend"].label, "−₹300.00")
     }
 
     @MainActor

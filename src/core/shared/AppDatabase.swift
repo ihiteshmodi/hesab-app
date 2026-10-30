@@ -53,6 +53,13 @@ public final class AppDatabase: Sendable {
             }
         }
 
+        migrator.registerMigration("v4-refunds") { db in
+            try db.alter(table: "expense") { table in
+                table.add(column: "refund_state", .text).notNull().defaults(to: "none")
+                table.add(column: "received_paise", .integer).notNull().defaults(to: 0)
+            }
+        }
+
         return migrator
     }
 }

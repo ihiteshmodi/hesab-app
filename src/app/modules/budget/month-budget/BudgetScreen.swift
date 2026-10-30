@@ -5,7 +5,7 @@ struct BudgetScreen: View {
     let model: BudgetViewModel
     @State private var addingExpense = false
     @State private var addingIncome = false
-
+    @State private var openedExpense: Int64?
     var body: some View {
         NavigationStack {
             List {
@@ -15,6 +15,18 @@ struct BudgetScreen: View {
                 if let budget = model.budget {
                     Section {
                         LeftToSpendCard(budget: budget)
+                        NavigationLink {
+                            PendingRefundsScreen(model: model)
+                        } label: {
+                            HStack {
+                                Text("Pending refunds")
+                                Spacer()
+                                Text("\(budget.pendingRefundsEverywhere.count) · \(IndianMoneyFormat.string(budget.pendingRefundsEverywhere.stillToCome))")
+                                    .foregroundStyle(.secondary)
+                                    .monospacedDigit()
+                            }
+                        }
+                        .accessibilityIdentifier("pendingRefundsLink")
                     }
                     Section(budget.month.title) {
                         if budget.hasNoEntriesAtAll {
@@ -22,7 +34,9 @@ struct BudgetScreen: View {
                                 .foregroundStyle(.secondary)
                         }
                         ForEach(budget.expenses, id: \.id) { expense in
-                            ExpenseRow(expense: expense)
+                            Button { openedExpense = expense.id } label: { ExpenseRow(expense: expense) }
+                                .buttonStyle(.plain)
+                                .accessibilityIdentifier("expenseRow")
                         }
                     }
                 }
@@ -46,6 +60,9 @@ struct BudgetScreen: View {
             }
             .sheet(isPresented: $addingIncome) {
                 NewIncomeSheet(model: model)
+            }
+            .sheet(item: $openedExpense) { id in
+                ExpenseDetailSheet(model: model, expenseID: id)
             }
         }
     }
@@ -99,10 +116,20 @@ private struct ExpenseRow: View {
                     .foregroundStyle(.secondary)
             }
             Spacer()
-            Text(IndianMoneyFormat.string(expense.amount))
-                .monospacedDigit()
+            VStack(alignment: .trailing, spacing: 2) {
+                Text(IndianMoneyFormat.string(expense.amount))
+                    .monospacedDigit()
+                switch expense.refund {
+                case .notRefundable: EmptyView()
+                case .pending: Text("Pending refund").font(.footnote).foregroundStyle(.orange)
+                case .settled: Text("Net \(IndianMoneyFormat.string(expense.netAmount))").font(.footnote).foregroundStyle(.secondary)
+                }
+            }
         }
-        .accessibilityElement(children: .combine)
-        .accessibilityIdentifier("expenseRow")
+        .contentShape(Rectangle())
     }
+}
+
+extension Int64: @retroactive Identifiable {
+    public var id: Int64 { self }
 }
