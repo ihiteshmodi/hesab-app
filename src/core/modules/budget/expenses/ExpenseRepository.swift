@@ -59,6 +59,7 @@ private struct ExpenseRecord: Codable, FetchableRecord, MutablePersistableRecord
     var notes: String
     var refundState: String
     var receivedPaise: Int
+    var keptAsCash: Bool
 
     init(_ expense: Expense) {
         id = expense.id
@@ -73,6 +74,7 @@ private struct ExpenseRecord: Codable, FetchableRecord, MutablePersistableRecord
         paymentName = expense.paymentMethod.name
         paymentSource = expense.paymentMethod.source.rawValue
         notes = expense.notes
+        keptAsCash = expense.keptAsCash
         switch expense.refund {
         case .notRefundable: (refundState, receivedPaise) = ("none", 0)
         case .pending: (refundState, receivedPaise) = ("pending", 0)
@@ -94,7 +96,7 @@ private struct ExpenseRecord: Codable, FetchableRecord, MutablePersistableRecord
             paymentMethod: PaymentMethod(
                 name: paymentName, source: PaymentMethod.Source(rawValue: paymentSource) ?? .bank
             ),
-            notes: notes, refund: refund
+            notes: notes, refund: refund, keptAsCash: keptAsCash
         )
     }
 

@@ -96,6 +96,57 @@ final class AddExpenseUITests: XCTestCase {
     }
 
     @MainActor
+    func testAddingALedgerListsItWithAZeroBalance() {
+        let app = launchApp()
+
+        app.buttons["ledgersLink"].tap()
+        app.buttons["addLedgerButton"].tap()
+        let name = app.textFields["ledgerNameField"]
+        XCTAssertTrue(name.waitForExistence(timeout: 20))
+        name.tap()
+        name.typeText("Mom")
+        app.buttons["saveLedgerButton"].tap()
+
+        let row = app.descendants(matching: .any)["ledgerRow"]
+        XCTAssertTrue(row.waitForExistence(timeout: 20))
+        XCTAssertTrue(row.label.contains("Mom"))
+        XCTAssertTrue(row.label.contains("₹0.00"))
+    }
+
+    @MainActor
+    func testKeepingACashWithdrawalFillsCashInHand() {
+        let app = launchApp()
+        app.buttons["addMenu"].tap()
+        app.buttons["addExpenseButton"].tap()
+        let amount = app.textFields["amountField"]
+        XCTAssertTrue(amount.waitForExistence(timeout: 20))
+        amount.tap()
+        amount.typeText("5000")
+        let description = app.textFields["descriptionField"]
+        description.tap()
+        description.typeText("ATM")
+        app.keyboards.buttons["Return"].tap()
+        app.buttons["categoryPicker"].tap()
+        app.buttons["Home & Utilities"].tap()
+        app.buttons["paymentPicker"].tap()
+        app.buttons["Cash Withdrawal"].tap()
+        let keep = app.switches["keepAsCashToggle"]
+        XCTAssertTrue(keep.waitForExistence(timeout: 20))
+        XCTAssertTrue(keep.isHittable)
+        keep.coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: 0.5)).tap()
+        let isOn = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == '1'"), object: keep)
+        XCTAssertEqual(XCTWaiter().wait(for: [isOn], timeout: 5), .completed, "toggle stayed off")
+        app.buttons["saveExpenseButton"].tap()
+
+        let link = app.buttons["cashInHandLink"]
+        XCTAssertTrue(link.waitForExistence(timeout: 20))
+        link.tap()
+        let balance = app.staticTexts["cashBalance"]
+        XCTAssertTrue(balance.waitForExistence(timeout: 20))
+        XCTAssertEqual(balance.label, "₹5,000.00")
+    }
+
+    @MainActor
     private func launchApp() -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments = ["-ui-testing"]
