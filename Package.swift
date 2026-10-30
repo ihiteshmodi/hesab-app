@@ -21,6 +21,7 @@ let testExclusions = [
     "budget/search/search-expenses.feature",
     "settings/preferences/preferences.feature",
     "data/backup-and-restore/backup-and-restore.feature",
+    "data/csv-import/csv-import.feature",
     "data/spreadsheet-import/spreadsheet-import.feature",
     "insights/spending-breakdown/spending-breakdown.feature",
     "networth/ledgers/ledgers.feature",
@@ -33,6 +34,7 @@ let package = Package(
     platforms: [.iOS(.v17), .macOS(.v14)],
     products: [
         .library(name: "HisaabCore", targets: ["HisaabCore"]),
+        .executable(name: "hisaab-import", targets: ["hisaab-import"]),
     ],
     dependencies: [
         .package(url: "https://github.com/groue/GRDB.swift.git", from: "7.0.0"),
@@ -43,9 +45,19 @@ let package = Package(
             dependencies: [.product(name: "GRDB", package: "GRDB.swift")],
             path: "src/core"
         ),
+        .target(
+            name: "HisaabImport",
+            dependencies: ["HisaabCore"],
+            path: "src/importer"
+        ),
+        .executableTarget(
+            name: "hisaab-import",
+            dependencies: ["HisaabImport", "HisaabCore"],
+            path: "tools/hisaab-import"
+        ),
         .testTarget(
             name: "HisaabCoreTests",
-            dependencies: ["HisaabCore", .product(name: "GRDB", package: "GRDB.swift")],
+            dependencies: ["HisaabCore", "HisaabImport", .product(name: "GRDB", package: "GRDB.swift")],
             path: "tests",
             exclude: testExclusions
         ),
