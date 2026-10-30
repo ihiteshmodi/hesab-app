@@ -18,7 +18,7 @@ public final class AppDatabase: Sendable {
         try AppDatabase(writer: try DatabaseQueue(path: url.path))
     }
 
-    private static var migrator: DatabaseMigrator {
+    static var migrator: DatabaseMigrator {
         var migrator = DatabaseMigrator()
 
         migrator.registerMigration("v1-expenses") { db in

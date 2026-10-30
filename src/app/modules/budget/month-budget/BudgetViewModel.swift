@@ -109,6 +109,31 @@ final class BudgetViewModel {
 
     func addCard(name: String) -> String? { run { try app.addCard(NewCard(name: name)) } }
 
+    /// Writes the export into the temporary folder; the screen hands it to the system file saver.
+    func exportData() -> (file: URL?, error: String?) {
+        do {
+            return (try app.exportData(into: FileManager.default.temporaryDirectory), nil)
+        } catch let error as BackupError {
+            return (nil, error.message)
+        } catch {
+            return (nil, "Could not export. Try again.")
+        }
+    }
+
+    func prepareImport(_ file: URL) -> (preview: ImportPreview?, error: String?) {
+        do {
+            return (try app.prepareImport(file), nil)
+        } catch let error as BackupError {
+            return (nil, error.message)
+        } catch {
+            return (nil, "Could not read that file. Try again.")
+        }
+    }
+
+    func confirmImport(_ preview: ImportPreview) -> String? {
+        run { try app.confirmImport(preview, keepingPreviousIn: try CompositionRoot.backupsFolder()) }
+    }
+
     func setBillPaid(_ cardID: Int64, paid: Bool) -> String? {
         guard let month = cardBills?.month else { return nil }
         return run { paid ? try app.markBillPaid(cardID, month) : try app.unmarkBillPaid(cardID, month) }
@@ -124,6 +149,8 @@ final class BudgetViewModel {
         } catch let error as LedgerError {
             return error.message
         } catch let error as CardError {
+            return error.message
+        } catch let error as BackupError {
             return error.message
         } catch {
             return "Could not do that. Try again."

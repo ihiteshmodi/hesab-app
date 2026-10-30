@@ -23,6 +23,9 @@ public final class BudgetApp: Sendable {
     public let cardBills: GetCardBills
     public let markBillPaid: MarkBillPaid
     public let unmarkBillPaid: UnmarkBillPaid
+    public let exportData: ExportData
+    public let prepareImport: PrepareImport
+    public let confirmImport: ConfirmImport
 
     public init(database: AppDatabase, clock: any DayClock) {
         let expenses = ExpenseRepository(database: database)
@@ -53,5 +56,8 @@ public final class BudgetApp: Sendable {
         cardBills = GetCardBills(cards: cardBook, expenses: expenses, clock: clock)
         markBillPaid = MarkBillPaid(cards: cardBook, bills: cardBills)
         unmarkBillPaid = UnmarkBillPaid(cards: cardBook)
+        exportData = ExportData(database: database, clock: clock)
+        prepareImport = PrepareImport(database: database)
+        confirmImport = ConfirmImport(database: database, clock: clock)
     }
 }
