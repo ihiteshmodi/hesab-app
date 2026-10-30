@@ -23,6 +23,11 @@ public struct CalendarDate: Hashable, Comparable, Sendable {
         public static func < (lhs: YearMonth, rhs: YearMonth) -> Bool {
             (lhs.year, lhs.month) < (rhs.year, rhs.month)
         }
+
+        public func shifted(by months: Int) -> YearMonth {
+            let index = year * 12 + (month - 1) + months
+            return YearMonth(year: index / 12, month: index % 12 + 1)
+        }
     }
 
     public let year: Int
@@ -57,6 +62,18 @@ public struct CalendarDate: Hashable, Comparable, Sendable {
 
     public static func < (lhs: CalendarDate, rhs: CalendarDate) -> Bool {
         (lhs.year, lhs.month, lhs.day) < (rhs.year, rhs.month, rhs.day)
+    }
+
+    /// The same day `months` later, or `preferredDay` when given; a short month gives its last day.
+    public func addingMonths(_ months: Int, preferredDay: Int? = nil) -> CalendarDate {
+        let target = yearMonth.shifted(by: months)
+        let wanted = min(preferredDay ?? day, Self.daysIn(month: target.month, year: target.year))
+        // `wanted` is clamped into the month, so this cannot throw.
+        return try! CalendarDate(year: target.year, month: target.month, day: wanted)
+    }
+
+    public var lastDayOfMonth: CalendarDate {
+        try! CalendarDate(year: year, month: month, day: Self.daysIn(month: month, year: year))
     }
 
     private static func daysIn(month: Int, year: Int) -> Int {

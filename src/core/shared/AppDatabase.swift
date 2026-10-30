@@ -107,6 +107,119 @@ public final class AppDatabase: Sendable {
             }
         }
 
+        migrator.registerMigration("v8-settings") { db in
+            try db.create(table: "setting") { table in
+                table.primaryKey("key", .text)
+                table.column("value", .text).notNull()
+            }
+        }
+
+        migrator.registerMigration("v9-categories") { db in
+            try db.create(table: "category") { table in
+                table.autoIncrementedPrimaryKey("id")
+                table.column("name", .text).notNull().unique().collate(.nocase)
+                table.column("colour", .text).notNull().defaults(to: "blue")
+                table.column("icon", .text).notNull().defaults(to: "tag")
+            }
+            try db.create(table: "sub_category") { table in
+                table.autoIncrementedPrimaryKey("id")
+                table.column("category_id", .integer).notNull().references("category", onDelete: .cascade)
+                table.column("name", .text).notNull().collate(.nocase)
+                table.uniqueKey(["category_id", "name"])
+            }
+            let palette = ["blue", "orange", "green", "red", "purple", "teal", "pink", "yellow"]
+            for (index, group) in DefaultCategories.tree.enumerated() {
+                try db.execute(
+                    sql: "INSERT INTO category (name, colour, icon) VALUES (?, ?, 'tag')",
+                    arguments: [group.name, palette[index % palette.count]]
+                )
+                let parentID = db.lastInsertedRowID
+                for name in group.subCategories {
+                    try db.execute(sql: "INSERT INTO sub_category (category_id, name) VALUES (?, ?)", arguments: [parentID, name])
+                }
+            }
+        }
+
+        migrator.registerMigration("v10-entities") { db in
+            try db.create(table: "entity") { table in
+                table.autoIncrementedPrimaryKey("id")
+                table.column("name", .text).notNull().unique().collate(.nocase)
+            }
+            try db.execute(sql: """
+                INSERT INTO entity (name)
+                SELECT trim(entity) FROM expense
+                WHERE id IN (
+                    SELECT MIN(id) FROM expense WHERE entity IS NOT NULL AND trim(entity) <> '' GROUP BY lower(trim(entity))
+                )
+                """)
+            try db.execute(sql: """
+                UPDATE expense SET entity = (SELECT name FROM entity WHERE name = trim(expense.entity) COLLATE NOCASE)
+                WHERE entity IS NOT NULL AND trim(entity) <> ''
+                """)
+        }
+
+        migrator.registerMigration("v11-planned-items") { db in
+            try db.create(table: "planned_item") { table in
+                table.autoIncrementedPrimaryKey("id")
+                table.column("description", .text).notNull()
+                table.column("amount_paise", .integer).notNull()
+            }
+        }
+
+        migrator.registerMigration("v12-bills") { db in
+            try db.create(table: "bill") { table in
+                table.autoIncrementedPrimaryKey("id")
+                table.column("name", .text).notNull()
+                table.column("amount_paise", .integer).notNull()
+                table.column("category", .text).notNull()
+                table.column("sub_category", .text).notNull().defaults(to: "")
+                table.column("entity", .text).notNull().defaults(to: "")
+                table.column("payment_name", .text).notNull()
+                table.column("payment_source", .text).notNull()
+                table.column("first_due", .text).notNull()
+                table.column("repeats", .text).notNull()
+                table.column("ends_on", .text)
+                table.column("automatic", .boolean).notNull().defaults(to: false)
+                table.column("alert", .text).notNull().defaults(to: "none")
+                table.column("notes", .text).notNull().defaults(to: "")
+                table.column("auto_skip_due", .text)
+            }
+            try db.create(table: "bill_occurrence") { table in
+                table.autoIncrementedPrimaryKey("id")
+                table.column("bill_id", .integer).notNull().references("bill", onDelete: .cascade)
+                table.column("due_date", .text).notNull()
+                table.column("expense_id", .integer).notNull().references("expense", onDelete: .cascade)
+                table.column("automatic", .boolean).notNull().defaults(to: false)
+                table.column("seen", .boolean).notNull().defaults(to: false)
+                table.uniqueKey(["bill_id", "due_date"])
+            }
+        }
+
+        migrator.registerMigration("v13-currencies") { db in
+            try db.alter(table: "expense") { table in
+                table.add(column: "foreign_currency", .text)
+                table.add(column: "foreign_paise", .integer)
+                table.add(column: "rate", .text)
+            }
+            try db.create(table: "currency") { table in
+                table.primaryKey("code", .text)
+                table.column("name", .text).notNull()
+                table.column("symbol", .text)
+                table.column("decimals", .integer).notNull()
+            }
+            let seeded: [(String, String, String?, Int)] = [
+                ("INR", "Indian Rupee", "₹", 2), ("USD", "US Dollar", "$", 2), ("EUR", "Euro", "€", 2),
+                ("GBP", "British Pound", "£", 2), ("AED", "UAE Dirham", nil, 2), ("SGD", "Singapore Dollar", "S$", 2),
+                ("THB", "Thai Baht", "฿", 2), ("JPY", "Japanese Yen", "¥", 0), ("IDR", "Indonesian Rupiah", nil, 0),
+            ]
+            for (code, name, symbol, decimals) in seeded {
+                try db.execute(
+                    sql: "INSERT INTO currency (code, name, symbol, decimals) VALUES (?, ?, ?, ?)",
+                    arguments: [code, name, symbol, decimals]
+                )
+            }
+        }
+
         return migrator
     }
 }

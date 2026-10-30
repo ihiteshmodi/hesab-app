@@ -6,7 +6,7 @@ struct HisaabApp: App {
 
     var body: some Scene {
         WindowGroup {
-            BudgetScreen(model: budget)
+            RootView(model: budget)
         }
     }
 }

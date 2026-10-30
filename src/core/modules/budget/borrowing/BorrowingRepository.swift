@@ -15,6 +15,12 @@ final class BorrowingRepository: Sendable {
         }
     }
 
+    func delete(_ id: Int64) throws {
+        try database.writer.write { db in
+            guard try RepaymentRecord.deleteOne(db, key: id) else { throw BorrowingError.repaymentNotFound(id) }
+        }
+    }
+
     func all() throws -> [Repayment] {
         try database.writer.read { db in
             try RepaymentRecord.fetchAll(db).map { try $0.repayment() }

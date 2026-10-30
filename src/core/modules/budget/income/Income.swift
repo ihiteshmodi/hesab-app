@@ -7,8 +7,6 @@ public enum IncomeKind: String, CaseIterable, Sendable {
 
     /// Money that goes up "left to spend"; savings is the one kind that takes it down.
     var addsToLeftToSpend: Bool { self != .savings }
-    /// Borrowed money and money moved to savings are not income.
-    var countsAsIncome: Bool { self == .salary || self == .investmentIncome || self == .moneyReceived }
 }
 
 public struct IncomeEntry: Equatable, Sendable {

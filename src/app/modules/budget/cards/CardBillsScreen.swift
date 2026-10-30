@@ -12,7 +12,7 @@ struct CardBillsScreen: View {
                 Section {
                     HStack {
                         Button("Previous Month", systemImage: "chevron.left") {
-                            model.showCardBills(for: Self.shifted(bills.month, by: -1))
+                            model.showCardBills(for: bills.month.shifted(by: -1))
                         }
                         .labelStyle(.iconOnly)
                         .accessibilityIdentifier("previousCardMonth")
@@ -20,7 +20,7 @@ struct CardBillsScreen: View {
                         Text(bills.month.title).font(.headline)
                         Spacer()
                         Button("Next Month", systemImage: "chevron.right") {
-                            model.showCardBills(for: Self.shifted(bills.month, by: 1))
+                            model.showCardBills(for: bills.month.shifted(by: 1))
                         }
                         .labelStyle(.iconOnly)
                         .accessibilityIdentifier("nextCardMonth")
@@ -70,11 +70,6 @@ struct CardBillsScreen: View {
             }
         }
         .sheet(isPresented: $adding) { NewCardSheet(model: model) }
-    }
-
-    private static func shifted(_ month: CalendarDate.YearMonth, by delta: Int) -> CalendarDate.YearMonth {
-        let index = month.year * 12 + (month.month - 1) + delta
-        return CalendarDate.YearMonth(year: index / 12, month: index % 12 + 1)
     }
 }
 

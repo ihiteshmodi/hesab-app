@@ -11,6 +11,7 @@ final class ExpenseRepository: Sendable {
     func add(_ expense: Expense) throws -> Expense {
         try database.writer.write { db in
             var record = ExpenseRecord(expense)
+            record.entity = try EntityRepository.canonical(db, record.entity)
             try record.insert(db)
             return try record.expense()
         }
@@ -21,7 +22,8 @@ final class ExpenseRepository: Sendable {
     func change(_ id: Int64, _ transform: (Expense) throws -> Expense) throws -> Expense {
         try database.writer.write { db in
             guard let existing = try ExpenseRecord.fetchOne(db, key: id) else { throw ExpenseNotFound(id: id) }
-            let record = ExpenseRecord(try transform(try existing.expense()))
+            var record = ExpenseRecord(try transform(try existing.expense()))
+            record.entity = try EntityRepository.canonical(db, record.entity)
             try record.update(db)
             return try record.expense()
         }
@@ -60,6 +62,9 @@ private struct ExpenseRecord: Codable, FetchableRecord, MutablePersistableRecord
     var refundState: String
     var receivedPaise: Int
     var keptAsCash: Bool
+    var foreignCurrency: String?
+    var foreignPaise: Int?
+    var rate: String?
 
     init(_ expense: Expense) {
         id = expense.id
@@ -75,6 +80,9 @@ private struct ExpenseRecord: Codable, FetchableRecord, MutablePersistableRecord
         paymentSource = expense.paymentMethod.source.rawValue
         notes = expense.notes
         keptAsCash = expense.keptAsCash
+        foreignCurrency = expense.foreign?.currency
+        foreignPaise = expense.foreign?.amount.paise
+        rate = expense.foreign.map { "\($0.rate)" }
         switch expense.refund {
         case .notRefundable: (refundState, receivedPaise) = ("none", 0)
         case .pending: (refundState, receivedPaise) = ("pending", 0)
@@ -96,7 +104,14 @@ private struct ExpenseRecord: Codable, FetchableRecord, MutablePersistableRecord
             paymentMethod: PaymentMethod(
                 name: paymentName, source: PaymentMethod.Source(rawValue: paymentSource) ?? .bank
             ),
-            notes: notes, refund: refund, keptAsCash: keptAsCash
+            notes: notes, refund: refund, keptAsCash: keptAsCash,
+            foreign: foreignCurrency.flatMap { code in
+                foreignPaise.flatMap { paise in
+                    rate.flatMap { Decimal(string: $0) }.map {
+                        ForeignAmount(currency: code, amount: Money(paise: paise), rate: $0)
+                    }
+                }
+            }
         )
     }
 

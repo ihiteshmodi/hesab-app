@@ -55,6 +55,23 @@ struct CalendarDateTests {
         #expect(try CalendarDate(isoString: iso).shortTitle == title)
     }
 
+    @Test(arguments: [
+        (2026, 10, 1, 2026, 11), (2026, 12, 1, 2027, 1), (2026, 1, -1, 2025, 12), (2026, 3, -14, 2025, 1), (2026, 10, 0, 2026, 10),
+    ])
+    func aMonthCanBeShiftedForwardAndBackAcrossYears(year: Int, month: Int, by: Int, toYear: Int, toMonth: Int) {
+        let shifted = CalendarDate.YearMonth(year: year, month: month).shifted(by: by)
+
+        #expect(shifted == CalendarDate.YearMonth(year: toYear, month: toMonth))
+    }
+
+    @Test func aDayRoundTripsThroughAnInstantInTheSameCalendar() throws {
+        var india = Calendar(identifier: .gregorian)
+        india.timeZone = TimeZone(identifier: "Asia/Kolkata")!
+        let day = try CalendarDate(isoString: "2026-10-30")
+
+        #expect(CalendarDate(day.instant(calendar: india), calendar: india) == day)
+    }
+
     @Test func isReadFromAnInstantUsingTheGivenCalendar() throws {
         var india = Calendar(identifier: .gregorian)
         india.timeZone = TimeZone(identifier: "Asia/Kolkata")!

@@ -14,7 +14,10 @@ public struct MonthBudget: Equatable, Sendable {
     /// Pending refunds from every month, so an old one never drops out of sight.
     public let pendingRefundsEverywhere: PendingRefundTotal
 
-    init(allExpenses: [Expense], allIncome: [IncomeEntry], allRepayments: [Repayment], month: CalendarDate.YearMonth) {
+    init(
+        allExpenses: [Expense], allIncome: [IncomeEntry], allRepayments: [Repayment],
+        preferences: Preferences, month: CalendarDate.YearMonth
+    ) {
         let expensesInMonth = allExpenses
             .filter { $0.date.yearMonth == month }
             .sorted { ($0.date, $0.id ?? 0) > ($1.date, $1.id ?? 0) }
@@ -22,12 +25,21 @@ public struct MonthBudget: Equatable, Sendable {
             .filter { $0.date.yearMonth == month }
             .sorted { ($0.date, $0.id) > ($1.date, $1.id) }
         let bankSpend: (Expense) -> Money = { $0.paymentMethod.movesLeftToSpend ? $0.netAmount : .zero }
+        let spentSpend: (Expense) -> Money = { preferences.includeCashAndLedgerInSpent ? $0.netAmount : bankSpend($0) }
+        let countsAsIncome: (IncomeKind) -> Bool = { kind in
+            switch kind {
+            case .salary, .investmentIncome: true
+            case .moneyReceived: preferences.countMoneyReceivedAsIncome
+            case .borrowed: preferences.countBorrowedAsIncome
+            case .savings: false
+            }
+        }
 
         self.month = month
         self.expenses = expensesInMonth
         self.incomeEntries = incomeInMonth
-        self.spentThisMonth = expensesInMonth.reduce(.zero) { $0 + bankSpend($1) }
-        self.incomeThisMonth = incomeInMonth.filter(\.kind.countsAsIncome).reduce(.zero) { $0 + $1.amount }
+        self.spentThisMonth = expensesInMonth.reduce(.zero) { $0 + spentSpend($1) }
+        self.incomeThisMonth = incomeInMonth.filter { countsAsIncome($0.kind) }.reduce(.zero) { $0 + $1.amount }
         let moneyIn = allIncome.filter(\.kind.addsToLeftToSpend).reduce(Money.zero) { $0 + $1.amount }
         let savings = allIncome.filter { !$0.kind.addsToLeftToSpend }.reduce(Money.zero) { $0 + $1.amount }
         let repaid = allRepayments.reduce(Money.zero) { $0 + $1.amount }
@@ -78,13 +90,14 @@ public struct GetMonthBudget: Sendable {
     let expenses: ExpenseRepository
     let income: IncomeRepository
     let repayments: BorrowingRepository
+    let settings: SettingsRepository
     let clock: any DayClock
 
     /// Defaults to the month containing today.
     public func callAsFunction(for month: CalendarDate.YearMonth? = nil) throws -> MonthBudget {
         MonthBudget(
             allExpenses: try expenses.all(), allIncome: try income.all(), allRepayments: try repayments.all(),
-            month: month ?? clock.today().yearMonth
+            preferences: Preferences(stored: try settings.all()), month: month ?? clock.today().yearMonth
         )
     }
 }

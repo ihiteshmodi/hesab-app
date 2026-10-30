@@ -33,7 +33,7 @@ struct AmountToRepayScreen: View {
                 }
                 Section("Borrowings") {
                     ForEach(owed.borrowings, id: \.borrowing.id) { line in
-                        Button { if !line.isRepaid { repaying = line.borrowing.id } } label: {
+                        Button { repaying = line.borrowing.id } label: {
                             HStack {
                                 VStack(alignment: .leading) {
                                     Text(line.lender)
@@ -72,6 +72,22 @@ private struct RepaymentSheet: View {
                     .accessibilityIdentifier("repaymentAmountField")
                 if let errorMessage {
                     Text(errorMessage).foregroundStyle(.red).accessibilityIdentifier("repaymentError")
+                }
+                if let repayments = model.amountToRepay?.borrowings.first(where: { $0.borrowing.id == borrowingID })?.repayments,
+                   !repayments.isEmpty {
+                    Section("Repaid so far") {
+                        ForEach(repayments, id: \.id) { repayment in
+                            HStack {
+                                Text(repayment.date.shortTitle)
+                                Spacer()
+                                Text(IndianMoneyFormat.string(repayment.amount)).monospacedDigit()
+                            }
+                            .accessibilityIdentifier("repaymentRow")
+                            .swipeActions {
+                                Button("Delete", role: .destructive) { errorMessage = model.deleteRepayment(repayment.id) }
+                            }
+                        }
+                    }
                 }
             }
             .navigationTitle("Record Repayment")
