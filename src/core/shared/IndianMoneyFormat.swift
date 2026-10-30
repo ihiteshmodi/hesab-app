@@ -1,3 +1,5 @@
+import Foundation
+
 /// Rupees with Indian digit grouping: ₹12,34,567.89. A negative amount gets a true minus sign.
 public enum IndianMoneyFormat {
     public static func string(_ money: Money) -> String {
@@ -6,6 +8,12 @@ public enum IndianMoneyFormat {
         let paise = absolute % 100
         let sign = money.paise < 0 ? "−" : ""
         return "\(sign)₹\(rupees).\(paise < 10 ? "0" : "")\(paise)"
+    }
+
+    /// For sentences: no symbol, and no decimals when the amount is a whole number of rupees.
+    public static func plain(_ money: Money) -> String {
+        let text = string(money).replacingOccurrences(of: "₹", with: "")
+        return text.hasSuffix(".00") ? String(text.dropLast(3)) : text
     }
 
     private static func grouped(_ digits: String) -> String {

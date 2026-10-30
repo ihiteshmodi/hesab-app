@@ -16,12 +16,12 @@ final class ExpenseRepository: Sendable {
         }
     }
 
-    func update(_ expense: Expense) throws -> Expense {
+    /// Loads the expense, lets `transform` rewrite it, and saves the result, all in one transaction.
+    @discardableResult
+    func change(_ id: Int64, _ transform: (Expense) throws -> Expense) throws -> Expense {
         try database.writer.write { db in
-            guard let id = expense.id, try ExpenseRecord.exists(db, key: id) else {
-                throw ExpenseNotFound(id: expense.id ?? 0)
-            }
-            let record = ExpenseRecord(expense)
+            guard let existing = try ExpenseRecord.fetchOne(db, key: id) else { throw ExpenseNotFound(id: id) }
+            let record = ExpenseRecord(try transform(try existing.expense()))
             try record.update(db)
             return try record.expense()
         }
@@ -57,6 +57,8 @@ private struct ExpenseRecord: Codable, FetchableRecord, MutablePersistableRecord
     var paymentName: String
     var paymentSource: String
     var notes: String
+    var refundState: String
+    var receivedPaise: Int
 
     init(_ expense: Expense) {
         id = expense.id
@@ -71,10 +73,20 @@ private struct ExpenseRecord: Codable, FetchableRecord, MutablePersistableRecord
         paymentName = expense.paymentMethod.name
         paymentSource = expense.paymentMethod.source.rawValue
         notes = expense.notes
+        switch expense.refund {
+        case .notRefundable: (refundState, receivedPaise) = ("none", 0)
+        case .pending: (refundState, receivedPaise) = ("pending", 0)
+        case .settled(let received): (refundState, receivedPaise) = ("settled", received.paise)
+        }
     }
 
     func expense() throws -> Expense {
-        Expense(
+        let refund: RefundState = switch refundState {
+        case "pending": .pending
+        case "settled": .settled(received: Money(paise: receivedPaise))
+        default: .notRefundable
+        }
+        return Expense(
             id: id, date: try CalendarDate(isoString: date), description: description,
             amount: Money(paise: amountPaise), category: category, subCategory: subCategory,
             entity: entity, spentFor: spentFor,
@@ -82,7 +94,7 @@ private struct ExpenseRecord: Codable, FetchableRecord, MutablePersistableRecord
             paymentMethod: PaymentMethod(
                 name: paymentName, source: PaymentMethod.Source(rawValue: paymentSource) ?? .bank
             ),
-            notes: notes
+            notes: notes, refund: refund
         )
     }
 

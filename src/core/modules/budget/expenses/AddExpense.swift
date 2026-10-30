@@ -14,7 +14,8 @@ public struct UpdateExpense: Sendable {
 
     @discardableResult
     public func callAsFunction(_ id: Int64, _ new: NewExpense) throws -> Expense {
-        try expenses.update(Expense.validated(new, today: clock.today(), id: id))
+        let edit = try Expense.validated(new, today: clock.today(), id: id)
+        return try expenses.change(id) { try $0.edited(to: edit) }
     }
 }
 

@@ -13,6 +13,13 @@ public struct Expense: Equatable, Sendable {
     public let tags: [String]
     public let paymentMethod: PaymentMethod
     public let notes: String
+    public let refund: RefundState
+
+    /// What the expense really cost: the amount minus what came back.
+    public var netAmount: Money {
+        if case .settled(let received) = refund { return amount - received }
+        return amount
+    }
 
     /// Checks the rules for an expense; the first broken rule is reported.
     static func validated(_ new: NewExpense, today: CalendarDate, id: Int64? = nil) throws -> Expense {
@@ -28,7 +35,7 @@ public struct Expense: Equatable, Sendable {
             category: new.category, subCategory: new.subCategory.trimmed.nilIfEmpty,
             entity: new.entity.trimmed.nilIfEmpty, spentFor: new.spentFor.trimmed.nilIfEmpty,
             tags: Self.cleaned(tags: new.tags), paymentMethod: new.paymentMethod,
-            notes: new.notes.trimmed
+            notes: new.notes.trimmed, refund: .notRefundable
         )
     }
 

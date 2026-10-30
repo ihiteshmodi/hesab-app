@@ -18,4 +18,14 @@ struct IndianMoneyFormatTests {
     func showsRupeesWithIndianGrouping(paise: Int, expected: String) {
         #expect(IndianMoneyFormat.string(Money(paise: paise)) == expected)
     }
+
+    @Test(arguments: [
+        (120_000, "1,200"),
+        (0, "0"),
+        (12_345_678, "1,23,456.78"),
+        (50, "0.50"),
+    ])
+    func plainFormatDropsTheSymbolAndWholeRupeeDecimals(paise: Int, expected: String) {
+        #expect(IndianMoneyFormat.plain(Money(paise: paise)) == expected)
+    }
 }
