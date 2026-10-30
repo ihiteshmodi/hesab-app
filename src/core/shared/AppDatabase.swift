@@ -84,6 +84,20 @@ public final class AppDatabase: Sendable {
             }
         }
 
+        migrator.registerMigration("v6-cards") { db in
+            try db.create(table: "card") { table in
+                table.autoIncrementedPrimaryKey("id")
+                table.column("name", .text).notNull()
+            }
+            try db.create(table: "card_bill_payment") { table in
+                table.column("card_id", .integer).notNull().references("card", onDelete: .cascade)
+                table.column("month", .text).notNull()
+                table.column("paid_paise", .integer).notNull()
+                table.primaryKey(["card_id", "month"])
+            }
+            try db.execute(sql: "INSERT INTO card (name) VALUES ('Credit Card')")
+        }
+
         return migrator
     }
 }

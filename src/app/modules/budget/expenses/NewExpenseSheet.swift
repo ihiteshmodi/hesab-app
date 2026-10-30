@@ -17,9 +17,11 @@ struct NewExpenseSheet: View {
     @State private var errorMessage: String?
 
     private var paymentChoices: [PaymentChoice] {
-        PaymentChoice.all + (model.ledgers?.ledgers ?? []).map {
-            PaymentChoice(title: "\($0.ledger.name) (ledger)", method: .ledger($0.ledger.name))
-        }
+        PaymentChoice.all
+            + model.cards.map { PaymentChoice(title: $0.name, method: .bank($0.name)) }
+            + (model.ledgers?.ledgers ?? []).map {
+                PaymentChoice(title: "\($0.ledger.name) (ledger)", method: .ledger($0.ledger.name))
+            }
     }
 
     private var subCategories: [String] {
@@ -102,14 +104,13 @@ struct NewExpenseSheet: View {
     }
 }
 
-/// Until cards and ledgers are built, the payment methods are a short fixed list.
+/// Cards and ledgers are added to these at runtime.
 struct PaymentChoice: Hashable {
     let title: String
     let method: PaymentMethod
 
     static let all = [
         PaymentChoice(title: "UPI", method: .upi),
-        PaymentChoice(title: "Credit Card", method: .bank("Credit Card")),
         PaymentChoice(title: "Cash Withdrawal", method: .cashWithdrawal),
         PaymentChoice(title: "Cash", method: .cash),
     ]

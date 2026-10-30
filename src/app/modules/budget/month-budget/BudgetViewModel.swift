@@ -10,7 +10,10 @@ final class BudgetViewModel {
     private(set) var pendingRefunds: PendingRefunds?
     private(set) var ledgers: LedgerOverview?
     private(set) var cash: CashInHand?
+    private(set) var cards: [Card] = []
+    private(set) var cardBills: CardBills?
     private(set) var loadError: String?
+    private var cardMonth: CalendarDate.YearMonth?
 
     init(app: BudgetApp) {
         self.app = app
@@ -23,6 +26,8 @@ final class BudgetViewModel {
             pendingRefunds = try app.pendingRefunds()
             ledgers = try app.ledgers()
             cash = try app.cashInHand()
+            cards = try app.cards()
+            cardBills = try app.cardBills(for: cardMonth)
             loadError = nil
         } catch {
             loadError = "Could not read your data. Close and reopen the app."
@@ -97,6 +102,18 @@ final class BudgetViewModel {
         return run { try app.setCashInHand(to: amount) }
     }
 
+    func showCardBills(for month: CalendarDate.YearMonth) {
+        cardMonth = month
+        reload()
+    }
+
+    func addCard(name: String) -> String? { run { try app.addCard(NewCard(name: name)) } }
+
+    func setBillPaid(_ cardID: Int64, paid: Bool) -> String? {
+        guard let month = cardBills?.month else { return nil }
+        return run { paid ? try app.markBillPaid(cardID, month) : try app.unmarkBillPaid(cardID, month) }
+    }
+
     private func run(_ action: () throws -> Void) -> String? {
         do {
             try action()
@@ -105,6 +122,8 @@ final class BudgetViewModel {
         } catch let error as RefundError {
             return error.message
         } catch let error as LedgerError {
+            return error.message
+        } catch let error as CardError {
             return error.message
         } catch {
             return "Could not do that. Try again."

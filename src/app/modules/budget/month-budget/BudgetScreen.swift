@@ -49,6 +49,16 @@ struct BudgetScreen: View {
                             }
                         }
                         .accessibilityIdentifier("ledgersLink")
+                        NavigationLink {
+                            CardBillsScreen(model: model)
+                        } label: {
+                            HStack {
+                                Text("Card bills")
+                                Spacer()
+                                Text(IndianMoneyFormat.string(model.cardBills?.totalDue ?? .zero)).foregroundStyle(.secondary).monospacedDigit()
+                            }
+                        }
+                        .accessibilityIdentifier("cardBillsLink")
                     }
                     Section(budget.month.title) {
                         if budget.hasNoEntriesAtAll {

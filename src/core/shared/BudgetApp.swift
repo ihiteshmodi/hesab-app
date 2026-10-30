@@ -18,6 +18,11 @@ public final class BudgetApp: Sendable {
     public let setCashInHand: SetCashInHand
     public let deleteIncome: DeleteIncome
     public let monthBudget: GetMonthBudget
+    public let addCard: AddCard
+    public let cards: GetCards
+    public let cardBills: GetCardBills
+    public let markBillPaid: MarkBillPaid
+    public let unmarkBillPaid: UnmarkBillPaid
 
     public init(database: AppDatabase, clock: any DayClock) {
         let expenses = ExpenseRepository(database: database)
@@ -42,5 +47,11 @@ public final class BudgetApp: Sendable {
         addIncome = AddIncome(income: income, clock: clock)
         deleteIncome = DeleteIncome(income: income)
         monthBudget = GetMonthBudget(expenses: expenses, income: income, clock: clock)
+        let cardBook = CardRepository(database: database)
+        addCard = AddCard(cards: cardBook)
+        cards = GetCards(cards: cardBook)
+        cardBills = GetCardBills(cards: cardBook, expenses: expenses, clock: clock)
+        markBillPaid = MarkBillPaid(cards: cardBook, bills: cardBills)
+        unmarkBillPaid = UnmarkBillPaid(cards: cardBook)
     }
 }
