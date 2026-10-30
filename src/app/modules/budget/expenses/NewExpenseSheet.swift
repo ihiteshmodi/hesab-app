@@ -13,7 +13,14 @@ struct NewExpenseSheet: View {
     @State private var spentFor = ""
     @State private var tagsText = ""
     @State private var payment = PaymentChoice.all[0]
+    @State private var keepAsCash = false
     @State private var errorMessage: String?
+
+    private var paymentChoices: [PaymentChoice] {
+        PaymentChoice.all + (model.ledgers?.ledgers ?? []).map {
+            PaymentChoice(title: "\($0.ledger.name) (ledger)", method: .ledger($0.ledger.name))
+        }
+    }
 
     private var subCategories: [String] {
         DefaultCategories.tree.first { $0.name == category }?.subCategories ?? []
@@ -47,9 +54,13 @@ struct NewExpenseSheet: View {
                         .accessibilityIdentifier("subCategoryPicker")
                     }
                     Picker("Paid with", selection: $payment) {
-                        ForEach(PaymentChoice.all, id: \.title) { Text($0.title).tag($0) }
+                        ForEach(paymentChoices, id: \.title) { Text($0.title).tag($0) }
                     }
                     .accessibilityIdentifier("paymentPicker")
+                    if payment.method == .cashWithdrawal {
+                        Toggle("Keep as cash in hand", isOn: $keepAsCash)
+                            .accessibilityIdentifier("keepAsCashToggle")
+                    }
                 }
                 Section {
                     TextField("Spent for (leave empty for you)", text: $spentFor)
@@ -84,7 +95,8 @@ struct NewExpenseSheet: View {
         errorMessage = model.addExpense(NewExpense(
             date: CalendarDate(date), description: description, amount: MoneyInput.parse(amountText),
             category: category, subCategory: subCategory, entity: entity, spentFor: spentFor,
-            tags: tagsText.split(separator: ",").map(String.init), paymentMethod: payment.method
+            tags: tagsText.split(separator: ",").map(String.init), paymentMethod: payment.method,
+            keepAsCash: keepAsCash
         ))
         if errorMessage == nil { dismiss() }
     }

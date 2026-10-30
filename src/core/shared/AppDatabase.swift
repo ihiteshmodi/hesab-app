@@ -60,6 +60,30 @@ public final class AppDatabase: Sendable {
             }
         }
 
+        migrator.registerMigration("v5-ledgers-and-cash") { db in
+            try db.alter(table: "expense") { table in
+                table.add(column: "kept_as_cash", .boolean).notNull().defaults(to: false)
+            }
+            try db.create(table: "ledger") { table in
+                table.autoIncrementedPrimaryKey("id")
+                table.column("name", .text).notNull()
+                table.column("counts_towards_net_worth", .boolean).notNull().defaults(to: false)
+            }
+            try db.create(table: "ledger_entry") { table in
+                table.autoIncrementedPrimaryKey("id")
+                table.column("ledger_id", .integer).notNull().references("ledger", onDelete: .cascade)
+                table.column("date", .text).notNull()
+                table.column("description", .text).notNull()
+                table.column("amount_paise", .integer).notNull()
+            }
+            try db.create(table: "cash_adjustment") { table in
+                table.autoIncrementedPrimaryKey("id")
+                table.column("date", .text).notNull()
+                table.column("amount_paise", .integer).notNull()
+                table.column("note", .text).notNull()
+            }
+        }
+
         return migrator
     }
 }

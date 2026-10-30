@@ -26,7 +26,7 @@ swift test                # runs the core tests, no simulator needed
 Expected output:
 
 ```text
-✔ Test run with 66 tests in 12 suites passed after 0.04 seconds.
+✔ Test run with 92 tests in 14 suites passed after 0.04 seconds.
 ...
 Built build/Hisaab.ipa
 ```

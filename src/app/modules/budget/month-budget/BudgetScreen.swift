@@ -27,6 +27,28 @@ struct BudgetScreen: View {
                             }
                         }
                         .accessibilityIdentifier("pendingRefundsLink")
+                        if let cash = model.cash {
+                            NavigationLink {
+                                CashInHandScreen(model: model)
+                            } label: {
+                                HStack {
+                                    Text("Cash in hand")
+                                    Spacer()
+                                    Text(IndianMoneyFormat.string(cash.balance)).foregroundStyle(.secondary).monospacedDigit()
+                                }
+                            }
+                            .accessibilityIdentifier("cashInHandLink")
+                        }
+                        NavigationLink {
+                            LedgersScreen(model: model)
+                        } label: {
+                            HStack {
+                                Text("Ledgers")
+                                Spacer()
+                                Text(IndianMoneyFormat.string(model.ledgers?.total ?? .zero)).foregroundStyle(.secondary).monospacedDigit()
+                            }
+                        }
+                        .accessibilityIdentifier("ledgersLink")
                     }
                     Section(budget.month.title) {
                         if budget.hasNoEntriesAtAll {

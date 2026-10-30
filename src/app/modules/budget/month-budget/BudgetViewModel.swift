@@ -8,6 +8,8 @@ final class BudgetViewModel {
     private let app: BudgetApp
     private(set) var budget: MonthBudget?
     private(set) var pendingRefunds: PendingRefunds?
+    private(set) var ledgers: LedgerOverview?
+    private(set) var cash: CashInHand?
     private(set) var loadError: String?
 
     init(app: BudgetApp) {
@@ -19,6 +21,8 @@ final class BudgetViewModel {
         do {
             budget = try app.monthBudget()
             pendingRefunds = try app.pendingRefunds()
+            ledgers = try app.ledgers()
+            cash = try app.cashInHand()
             loadError = nil
         } catch {
             loadError = "Could not read your data. Close and reopen the app."
@@ -66,12 +70,41 @@ final class BudgetViewModel {
         return run { try app.recordReceived(id, amount) }
     }
 
+    func addLedger(name: String, countsTowardsNetWorth: Bool) -> String? {
+        run { try app.addLedger(NewLedger(name: name, countsTowardsNetWorth: countsTowardsNetWorth)) }
+    }
+
+    func deleteLedger(_ id: Int64) -> String? { run { try app.deleteLedger(id) } }
+    func deleteLedgerEntry(_ id: Int64) -> String? { run { try app.deleteLedgerEntry(id) } }
+
+    /// A warning is not a refusal: the entry is saved and the warning is shown beside it.
+    func addLedgerEntry(_ ledgerID: Int64, description: String, amountText: String, moneyOut: Bool) -> (error: String?, warning: String?) {
+        let magnitude = MoneyInput.parse(amountText)
+        let value = magnitude.map { moneyOut ? Money.zero - $0 : $0 }
+        do {
+            let added = try app.addLedgerEntry(ledgerID, NewLedgerEntry(description: description, value: value))
+            reload()
+            return (nil, added.warning)
+        } catch let error as LedgerError {
+            return (error.message, nil)
+        } catch {
+            return ("Could not do that. Try again.", nil)
+        }
+    }
+
+    func setCashInHand(_ amountText: String) -> String? {
+        guard let amount = MoneyInput.parse(amountText) else { return "Enter the cash you are holding" }
+        return run { try app.setCashInHand(to: amount) }
+    }
+
     private func run(_ action: () throws -> Void) -> String? {
         do {
             try action()
             reload()
             return nil
         } catch let error as RefundError {
+            return error.message
+        } catch let error as LedgerError {
             return error.message
         } catch {
             return "Could not do that. Try again."

@@ -14,6 +14,8 @@ public struct Expense: Equatable, Sendable {
     public let paymentMethod: PaymentMethod
     public let notes: String
     public let refund: RefundState
+    /// A cash withdrawal the owner keeps as cash in hand; false for everything else.
+    public let keptAsCash: Bool
 
     /// What the expense really cost: the amount minus what came back.
     public var netAmount: Money {
@@ -35,7 +37,8 @@ public struct Expense: Equatable, Sendable {
             category: new.category, subCategory: new.subCategory.trimmed.nilIfEmpty,
             entity: new.entity.trimmed.nilIfEmpty, spentFor: new.spentFor.trimmed.nilIfEmpty,
             tags: Self.cleaned(tags: new.tags), paymentMethod: new.paymentMethod,
-            notes: new.notes.trimmed, refund: .notRefundable
+            notes: new.notes.trimmed, refund: .notRefundable,
+            keptAsCash: new.keepAsCash && new.paymentMethod == .cashWithdrawal
         )
     }
 
@@ -58,12 +61,14 @@ public struct NewExpense: Sendable {
     public var tags: [String]
     public var paymentMethod: PaymentMethod
     public var notes: String
+    public var keepAsCash: Bool
 
     public init(
         date: CalendarDate? = nil, description: String, amount: Money?, category: String,
         subCategory: String = "", entity: String = "", spentFor: String = "", tags: [String] = [],
-        paymentMethod: PaymentMethod = .upi, notes: String = ""
+        paymentMethod: PaymentMethod = .upi, notes: String = "", keepAsCash: Bool = false
     ) {
+        self.keepAsCash = keepAsCash
         self.date = date
         self.description = description
         self.amount = amount
