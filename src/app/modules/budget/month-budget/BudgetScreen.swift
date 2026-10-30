@@ -4,6 +4,7 @@ import SwiftUI
 struct BudgetScreen: View {
     let model: BudgetViewModel
     @State private var addingExpense = false
+    @State private var addingIncome = false
 
     var body: some View {
         NavigationStack {
@@ -16,8 +17,8 @@ struct BudgetScreen: View {
                         LeftToSpendCard(budget: budget)
                     }
                     Section(budget.month.title) {
-                        if budget.expenses.isEmpty {
-                            Text("No entries yet. Add your first expense.")
+                        if budget.hasNoEntriesAtAll {
+                            Text("No entries yet. Add your first expense or income.")
                                 .foregroundStyle(.secondary)
                         }
                         ForEach(budget.expenses, id: \.id) { expense in
@@ -29,12 +30,22 @@ struct BudgetScreen: View {
             .navigationTitle("Budget")
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
-                    Button("Add Expense", systemImage: "plus") { addingExpense = true }
-                        .accessibilityIdentifier("addExpenseButton")
+                    Menu {
+                        Button("Add Expense", systemImage: "minus.circle") { addingExpense = true }
+                            .accessibilityIdentifier("addExpenseButton")
+                        Button("Add Income", systemImage: "plus.circle") { addingIncome = true }
+                            .accessibilityIdentifier("addIncomeButton")
+                    } label: {
+                        Image(systemName: "plus")
+                    }
+                    .accessibilityIdentifier("addMenu")
                 }
             }
             .sheet(isPresented: $addingExpense) {
                 NewExpenseSheet(model: model)
+            }
+            .sheet(isPresented: $addingIncome) {
+                NewIncomeSheet(model: model)
             }
         }
     }
@@ -63,6 +74,13 @@ private struct LeftToSpendCard: View {
                 .font(.title3.weight(.semibold))
                 .monospacedDigit()
                 .accessibilityIdentifier("spentThisMonth")
+            Text("Income this month")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+            Text(IndianMoneyFormat.string(budget.incomeThisMonth))
+                .font(.title3.weight(.semibold))
+                .monospacedDigit()
+                .accessibilityIdentifier("incomeThisMonth")
         }
         .padding(.vertical, 6)
     }
@@ -75,7 +93,8 @@ private struct ExpenseRow: View {
         HStack {
             VStack(alignment: .leading, spacing: 2) {
                 Text(expense.description)
-                Text("\(expense.category) · \(expense.date.shortTitle)")
+                Text([expense.subCategory ?? expense.category, expense.entity, expense.date.shortTitle]
+                    .compactMap { $0 }.joined(separator: " · "))
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }

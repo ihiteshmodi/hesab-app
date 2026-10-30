@@ -31,6 +31,28 @@ public final class AppDatabase: Sendable {
             }
         }
 
+        migrator.registerMigration("v2-expense-details") { db in
+            try db.alter(table: "expense") { table in
+                table.add(column: "sub_category", .text)
+                table.add(column: "entity", .text)
+                table.add(column: "spent_for", .text)
+                table.add(column: "tags", .text).notNull().defaults(to: "[]")
+                table.add(column: "payment_name", .text).notNull().defaults(to: "UPI")
+                table.add(column: "payment_source", .text).notNull().defaults(to: "bank")
+                table.add(column: "notes", .text).notNull().defaults(to: "")
+            }
+        }
+
+        migrator.registerMigration("v3-income") { db in
+            try db.create(table: "income_entry") { table in
+                table.autoIncrementedPrimaryKey("id")
+                table.column("date", .text).notNull()
+                table.column("kind", .text).notNull()
+                table.column("amount_paise", .integer).notNull()
+                table.column("note", .text).notNull().defaults(to: "")
+            }
+        }
+
         return migrator
     }
 }

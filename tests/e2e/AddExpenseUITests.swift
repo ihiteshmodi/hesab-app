@@ -12,6 +12,7 @@ final class AddExpenseUITests: XCTestCase {
         let app = launchApp()
         XCTAssertEqual(app.staticTexts["leftToSpend"].label, "₹0.00")
 
+        app.buttons["addMenu"].tap()
         app.buttons["addExpenseButton"].tap()
         let amount = app.textFields["amountField"]
         XCTAssertTrue(amount.waitForExistence(timeout: 5))
@@ -34,12 +35,32 @@ final class AddExpenseUITests: XCTestCase {
     func testAnIncompleteExpenseShowsWhatToFixAndKeepsTheSheetOpen() {
         let app = launchApp()
 
+        app.buttons["addMenu"].tap()
         app.buttons["addExpenseButton"].tap()
         app.buttons["saveExpenseButton"].tap()
 
         let message = app.staticTexts["errorMessage"]
         XCTAssertTrue(message.waitForExistence(timeout: 5))
         XCTAssertEqual(message.label, "Enter an amount above 0")
+    }
+
+    @MainActor
+    func testRecordingASalaryRaisesLeftToSpend() {
+        let app = launchApp()
+
+        app.buttons["addMenu"].tap()
+        app.buttons["addIncomeButton"].tap()
+        let amount = app.textFields["incomeAmountField"]
+        XCTAssertTrue(amount.waitForExistence(timeout: 5))
+        amount.tap()
+        amount.typeText("150000")
+        app.buttons["incomeTypePicker"].tap()
+        app.buttons["Salary"].tap()
+        app.buttons["saveIncomeButton"].tap()
+
+        XCTAssertTrue(app.staticTexts["leftToSpend"].waitForExistence(timeout: 5))
+        XCTAssertEqual(app.staticTexts["leftToSpend"].label, "₹1,50,000.00")
+        XCTAssertEqual(app.staticTexts["incomeThisMonth"].label, "₹1,50,000.00")
     }
 
     @MainActor
