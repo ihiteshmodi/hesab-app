@@ -45,7 +45,7 @@ let package = Package(
         ),
         .testTarget(
             name: "HisaabCoreTests",
-            dependencies: ["HisaabCore"],
+            dependencies: ["HisaabCore", .product(name: "GRDB", package: "GRDB.swift")],
             path: "tests",
             exclude: testExclusions
         ),

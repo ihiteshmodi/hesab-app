@@ -59,6 +59,12 @@ struct BudgetScreen: View {
                             }
                         }
                         .accessibilityIdentifier("cardBillsLink")
+                        NavigationLink {
+                            BackupScreen(model: model)
+                        } label: {
+                            Text("Backup")
+                        }
+                        .accessibilityIdentifier("backupLink")
                     }
                     Section(budget.month.title) {
                         if budget.hasNoEntriesAtAll {

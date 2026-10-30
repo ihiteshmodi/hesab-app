@@ -16,10 +16,21 @@ enum CompositionRoot {
     }
 
     private static func databaseFileURL() throws -> URL {
+        try dataFolder().appendingPathComponent("hisaab.sqlite")
+    }
+
+    /// Where the copy of the previous data goes before a restore.
+    static func backupsFolder() throws -> URL {
+        let folder = try dataFolder().appendingPathComponent("Backups", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        return folder
+    }
+
+    private static func dataFolder() throws -> URL {
         let folder = try FileManager.default
             .url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
             .appendingPathComponent("Hisaab", isDirectory: true)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        return folder.appendingPathComponent("hisaab.sqlite")
+        return folder
     }
 }

@@ -181,6 +181,18 @@ final class AddExpenseUITests: XCTestCase {
     }
 
     @MainActor
+    func testTheBackupScreenOffersExportAndImport() {
+        let app = launchApp()
+
+        let link = app.buttons["backupLink"]
+        XCTAssertTrue(link.waitForExistence(timeout: 20))
+        link.tap()
+
+        XCTAssertTrue(app.buttons["exportDataButton"].waitForExistence(timeout: 20))
+        XCTAssertTrue(app.buttons["importDataButton"].exists)
+    }
+
+    @MainActor
     private func launchApp() -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments = ["-ui-testing"]
