@@ -47,10 +47,10 @@ Feature: One-time spreadsheet import (Mac tool)
     Then both milk rows share one sub-category
     And "Fibre bill" is under "Home & Utilities"
 
-  Scenario: The mapping file places sub-categories under parent categories
-    Given the mapping says the old main category "Shopping - Needs" becomes the parent "Shopping" with the sub-category "Needs"
+  Scenario: The mapping file splits an old main category by what the row is
+    Given the mapping says rows of the old main category "Transport & Vehicle" with the sub category "Repairs & Maintenance" belong to the parent "Vehicle"
     When Priya runs the tool
-    Then the parent "Shopping" exists with its sub-categories
+    Then those rows are under "Vehicle"
     And no expense is left without a parent category
 
   Scenario: Entity prefixes in descriptions are split off using the mapping file
