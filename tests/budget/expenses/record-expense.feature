@@ -8,8 +8,8 @@ Feature: Record an expense
 
   Scenario: Priya adds an expense
     When Priya adds an expense
-      | date       | description      | amount | main category   | sub category | payment method |
-      | 2026-10-30 | Weekly groceries | 1,250  | Home & Utilities | Ration       | UPI            |
+      | date       | description      | amount | category         | sub-category | payment method |
+      | 2026-10-30 | Weekly groceries | 1,250  | Groceries        | Ration       | UPI            |
     Then the expense appears in the October list
     And "Left to spend" drops by 1,250
 
@@ -24,12 +24,12 @@ Feature: Record an expense
       | amount        | 0        | Enter an amount above 0 |
       | amount        | -50      | Enter an amount above 0. To record money received, add it under Income. |
       | description   | empty    | Enter a description     |
-      | main category | empty    | Choose a category       |
+      | category       | empty    | Choose a category       |
 
   Scenario: Sub-categories are suggested so spellings do not drift
-    Given a "Ration - Milk" sub-category already exists under "Home & Utilities"
-    When Priya types "ration - milk" as the sub-category
-    Then she is offered the existing "Ration - Milk" and no near-duplicate is created
+    Given a "Milk" sub-category already exists under "Groceries"
+    When Priya types "milk" as the sub-category
+    Then she is offered the existing "Milk" and no near-duplicate is created
 
   Scenario: Priya adds an expense with a future date
     When Priya adds an expense dated 2026-11-10
