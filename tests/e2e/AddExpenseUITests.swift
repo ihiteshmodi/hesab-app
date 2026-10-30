@@ -147,6 +147,40 @@ final class AddExpenseUITests: XCTestCase {
     }
 
     @MainActor
+    func testTickingACardBillAsPaidClearsWhatIsDue() {
+        let app = launchApp()
+        app.buttons["addMenu"].tap()
+        app.buttons["addExpenseButton"].tap()
+        let amount = app.textFields["amountField"]
+        XCTAssertTrue(amount.waitForExistence(timeout: 20))
+        amount.tap()
+        amount.typeText("1200")
+        let description = app.textFields["descriptionField"]
+        description.tap()
+        description.typeText("Train ticket")
+        app.keyboards.buttons["Return"].tap()
+        app.buttons["categoryPicker"].tap()
+        app.buttons["Transport"].tap()
+        app.buttons["paymentPicker"].tap()
+        app.buttons["Credit Card"].tap()
+        app.buttons["saveExpenseButton"].tap()
+
+        let link = app.buttons["cardBillsLink"]
+        XCTAssertTrue(link.waitForExistence(timeout: 20))
+        link.tap()
+        let row = app.descendants(matching: .any)["cardBillRow"]
+        XCTAssertTrue(row.waitForExistence(timeout: 20))
+        XCTAssertTrue(row.label.contains("Credit Card, bill ₹1,200.00, due ₹1,200.00"))
+        XCTAssertEqual(app.staticTexts["cardTotalDue"].label, "₹1,200.00")
+
+        app.buttons["cardPaidButton"].tap()
+
+        let paid = NSPredicate(format: "label == %@", "₹0.00")
+        let cleared = XCTNSPredicateExpectation(predicate: paid, object: app.staticTexts["cardTotalDue"])
+        XCTAssertEqual(XCTWaiter().wait(for: [cleared], timeout: 10), .completed, "due was not cleared")
+    }
+
+    @MainActor
     private func launchApp() -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments = ["-ui-testing"]
