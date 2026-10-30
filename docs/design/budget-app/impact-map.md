@@ -24,6 +24,7 @@ Vision: one offline iPhone app that replaces a personal budget spreadsheet: what
 | Budget | Entities (shops and services) on expenses | `tests/budget/entities/entities.feature` |
 | Budget | Spending in another currency | `tests/budget/currencies/foreign-currency-spending.feature` |
 | Budget | Search expenses | `tests/budget/search/search-expenses.feature` |
+| Budget | Spent for (who it was for) and tags | `tests/budget/expenses/spent-for-and-tags.feature` |
 | Settings | Preferences (currency, privacy, totals, due dates, filters) | `tests/settings/preferences/preferences.feature` |
 | Budget | Card bills with a paid tick | `tests/budget/cards/card-bills.feature` |
 | Budget | Amount to repay | `tests/budget/borrowing/amount-to-repay.feature` |

@@ -10,6 +10,7 @@ let testExclusions = [
     "budget/cash-in-hand/cash-in-hand.feature",
     "budget/expenses/record-expense.feature",
     "budget/expenses/refunds.feature",
+    "budget/expenses/spent-for-and-tags.feature",
     "budget/income/record-income.feature",
     "budget/month-budget/month-budget.feature",
     "budget/bills/bills.feature",
