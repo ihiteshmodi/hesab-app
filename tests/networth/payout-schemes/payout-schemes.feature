@@ -3,8 +3,11 @@ Feature: Payout schemes and maturity reminders
   I want to see what pays out and when each one matures
   So that I never miss a maturity and my monthly income is easy to record
 
+  # Expected payouts show on the Bills tab as "Upcoming Income"; maturities show there too.
+  # There is no separate Reminders tab.
   # Payout amounts are approximate (month length changes them),
-  # so recording a payout always lets me edit the amount.
+  # so recording a payout always shows a confirmation where the date and amount can be changed.
+  # A payout counts on the Bills tab from "Payout alert" days before its date (default 5).
 
   Background:
     Given these payout schemes
@@ -18,28 +21,58 @@ Feature: Payout schemes and maturity reminders
     Then "Invested" shows 900,000
     And "Monthly payout" shows 5,750
 
-  Scenario: A maturity within 90 days appears in Reminders
+  Scenario: A maturity within 90 days appears on the Bills tab
     Given today is 2026-12-15
-    When she opens the Reminders tab
+    When she opens the Bills tab filtered to "Upcoming Income"
     Then she sees "Bond A matures in 53 days"
     And "Bank FD" is not listed
     And "Post scheme" is not listed because it has no maturity date
 
-  Scenario: A payout expected within 7 days is listed
-    Given today is 2026-11-20
-    When she opens the Reminders tab
+  Scenario: A payout expected inside the alert window is listed
+    Given "Payout alert" is 5 days before
+    And today is 2026-11-20
+    When she opens the Bills tab filtered to "Upcoming Income"
     Then she sees "Bond A payout expected 24 Nov, about 800"
     And "Bank FD" is not listed because its payout is 8 days away
 
   Scenario: Priya records a payout with the actual amount
     Given today is 2026-11-24
-    When she chooses "Record Payout" on Bond A and changes the amount to 790
+    When she chooses "Record" on Bond A
+    Then a confirmation shows the date 2026-11-24, the amount 800 and the bank it lands in
+    When she changes the amount to 790 and confirms
     Then an "Investment Income" entry of 790 dated 2026-11-24 is created with note "Bond A"
     And the November payout for Bond A no longer shows as expected
 
+  Scenario Outline: A payout can arrive a day early or late
+    Given Bond A's payout is expected on 2026-11-24
+    And today is <today>
+    When she chooses "Record" on Bond A
+    Then the confirmation shows the date <today> and says "<note>"
+
+    Examples:
+      | today      | note                    |
+      | 2026-11-23 | 1 day earlier than expected |
+      | 2026-11-24 | on the expected date    |
+      | 2026-11-25 | 1 day later than expected   |
+
+  Scenario: The confirmation can change the date
+    Given today is 2026-11-25 and Bond A's payout was expected on 2026-11-24
+    When she chooses "Record" on Bond A, sets the date to 2026-11-24 and confirms
+    Then the entry is dated 2026-11-24
+
+  Scenario: Cancelling the confirmation records nothing
+    Given today is 2026-11-24
+    When she chooses "Record" on Bond A and cancels
+    Then no entry is created
+    And Bond A's payout still shows as expected
+
+  Scenario: A confirmation amount must be above zero
+    When she chooses "Record" on Bond A, clears the amount and confirms
+    Then she sees "Enter an amount above 0"
+
   Scenario: A matured scheme asks to be closed
     Given today is 2027-02-07
-    When she opens the Reminders tab
+    When she opens the Bills tab filtered to "Upcoming Income"
     Then she sees "Bond A matured 1 day ago"
     When she chooses "Close Scheme"
     Then "Invested" shows 800,000
@@ -62,11 +95,11 @@ Feature: Payout schemes and maturity reminders
       | Bond C | 0        | 10     | Enter an amount above 0          |
       | Bond C | 1000     | -1     | Enter a payout of 0 or more      |
 
-  Scenario Outline: The Reminders tab shows a count of what needs attention
+  Scenario Outline: The Bills tab shows a count of what needs attention
     Given today is 2026-11-24
     And Bond A's November payout is <bond status>
     And <matured> scheme(s) have matured and are not closed
-    Then the Reminders tab shows <badge>
+    Then the Bills tab shows <badge>
 
     Examples:
       | bond status    | matured | badge |
@@ -74,10 +107,11 @@ Feature: Payout schemes and maturity reminders
       | recorded       | 0       | none  |
       | not yet recorded | 1     | 2     |
 
-  Scenario: Payouts that are not due yet do not add to the count
-    Given today is 2026-11-20
+  Scenario: Payouts outside the alert window do not add to the count
+    Given "Payout alert" is 5 days before
+    And today is 2026-11-17
     And Bond A's payout is expected on 2026-11-24
-    Then the Reminders tab shows no count
+    Then the Bills tab shows no count
 
   Scenario: Nothing to remind
     Given no scheme matures within 90 days and no payout is expected
