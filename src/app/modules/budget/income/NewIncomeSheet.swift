@@ -23,7 +23,8 @@ struct NewIncomeSheet: View {
                         ForEach(IncomeKind.allCases, id: \.self) { Text($0.title).tag(IncomeKind?.some($0)) }
                     }
                     .accessibilityIdentifier("incomeTypePicker")
-                    TextField("Note (optional)", text: $note)
+                    TextField(kind == .borrowed ? "Borrowed from" : "Note (optional)", text: $note)
+                        .accessibilityIdentifier("incomeNoteField")
                     DatePicker("Date", selection: $date, displayedComponents: .date)
                 }
                 if let errorMessage {

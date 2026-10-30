@@ -26,12 +26,15 @@ public final class BudgetApp: Sendable {
     public let exportData: ExportData
     public let prepareImport: PrepareImport
     public let confirmImport: ConfirmImport
+    public let recordRepayment: RecordRepayment
+    public let amountToRepay: GetAmountToRepay
 
     public init(database: AppDatabase, clock: any DayClock) {
         let expenses = ExpenseRepository(database: database)
         let income = IncomeRepository(database: database)
         let ledgerBook = LedgerRepository(database: database)
         let cash = CashAdjustmentRepository(database: database)
+        let borrowingBook = BorrowingRepository(database: database)
         addLedger = AddLedger(ledgers: ledgerBook)
         deleteLedger = DeleteLedger(ledgers: ledgerBook, expenses: expenses)
         addLedgerEntry = AddLedgerEntry(ledgers: ledgerBook, expenses: expenses, clock: clock)
@@ -49,7 +52,7 @@ public final class BudgetApp: Sendable {
         pendingRefunds = GetPendingRefunds(expenses: expenses)
         addIncome = AddIncome(income: income, clock: clock)
         deleteIncome = DeleteIncome(income: income)
-        monthBudget = GetMonthBudget(expenses: expenses, income: income, clock: clock)
+        monthBudget = GetMonthBudget(expenses: expenses, income: income, repayments: borrowingBook, clock: clock)
         let cardBook = CardRepository(database: database)
         addCard = AddCard(cards: cardBook)
         cards = GetCards(cards: cardBook)
@@ -59,5 +62,7 @@ public final class BudgetApp: Sendable {
         exportData = ExportData(database: database, clock: clock)
         prepareImport = PrepareImport(database: database)
         confirmImport = ConfirmImport(database: database, clock: clock)
+        recordRepayment = RecordRepayment(income: income, borrowings: borrowingBook, clock: clock)
+        amountToRepay = GetAmountToRepay(income: income, borrowings: borrowingBook)
     }
 }

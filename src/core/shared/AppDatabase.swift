@@ -98,6 +98,15 @@ public final class AppDatabase: Sendable {
             try db.execute(sql: "INSERT INTO card (name) VALUES ('Credit Card')")
         }
 
+        migrator.registerMigration("v7-repayments") { db in
+            try db.create(table: "repayment") { table in
+                table.autoIncrementedPrimaryKey("id")
+                table.column("income_id", .integer).notNull().references("income_entry", onDelete: .cascade)
+                table.column("date", .text).notNull()
+                table.column("amount_paise", .integer).notNull()
+            }
+        }
+
         return migrator
     }
 }
