@@ -1,0 +1,444 @@
+import Charts
+import HisaabCore
+import SwiftUI
+import UIKit
+
+struct TripExpenseDetailScreen: View {
+    let model: BudgetViewModel
+    let tripID: Int64
+    let expenseID: Int64
+    let onEdit: (TripExpense) -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        if let summary = model.tripSummary(tripID), let expense = summary.expenses.first(where: { $0.id == expenseID }) {
+            let trip = summary.trip
+            List {
+                Section {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(expense.paidBy == .me ? "PAID BY ME" : "PAID BY \(name(expense.paidBy, summary).uppercased())")
+                            .font(.caption).foregroundStyle(.secondary)
+                        Text(model.tripText(expense.amount, trip)).font(.title.bold()).monospacedDigit()
+                        if let charge = expense.paidInHome {
+                            Text("card charged \(IndianMoneyFormat.string(charge))").foregroundStyle(.secondary)
+                        } else if trip.currency != nil {
+                            Text(expense.paidWith == .cash ? "paid in cash" : "≈ \(IndianMoneyFormat.string(TripValue.home(expense.amount, trip)))")
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    Chart(shares(expense), id: \.who) { item in
+                        BarMark(x: .value("Share", item.paise)).foregroundStyle(by: .value("Person", item.name))
+                    }
+                    .chartXAxis(.hidden)
+                    .frame(height: 36)
+                }
+                Section("Who owes what") {
+                    ForEach(shares(expense), id: \.who) { item in
+                        HStack {
+                            Text(item.name)
+                            Spacer()
+                            VStack(alignment: .trailing) {
+                                Text(model.tripText(Money(paise: item.paise), trip)).monospacedDigit()
+                                if trip.currency != nil {
+                                    Text("≈ \(IndianMoneyFormat.string(TripValue.home(Money(paise: item.paise), trip, charge: expense)))")
+                                        .font(.footnote).foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+                    }
+                }
+                if !expense.tag.isEmpty || !expense.note.isEmpty {
+                    Section("Details") {
+                        if !expense.tag.isEmpty { LabeledContent("Tag", value: expense.tag) }
+                        if !expense.note.isEmpty { Text(expense.note) }
+                    }
+                }
+                if expense.hasReceipt, let data = model.tripReceipt(expense.id), let image = UIImage(data: data) {
+                    Section("Receipt") {
+                        Image(uiImage: image).resizable().scaledToFit().accessibilityIdentifier("receiptImage")
+                    }
+                }
+            }
+            .navigationTitle(expense.description)
+            .toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    Button("Edit") { onEdit(expense); dismiss() }.accessibilityIdentifier("editTripExpenseButton")
+                }
+            }
+        } else {
+            Text("That expense no longer exists.").foregroundStyle(.secondary)
+        }
+    }
+
+    private struct ShareItem { let who: Participant; let name: String; let paise: Int }
+
+    private func shares(_ expense: TripExpense) -> [ShareItem] {
+        guard let summary = model.tripSummary(tripID) else { return [] }
+        return expense.shares.map { ShareItem(who: $0.key, name: name($0.key, summary), paise: $0.value.paise) }
+            .sorted { $0.who.hashValue < $1.who.hashValue }
+            .sorted { ($0.name == "Me" ? 0 : 1, $0.name) < ($1.name == "Me" ? 0 : 1, $1.name) }
+    }
+
+    private func name(_ who: Participant, _ summary: TripSummary) -> String {
+        switch who {
+        case .me: "Me"
+        case .person(let id): summary.members.first { $0.id == id }?.name ?? "Someone"
+        }
+    }
+}
+
+/// What a trip-currency amount is worth in rupees at the trip rate, or at the expense's own card charge.
+enum TripValue {
+    static func home(_ money: Money, _ trip: Trip, charge expense: TripExpense? = nil) -> Money {
+        guard let rate = trip.rate else { return money }
+        var exact: Decimal
+        if let expense, let paid = expense.paidInHome, expense.amount > .zero {
+            exact = Decimal(money.paise) * Decimal(paid.paise) / Decimal(expense.amount.paise)
+        } else {
+            exact = Decimal(money.paise) * rate
+        }
+        var rounded = Decimal()
+        NSDecimalRound(&rounded, &exact, 0, .plain)
+        return Money(paise: NSDecimalNumber(decimal: rounded).intValue)
+    }
+}
+
+struct PersonStatementScreen: View {
+    let model: BudgetViewModel
+    let tripID: Int64
+    let personID: Int64
+    let onSettle: (Int64) -> Void
+    @Environment(\.dismiss) private var dismiss
+    @State private var errorMessage: String?
+
+    var body: some View {
+        if let summary = model.tripSummary(tripID), let page = model.tripStatement(tripID, personID) {
+            let trip = summary.trip
+            List {
+                Section {
+                    HStack {
+                        Text(page.owesMe >= .zero ? "Still owes me" : "I still owe").font(.headline)
+                        Spacer()
+                        VStack(alignment: .trailing) {
+                            Text(model.tripText(page.owesMe < .zero ? .zero - page.owesMe : page.owesMe, trip)).font(.headline).monospacedDigit()
+                                .foregroundStyle(page.owesMe > .zero ? Color.green : page.owesMe < .zero ? Color.red : Color.secondary)
+                                .accessibilityIdentifier("statementBalance")
+                            if trip.currency != nil {
+                                Text("≈ \(IndianMoneyFormat.string(page.owesMeHome < .zero ? .zero - page.owesMeHome : page.owesMeHome))")
+                                    .font(.footnote).foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                }
+                if let errorMessage { Text(errorMessage).foregroundStyle(.red) }
+                section("Entries they owe me for", page.lines.filter { $0.kind == .iPaid }, trip)
+                section("What I owe them for", page.lines.filter { $0.kind == .theyPaid }, trip)
+                section("Payments", page.lines.filter { $0.kind == .payment }, trip, deletable: true)
+            }
+            .navigationTitle(page.person.name)
+            .toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    Button("Settle") { onSettle(personID); dismiss() }.accessibilityIdentifier("statementSettleButton")
+                }
+            }
+        } else {
+            Text("That person is no longer in this trip.").foregroundStyle(.secondary)
+        }
+    }
+
+    @ViewBuilder private func section(_ title: String, _ lines: [StatementLine], _ trip: Trip, deletable: Bool = false) -> some View {
+        if !lines.isEmpty {
+            Section(title) {
+                ForEach(Array(lines.enumerated()), id: \.offset) { _, line in
+                    HStack {
+                        VStack(alignment: .leading) {
+                            Text(line.title)
+                            Text(line.date.shortTitle).font(.footnote).foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Text((line.amount > .zero ? "+ " : "− ") + model.tripText(line.amount < .zero ? .zero - line.amount : line.amount, trip))
+                            .monospacedDigit()
+                    }
+                    .swipeActions {
+                        if deletable, let id = line.settlementID {
+                            Button("Undo", role: .destructive) { errorMessage = model.deleteTripSettlement(id) }
+                        }
+                    }
+                    .accessibilityIdentifier("statementLine")
+                }
+            }
+        }
+    }
+}
+
+struct TripCashScreen: View {
+    let model: BudgetViewModel
+    let tripID: Int64
+    @State private var setting = false
+
+    var body: some View {
+        if let summary = model.tripSummary(tripID) {
+            let trip = summary.trip
+            List {
+                Section {
+                    VStack(alignment: .center, spacing: 4) {
+                        Text("CASH IN HAND (\(trip.currency ?? ""))").font(.caption).foregroundStyle(.secondary)
+                        Text(model.tripText(summary.cash.balance, trip)).font(.largeTitle.bold()).monospacedDigit()
+                            .accessibilityIdentifier("tripCashScreenBalance")
+                        Text("≈ \(IndianMoneyFormat.string(TripValue.home(summary.cash.balance, trip))) at the trip rate").foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity)
+                    if let warning = summary.cash.warning { Text(warning).foregroundStyle(.orange) }
+                }
+                Section("Where it went") {
+                    if summary.cash.lines.isEmpty { Text("Nothing yet. Set what you are holding, or take cash from a friend.").foregroundStyle(.secondary) }
+                    ForEach(Array(summary.cash.lines.enumerated()), id: \.offset) { _, line in
+                        HStack {
+                            VStack(alignment: .leading) {
+                                Text(line.description)
+                                Text(line.date.shortTitle).font(.footnote).foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            VStack(alignment: .trailing) {
+                                Text((line.amount >= .zero ? "+ " : "− ") + model.tripText(line.amount < .zero ? .zero - line.amount : line.amount, trip))
+                                    .monospacedDigit()
+                                Text(model.tripText(line.runningBalance, trip)).font(.footnote).foregroundStyle(.secondary).monospacedDigit()
+                            }
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Trip Cash")
+            .toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    Button("Set Cash", systemImage: "pencil") { setting = true }.accessibilityIdentifier("setTripCashButton")
+                }
+            }
+            .sheet(isPresented: $setting) { SetTripCashSheet(model: model, tripID: tripID) }
+        }
+    }
+}
+
+private struct SetTripCashSheet: View {
+    let model: BudgetViewModel
+    let tripID: Int64
+    @Environment(\.dismiss) private var dismiss
+    @State private var text = ""
+    @State private var errorMessage: String?
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                TextField("Cash you are holding", text: $text).keyboardType(.decimalPad).accessibilityIdentifier("setTripCashField")
+                if let errorMessage { Text(errorMessage).foregroundStyle(.red) }
+            }
+            .navigationTitle("Set Trip Cash")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") {
+                        errorMessage = model.setTripCash(tripID, text: text)
+                        if errorMessage == nil { dismiss() }
+                    }
+                    .accessibilityIdentifier("saveTripCashButton")
+                }
+            }
+        }
+    }
+}
+
+struct TripInsightsScreen: View {
+    let model: BudgetViewModel
+    let tripID: Int64
+
+    private struct Owed: Identifiable { let id: Int64; let name: String; let paise: Int }
+
+    var body: some View {
+        if let summary = model.tripSummary(tripID) {
+            let trip = summary.trip
+            List {
+                Section("Who owes me") {
+                    let owed = summary.balances.filter { $0.owesMe > .zero }.map { Owed(id: $0.person.id, name: $0.person.name, paise: $0.owesMe.paise) }
+                    if owed.isEmpty { Text("Nobody owes you anything.").foregroundStyle(.secondary) }
+                    Chart(owed) { item in
+                        BarMark(x: .value("Owes", item.paise), y: .value("Person", item.name)).foregroundStyle(.green)
+                    }
+                    .chartXAxis(.hidden)
+                    .frame(height: CGFloat(max(owed.count, 1)) * 36)
+                    ForEach(owed) { item in
+                        HStack { Text(item.name); Spacer(); Text(model.tripText(Money(paise: item.paise), trip)).monospacedDigit() }
+                    }
+                }
+                Section("Spend by tag") {
+                    if summary.spendByTag.isEmpty { Text("No expenses yet.").foregroundStyle(.secondary) }
+                    Chart(summary.spendByTag, id: \.tag) { item in
+                        SectorMark(angle: .value("Spend", item.amount.paise), innerRadius: .ratio(0.55))
+                            .foregroundStyle(by: .value("Tag", item.tag.isEmpty ? "Untagged" : item.tag))
+                    }
+                    .frame(height: 180)
+                    ForEach(summary.spendByTag, id: \.tag) { item in
+                        HStack {
+                            Text(item.tag.isEmpty ? "Untagged" : item.tag)
+                            Spacer()
+                            Text(model.tripText(item.amount, trip)).monospacedDigit()
+                        }
+                    }
+                }
+                Section("Paid vs share") {
+                    ForEach(summary.totals, id: \.participant) { total in
+                        VStack(alignment: .leading) {
+                            Text(name(total.participant, summary))
+                            Text("paid \(model.tripText(total.paid, trip)) · share \(model.tripText(total.share, trip))")
+                                .font(.footnote).foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Insights")
+        }
+    }
+
+    private func name(_ who: Participant, _ summary: TripSummary) -> String {
+        switch who {
+        case .me: "Me"
+        case .person(let id): summary.members.first { $0.id == id }?.name ?? "Someone"
+        }
+    }
+}
+
+struct TripPeopleScreen: View {
+    let model: BudgetViewModel
+    let tripID: Int64
+    @State private var adding = false
+    @State private var newName = ""
+    @State private var editingGroup: GroupDraft?
+    @State private var errorMessage: String?
+
+    var body: some View {
+        if let summary = model.tripSummary(tripID) {
+            List {
+                if let errorMessage { Text(errorMessage).foregroundStyle(.red).accessibilityIdentifier("peopleError") }
+                Section("In this trip") {
+                    ForEach(summary.members, id: \.id) { person in
+                        Text(person.name)
+                            .swipeActions {
+                                Button("Remove", role: .destructive) { errorMessage = model.deletePerson(tripID, person.id) }
+                            }
+                            .accessibilityIdentifier("personRow")
+                    }
+                    Button("Add Person") { adding = true }.accessibilityIdentifier("addPersonButton")
+                }
+                Section {
+                    ForEach(summary.groups, id: \.id) { group in
+                        Button { editingGroup = GroupDraft(group) } label: {
+                            VStack(alignment: .leading) {
+                                Text(group.name).foregroundStyle(.primary)
+                                Text(names(group.members, summary)).font(.footnote).foregroundStyle(.secondary)
+                            }
+                        }
+                        .swipeActions {
+                            Button("Delete", role: .destructive) { errorMessage = model.deleteTripGroup(group.id) }
+                        }
+                        .accessibilityIdentifier("groupRow")
+                    }
+                    Button("New Group") { editingGroup = GroupDraft(nil) }.accessibilityIdentifier("newGroupButton")
+                } header: {
+                    Text("Groups")
+                } footer: {
+                    Text("A group only saves taps in the split. It never changes who owes what.")
+                }
+            }
+            .navigationTitle("People")
+            .alert("Add Person", isPresented: $adding) {
+                TextField("Name", text: $newName).accessibilityIdentifier("newPersonField")
+                Button("Add") {
+                    errorMessage = model.addPerson(tripID, newName)
+                    newName = ""
+                }
+                .accessibilityIdentifier("confirmAddPersonButton")
+                Button("Cancel", role: .cancel) { newName = "" }
+            }
+            .sheet(item: $editingGroup) { GroupSheet(model: model, summary: summary, draft: $0) }
+        }
+    }
+
+    private func names(_ members: Set<Participant>, _ summary: TripSummary) -> String {
+        let order = [Participant.me] + summary.members.map { Participant.person($0.id) }
+        return order.filter { members.contains($0) }.map { who in
+            switch who {
+            case .me: "Me"
+            case .person(let id): summary.members.first { $0.id == id }?.name ?? "Someone"
+            }
+        }.joined(separator: ", ")
+    }
+}
+
+struct GroupDraft: Identifiable {
+    let id: Int64
+    let name: String
+    let members: Set<Participant>
+
+    init(_ group: TripGroup?) {
+        id = group?.id ?? 0
+        name = group?.name ?? ""
+        members = group?.members ?? []
+    }
+}
+
+private struct GroupSheet: View {
+    let model: BudgetViewModel
+    let summary: TripSummary
+    let draft: GroupDraft
+    @Environment(\.dismiss) private var dismiss
+    @State private var name = ""
+    @State private var members: Set<Participant> = []
+    @State private var errorMessage: String?
+
+    private var participants: [Participant] { [.me] + summary.members.map { Participant.person($0.id) } }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                TextField("Group name", text: $name).accessibilityIdentifier("groupNameField")
+                Section("Who is in it") {
+                    ForEach(participants, id: \.self) { who in
+                        let title: String = {
+                            switch who {
+                            case .me: "Me"
+                            case .person(let id): summary.members.first { $0.id == id }?.name ?? "Someone"
+                            }
+                        }()
+                        Button {
+                            if members.contains(who) { members.remove(who) } else { members.insert(who) }
+                        } label: {
+                            HStack {
+                                Text(title).foregroundStyle(.primary)
+                                Spacer()
+                                if members.contains(who) { Image(systemName: "checkmark").foregroundStyle(.blue) }
+                            }
+                        }
+                        .accessibilityIdentifier("groupMember-\(title)")
+                    }
+                }
+                if let errorMessage { Text(errorMessage).foregroundStyle(.red).accessibilityIdentifier("groupError") }
+            }
+            .navigationTitle(draft.id == 0 ? "New Group" : "Edit Group")
+            .navigationBarTitleDisplayMode(.inline)
+            .onAppear {
+                name = draft.name
+                members = draft.members
+            }
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") {
+                        errorMessage = model.saveTripGroup(summary.trip.id, id: draft.id == 0 ? nil : draft.id, name: name, members: members)
+                        if errorMessage == nil { dismiss() }
+                    }
+                    .accessibilityIdentifier("saveGroupButton")
+                }
+            }
+        }
+    }
+}

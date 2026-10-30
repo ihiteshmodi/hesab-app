@@ -21,6 +21,13 @@ final class LedgerRepository: Sendable {
         }
     }
 
+    func setCountsTowardsNetWorth(_ id: Int64, _ counts: Bool) throws {
+        try database.writer.write { db in
+            try db.execute(sql: "UPDATE ledger SET counts_towards_net_worth = ? WHERE id = ?", arguments: [counts, id])
+            guard db.changesCount > 0 else { throw LedgerError.notFound(id) }
+        }
+    }
+
     func ledger(_ id: Int64) throws -> Ledger {
         try database.writer.read { db in
             guard let record = try LedgerRecord.fetchOne(db, key: id) else { throw LedgerError.notFound(id) }

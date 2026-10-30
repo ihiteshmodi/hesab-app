@@ -17,3 +17,6 @@ extension EntityError: UserMessage {}
 extension PlannedItemError: UserMessage {}
 extension BillError: UserMessage {}
 extension CurrencyError: UserMessage {}
+extension TripError: UserMessage {}
+extension PortfolioError: UserMessage {}
+extension PayoutSchemeError: UserMessage {}

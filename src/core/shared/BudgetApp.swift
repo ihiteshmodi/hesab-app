@@ -76,21 +76,61 @@ public final class BudgetApp: Sendable {
     public let addCurrency: AddCurrency
     public let lastRate: GetLastRate
     public let setHomeCurrency: SetHomeCurrency
+    public let portfolio: GetPortfolio
+    public let setBankBalance: SetBankBalance
+    public let setExchangeRate: SetExchangeRate
+    public let addHolding: AddHolding
+    public let deleteHolding: DeleteHolding
+    public let addAllocatedFund: AddAllocatedFund
+    public let deleteAllocatedFund: DeleteAllocatedFund
+    public let setLedgerCountsTowardsNetWorth: SetLedgerCountsTowardsNetWorth
+    public let addScheme: AddScheme
+    public let payoutSchemes: GetPayoutSchemes
+    public let upcomingIncome: GetUpcomingIncome
+    public let payoutDraft: GetPayoutDraft
+    public let recordPayout: RecordPayout
+    public let closeScheme: CloseScheme
+    public let addPerson: AddPerson
+    public let people: GetPeople
+    public let deletePerson: DeletePerson
+    public let saveTripGroup: SaveTripGroup
+    public let deleteTripGroup: DeleteTripGroup
+    public let tripTags: GetTripTags
+    public let addTripTag: AddTripTag
+    public let deleteTripTag: DeleteTripTag
+    public let createTrip: CreateTrip
+    public let updateTrip: UpdateTrip
+    public let setTripSettled: SetTripSettled
+    public let deleteTrip: DeleteTrip
+    public let trips: GetTrips
+    public let tripSummary: GetTripSummary
+    public let tripPersonStatement: GetTripPersonStatement
+    public let addTripExpense: AddTripExpense
+    public let updateTripExpense: UpdateTripExpense
+    public let deleteTripExpense: DeleteTripExpense
+    public let setTripReceipt: SetTripReceipt
+    public let tripReceipt: GetTripReceipt
+    public let recordTripSettlement: RecordTripSettlement
+    public let deleteTripSettlement: DeleteTripSettlement
+    public let setTripCash: SetTripCash
 
     public init(database: AppDatabase, clock: any DayClock) {
         let expenses = ExpenseRepository(database: database)
         let income = IncomeRepository(database: database)
         let ledgerBook = LedgerRepository(database: database)
         let cash = CashAdjustmentRepository(database: database)
+        let tripBook = TripRepository(database: database)
         let borrowingBook = BorrowingRepository(database: database)
         let settingsBook = SettingsRepository(database: database)
+        let schemeBook = PayoutSchemeRepository(database: database)
+        let schemeStore = SchemeStore(schemes: schemeBook, settings: settingsBook, clock: clock)
         addLedger = AddLedger(ledgers: ledgerBook)
         deleteLedger = DeleteLedger(ledgers: ledgerBook, expenses: expenses)
         addLedgerEntry = AddLedgerEntry(ledgers: ledgerBook, expenses: expenses, clock: clock)
         deleteLedgerEntry = DeleteLedgerEntry(ledgers: ledgerBook)
         ledgers = GetLedgers(ledgers: ledgerBook, expenses: expenses)
-        cashInHand = GetCashInHand(expenses: expenses, adjustments: cash)
-        setCashInHand = SetCashInHand(expenses: expenses, adjustments: cash, clock: clock)
+        cashInHand = GetCashInHand(expenses: expenses, adjustments: cash, trips: tripBook)
+        setCashInHand = SetCashInHand(expenses: expenses, adjustments: cash, trips: tripBook, clock: clock)
         addExpense = AddExpense(expenses: expenses, clock: clock)
         updateExpense = UpdateExpense(expenses: expenses, clock: clock)
         deleteExpense = DeleteExpense(expenses: expenses)
@@ -158,7 +198,7 @@ public final class BudgetApp: Sendable {
         autoAdded = GetAutoAdded(store: billStore, expenses: expenses)
         markAutoAddedSeen = MarkAutoAddedSeen(bills: billBook)
         undoAutoAdded = UndoAutoAdded(store: billStore, expenses: expenses)
-        billsAttention = GetBillsAttention(store: billStore)
+        billsAttention = GetBillsAttention(store: billStore, schemes: schemeStore)
         searchExpenses = SearchExpenses(expenses: expenses)
         spendingBreakdown = GetSpendingBreakdown(expenses: expenses)
         categoryBreakdown = GetCategoryBreakdown(expenses: expenses)
@@ -167,5 +207,45 @@ public final class BudgetApp: Sendable {
         addCurrency = AddCurrency(currencies: currencyBook)
         lastRate = GetLastRate(expenses: expenses)
         setHomeCurrency = SetHomeCurrency(expenses: expenses, income: income, settings: settingsBook)
+        let portfolioBook = PortfolioRepository(database: database, settings: settingsBook)
+        portfolio = GetPortfolio(portfolio: portfolioBook, ledgers: ledgerBook, expenses: expenses, schemes: schemeBook)
+        setBankBalance = SetBankBalance(portfolio: portfolioBook, clock: clock)
+        setExchangeRate = SetExchangeRate(portfolio: portfolioBook, clock: clock)
+        addHolding = AddHolding(portfolio: portfolioBook, setRate: setExchangeRate)
+        deleteHolding = DeleteHolding(portfolio: portfolioBook)
+        addAllocatedFund = AddAllocatedFund(portfolio: portfolioBook)
+        deleteAllocatedFund = DeleteAllocatedFund(portfolio: portfolioBook)
+        setLedgerCountsTowardsNetWorth = SetLedgerCountsTowardsNetWorth(ledgers: ledgerBook)
+        addScheme = AddScheme(schemes: schemeBook)
+        payoutSchemes = GetPayoutSchemes(schemes: schemeBook)
+        upcomingIncome = GetUpcomingIncome(store: schemeStore)
+        payoutDraft = GetPayoutDraft(store: schemeStore)
+        recordPayout = RecordPayout(store: schemeStore, income: income)
+        closeScheme = CloseScheme(schemes: schemeBook)
+        let tripStore = TripStore(trips: tripBook, expenses: expenses, clock: clock)
+        addPerson = AddPerson(trips: tripBook)
+        people = GetPeople(trips: tripBook)
+        deletePerson = DeletePerson(store: tripStore)
+        saveTripGroup = SaveTripGroup(store: tripStore)
+        deleteTripGroup = DeleteTripGroup(trips: tripBook)
+        tripTags = GetTripTags(trips: tripBook)
+        addTripTag = AddTripTag(trips: tripBook)
+        deleteTripTag = DeleteTripTag(trips: tripBook)
+        createTrip = CreateTrip(trips: tripBook)
+        updateTrip = UpdateTrip(store: tripStore)
+        setTripSettled = SetTripSettled(trips: tripBook)
+        deleteTrip = DeleteTrip(store: tripStore)
+        trips = GetTrips(store: tripStore)
+        tripSummary = GetTripSummary(store: tripStore)
+        tripPersonStatement = GetTripPersonStatement(store: tripStore)
+        let tripSaver = SaveTripExpense(store: tripStore)
+        addTripExpense = AddTripExpense(saver: tripSaver)
+        updateTripExpense = UpdateTripExpense(saver: tripSaver)
+        deleteTripExpense = DeleteTripExpense(store: tripStore)
+        setTripReceipt = SetTripReceipt(trips: tripBook)
+        tripReceipt = GetTripReceipt(trips: tripBook)
+        recordTripSettlement = RecordTripSettlement(store: tripStore)
+        deleteTripSettlement = DeleteTripSettlement(store: tripStore)
+        setTripCash = SetTripCash(store: tripStore)
     }
 }

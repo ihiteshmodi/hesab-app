@@ -24,6 +24,7 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: app.hisaab.Hisaab
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_CFBundleDisplayName: Hisaab
+        INFOPLIST_KEY_NSCameraUsageDescription: Take a photo of a receipt to keep with a trip expense.
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone: UIInterfaceOrientationPortrait
         MARKETING_VERSION: "0.1.0"
