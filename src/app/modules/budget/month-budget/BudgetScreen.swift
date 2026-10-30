@@ -60,6 +60,16 @@ struct BudgetScreen: View {
                         }
                         .accessibilityIdentifier("cardBillsLink")
                         NavigationLink {
+                            AmountToRepayScreen(model: model)
+                        } label: {
+                            HStack {
+                                Text("Amount to repay")
+                                Spacer()
+                                Text(IndianMoneyFormat.string(model.amountToRepay?.total ?? .zero)).foregroundStyle(.secondary).monospacedDigit()
+                            }
+                        }
+                        .accessibilityIdentifier("amountToRepayLink")
+                        NavigationLink {
                             BackupScreen(model: model)
                         } label: {
                             Text("Backup")

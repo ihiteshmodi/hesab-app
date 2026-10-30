@@ -6,6 +6,7 @@ public struct AddIncome: Sendable {
     public func callAsFunction(_ new: NewIncome) throws -> IncomeEntry {
         guard let amount = new.amount, amount > .zero else { throw IncomeValidationError.amountMissingOrZero }
         guard let kind = new.kind else { throw IncomeValidationError.typeMissing }
+        guard kind != .borrowed || !new.note.trimmed.isEmpty else { throw IncomeValidationError.lenderMissing }
         return try income.add(date: new.date ?? clock.today(), kind: kind, amount: amount, note: new.note.trimmed)
     }
 }

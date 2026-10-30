@@ -193,6 +193,40 @@ final class AddExpenseUITests: XCTestCase {
     }
 
     @MainActor
+    func testRepayingPartOfABorrowingLowersWhatIsOwed() {
+        let app = launchApp()
+        app.buttons["addMenu"].tap()
+        app.buttons["addIncomeButton"].tap()
+        let amount = app.textFields["incomeAmountField"]
+        XCTAssertTrue(amount.waitForExistence(timeout: 20))
+        amount.tap()
+        amount.typeText("10000")
+        app.buttons["incomeTypePicker"].tap()
+        app.buttons["Borrowed"].tap()
+        let lender = app.textFields["incomeNoteField"]
+        lender.tap()
+        lender.typeText("Savings")
+        app.keyboards.buttons["Return"].tap()
+        app.buttons["saveIncomeButton"].tap()
+
+        let link = app.buttons["amountToRepayLink"]
+        XCTAssertTrue(link.waitForExistence(timeout: 20))
+        link.tap()
+        XCTAssertEqual(app.staticTexts["repayTotal"].label, "₹10,000.00")
+        app.buttons["borrowingRow"].tap()
+        let repaid = app.textFields["repaymentAmountField"]
+        XCTAssertTrue(repaid.waitForExistence(timeout: 20))
+        repaid.tap()
+        repaid.typeText("4000")
+        app.buttons["saveRepaymentButton"].tap()
+
+        let owed = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "label == %@", "₹6,000.00"), object: app.staticTexts["repayTotal"]
+        )
+        XCTAssertEqual(XCTWaiter().wait(for: [owed], timeout: 10), .completed, "repayment was not applied")
+    }
+
+    @MainActor
     private func launchApp() -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments = ["-ui-testing"]

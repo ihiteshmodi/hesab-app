@@ -12,6 +12,7 @@ final class BudgetViewModel {
     private(set) var cash: CashInHand?
     private(set) var cards: [Card] = []
     private(set) var cardBills: CardBills?
+    private(set) var amountToRepay: AmountToRepay?
     private(set) var loadError: String?
     private var cardMonth: CalendarDate.YearMonth?
 
@@ -28,6 +29,7 @@ final class BudgetViewModel {
             cash = try app.cashInHand()
             cards = try app.cards()
             cardBills = try app.cardBills(for: cardMonth)
+            amountToRepay = try app.amountToRepay()
             loadError = nil
         } catch {
             loadError = "Could not read your data. Close and reopen the app."
@@ -109,6 +111,10 @@ final class BudgetViewModel {
 
     func addCard(name: String) -> String? { run { try app.addCard(NewCard(name: name)) } }
 
+    func recordRepayment(_ borrowingID: Int64, amountText: String) -> String? {
+        run { try app.recordRepayment(borrowingID, MoneyInput.parse(amountText)) }
+    }
+
     /// Writes the export into the temporary folder; the screen hands it to the system file saver.
     func exportData() -> (file: URL?, error: String?) {
         do {
@@ -151,6 +157,8 @@ final class BudgetViewModel {
         } catch let error as CardError {
             return error.message
         } catch let error as BackupError {
+            return error.message
+        } catch let error as BorrowingError {
             return error.message
         } catch {
             return "Could not do that. Try again."

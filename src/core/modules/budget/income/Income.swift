@@ -37,11 +37,13 @@ public struct NewIncome: Sendable {
 public enum IncomeValidationError: Error, Equatable, Sendable {
     case amountMissingOrZero
     case typeMissing
+    case lenderMissing
 
     public var message: String {
         switch self {
         case .amountMissingOrZero: "Enter an amount above 0"
         case .typeMissing: "Choose a type"
+        case .lenderMissing: "Enter who you borrowed from"
         }
     }
 }
