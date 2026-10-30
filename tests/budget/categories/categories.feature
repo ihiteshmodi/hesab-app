@@ -22,20 +22,20 @@ Feature: Categories with sub-categories
       | Home & Utilities       | Electric, Gas, Internet, Mortgage, Rent, Home maintenance, Utilities, Cell phone |
       | Food & Dining          | Restaurant, Food delivery, Coffee, Alcohol                                  |
       | Groceries              | Ration, Milk, Biscuits                                                      |
-      | Health & Medical       | Medical, Blood tests, Skin & face, Dental, Personal care, Fitness, Supplements, Vision, Therapy, Pharmacy |
-      | Transport              | Ride share, Train tickets, Travel                                           |
+      | Health & Medical       | Medical, Blood tests, Skin & face, Dental, Personal care, Fitness, Supplements, Vision, Therapy, Pharmacy, Courses |
+      | Transport              | Ride share, Train tickets, Travel, Flight tickets                           |
       | Vehicle                | Vehicle service, Vehicle repairs, Vehicle loan, Parking                     |
       | Fuel                   |                                                                             |
-      | Insurance              | Health insurance - Me, Health insurance - Mom, Term life, Vehicle insurance, Home insurance |
+      | Insurance              | Health insurance - Me, Health insurance - Mom, Term life, Vehicle insurance, Home insurance, Travel insurance |
       | Entertainment & Movies |                                                                             |
       | Personal & Family      | Family cash gifts                                                           |
       | Lifestyle              | Subscriptions, Vacation, Concerts, Charity, Clothing, Gifts, Child care, Night life, Pets |
       | Shopping - Needs       |                                                                             |
-      | Shopping - Wants       |                                                                             |
-      | Technology & Gadgets   |                                                                             |
+      | Shopping - Wants       | Perfumes                                                                    |
+      | Technology & Gadgets   | Courses                                                                     |
       | Monthly Fixed Expenses |                                                                             |
       | Annual Fixed Expenses  |                                                                             |
-      | Miscellaneous          | Special occasions, Loan payment, Credit card payment                        |
+      | Miscellaneous          | Special occasions, Loan payment, Credit card payment, Bad expenses |
     And she can add, rename and delete any of them
 
   # The default set is the reference app's categories merged with the spreadsheet's.
