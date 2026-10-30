@@ -284,8 +284,16 @@ public struct UndoAutoAdded: Sendable {
 
 public struct GetBillsAttention: Sendable {
     let store: BillStore
+    let schemes: SchemeStore
 
     public func callAsFunction() throws -> BillsAttention {
-        try store.book().attention()
+        let bills = try store.book().attention()
+        let items = try schemes.book().upcoming()
+        let payouts = items.filter { $0.kind == .payout }.count
+        let matured = items.filter { $0.kind == .matured }.count
+        return BillsAttention(
+            badge: bills.badge + payouts + matured, autoAddedUnseen: bills.autoAddedUnseen,
+            menuCount: bills.menuCount + payouts
+        )
     }
 }

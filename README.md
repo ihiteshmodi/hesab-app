@@ -26,7 +26,7 @@ swift test                # runs the core tests, no simulator needed
 Expected output:
 
 ```text
-✔ Test run with 277 tests in 26 suites passed after 0.04 seconds.
+✔ Test run with 393 tests in 32 suites passed after 1.4 seconds.
 ...
 Built build/Hisaab.ipa
 ```
@@ -158,6 +158,6 @@ Design notes: [impact map](docs/design/budget-app/impact-map.md), [architecture]
 
 ## Roadmap
 
-Built: record an expense, this month's budget.
+Built: expenses, income, refunds, planned expenses and bills, categories and entities, search and reports, ledgers, cash in hand, card bills, amount to repay, foreign currencies, backup and restore, a one-time spreadsheet importer, portfolio and net worth, payout schemes with reminders, and trips (split expenses with friends, in any currency, with the main ledger following bank and card money only).
 
-Specified next (see the `.feature` files): income and savings, refunds and reimbursements, recurring and upcoming expenses, card bills, people ledgers, portfolio and net worth, payout schemes with reminders, spending insights, cash in hand, backup and restore, and a one-time importer for existing spreadsheets.
+Specified next (see the `.feature` files): spending insights polish and anything you add as a new requirement.

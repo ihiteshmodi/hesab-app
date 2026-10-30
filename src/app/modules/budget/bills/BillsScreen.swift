@@ -10,6 +10,7 @@ struct BillsScreen: View {
     @State private var plannedToAdd: Int64?
     @State private var plannedToSchedule: PlannedItem?
     @State private var editingBill: Int64?
+    @State private var recordingPayout: PayoutScheme?
     @State private var errorMessage: String?
 
     var body: some View {
@@ -17,6 +18,25 @@ struct BillsScreen: View {
             List {
                 if let errorMessage {
                     Text(errorMessage).foregroundStyle(.red).accessibilityIdentifier("billsError")
+                }
+                if !model.upcomingIncome.isEmpty {
+                    Section("Upcoming income") {
+                        ForEach(Array(model.upcomingIncome.enumerated()), id: \.offset) { _, item in
+                            HStack {
+                                Text(item.label)
+                                    .font(.footnote)
+                                    .foregroundStyle(item.kind == .payout ? Color.primary : Color.red)
+                                Spacer()
+                                if item.kind == .payout {
+                                    Button("Record") { recordingPayout = item.scheme }
+                                        .buttonStyle(.bordered)
+                                        .accessibilityIdentifier("recordPayoutButton")
+                                }
+                            }
+                            .accessibilityElement(children: .contain)
+                            .accessibilityIdentifier("upcomingIncomeRow")
+                        }
+                    }
                 }
                 Section("Upcoming") {
                     if model.upcoming.items.isEmpty {
@@ -119,6 +139,7 @@ struct BillsScreen: View {
             .sheet(isPresented: $addingPlanned) { NewPlannedSheet(model: model) }
             .sheet(isPresented: $addingSeveral) { AddSeveralSheet(model: model) }
             .sheet(item: $editingBill) { id in NewBillSheet(model: model, editing: id) }
+            .sheet(item: $recordingPayout) { RecordPayoutSheet(model: model, scheme: $0) }
             .sheet(item: $plannedToSchedule) { item in
                 NewBillSheet(model: model, startingFrom: item)
             }

@@ -24,6 +24,10 @@ final class BudgetViewModel {
     private(set) var preferences = Preferences()
     private(set) var currencies: [Currency] = []
     private(set) var searchResults = SearchResults(groups: [], total: .zero)
+    private(set) var trips: [TripSummary] = []
+    private(set) var portfolio: Portfolio?
+    private(set) var payouts = PayoutOverview(schemes: [], investedTotal: .zero, monthlyPayoutTotal: .zero)
+    private(set) var upcomingIncome: [UpcomingIncomeItem] = []
     private(set) var report = Breakdown.empty
     private(set) var reportGrouping = BreakdownGrouping.category
     private(set) var reportMonth = CalendarDate(Date()).yearMonth
@@ -59,6 +63,10 @@ final class BudgetViewModel {
             attention = try app.billsAttention()
             preferences = try app.preferences()
             currencies = try app.currencies()
+            trips = try app.trips()
+            portfolio = try app.portfolio()
+            payouts = try app.payoutSchemes()
+            upcomingIncome = try app.upcomingIncome()
             report = try app.spendingBreakdown(reportAllTime ? .allTime : .month(reportMonth), by: reportGrouping)
             loadError = nil
         } catch {
@@ -173,6 +181,79 @@ final class BudgetViewModel {
         }
         return CurrencyFormat.string(foreign.amount, in: currency)
     }
+
+    // MARK: trips
+
+    /// Reading `trips` first lets a screen that calls these refresh whenever the data is reloaded.
+    func tripSummary(_ id: Int64) -> TripSummary? { _ = trips; return try? app.tripSummary(id) }
+    func tripStatement(_ tripID: Int64, _ personID: Int64) -> PersonStatement? { _ = trips; return try? app.tripPersonStatement(tripID, personID) }
+    func tripReceipt(_ expenseID: Int64) -> Data? { _ = trips; return (try? app.tripReceipt(expenseID)) ?? nil }
+    func tripTags() -> [TripTag] { _ = trips; return (try? app.tripTags()) ?? [] }
+    func addPerson(_ tripID: Int64, _ name: String) -> String? { run { try app.addPerson(tripID, name) } }
+    func deletePerson(_ tripID: Int64, _ personID: Int64) -> String? { run { try app.deletePerson(tripID, personID) } }
+    func saveTripGroup(_ tripID: Int64, id: Int64? = nil, name: String, members: Set<Participant>) -> String? {
+        run { try app.saveTripGroup(tripID, id: id, name: name, members: members) }
+    }
+
+    func deleteTripGroup(_ id: Int64) -> String? { run { try app.deleteTripGroup(id) } }
+    func deleteTripTag(_ name: String) -> String? { run { try app.deleteTripTag(name) } }
+    func createTrip(_ trip: NewTrip) -> String? { run { try app.createTrip(trip) } }
+    func updateTrip(_ id: Int64, _ trip: NewTrip) -> String? { run { try app.updateTrip(id, trip) } }
+    func setTripSettled(_ id: Int64, _ settled: Bool) -> String? { run { try app.setTripSettled(id, settled) } }
+    func deleteTrip(_ id: Int64) -> String? { run { try app.deleteTrip(id) } }
+    func addTripExpense(_ tripID: Int64, _ expense: NewTripExpense) -> String? { run { try app.addTripExpense(tripID, expense) } }
+    func updateTripExpense(_ id: Int64, _ expense: NewTripExpense) -> String? { run { try app.updateTripExpense(id, expense) } }
+    func deleteTripExpense(_ id: Int64) -> String? { run { try app.deleteTripExpense(id) } }
+    func setTripReceipt(_ expenseID: Int64, _ image: Data?) -> String? { run { try app.setTripReceipt(expenseID, image) } }
+    func deleteTripSettlement(_ id: Int64) -> String? { run { try app.deleteTripSettlement(id) } }
+    func setTripCash(_ tripID: Int64, text: String) -> String? { run { try app.setTripCash(tripID, to: MoneyInput.parse(text)) } }
+
+    func recordTripSettlement(
+        _ tripID: Int64, personID: Int64, _ direction: SettlementDirection, amountText: String, method: SettlementMethod,
+        rateText: String, fullSettlement: Bool, on date: CalendarDate
+    ) -> String? {
+        let rate = Decimal(string: rateText.trimmingCharacters(in: .whitespaces))
+        return run {
+            try app.recordTripSettlement(
+                tripID, personID: personID, direction, MoneyInput.parse(amountText), method: method, atRate: rate,
+                fullSettlement: fullSettlement, on: date
+            )
+        }
+    }
+
+    /// An amount in the trip's currency, for example "IDR 150,000"; the home rupee when the trip has no other currency.
+    func tripText(_ money: Money, _ trip: Trip) -> String {
+        guard let code = trip.currency else { return IndianMoneyFormat.string(money) }
+        guard let currency = currencies.first(where: { $0.code == code }) else {
+            return "\(code) \(IndianMoneyFormat.plain(money))"
+        }
+        return CurrencyFormat.string(money, in: currency)
+    }
+
+    // MARK: portfolio and payout schemes
+
+    func setBankBalance(_ text: String) -> String? {
+        guard let amount = MoneyInput.parse(text) else { return PortfolioError.amountInvalid.message }
+        return run { try app.setBankBalance(amount) }
+    }
+
+    func addHolding(name: String, amountText: String, currency: String?, rateText: String) -> String? {
+        run {
+            try app.addHolding(NewHolding(
+                name: name, amount: MoneyInput.parse(amountText), currency: currency,
+                rate: Decimal(string: rateText.trimmingCharacters(in: .whitespaces))
+            ))
+        }
+    }
+
+    func deleteHolding(_ id: Int64) -> String? { run { try app.deleteHolding(id) } }
+    func addAllocatedFund(name: String, amountText: String) -> String? { run { try app.addAllocatedFund(name: name, amount: MoneyInput.parse(amountText)) } }
+    func deleteAllocatedFund(_ id: Int64) -> String? { run { try app.deleteAllocatedFund(id) } }
+    func setLedgerCountsTowardsNetWorth(_ id: Int64, _ counts: Bool) -> String? { run { try app.setLedgerCountsTowardsNetWorth(id, counts) } }
+    func addScheme(_ scheme: NewPayoutScheme) -> String? { run { try app.addScheme(scheme) } }
+    func payoutDraft(_ id: Int64) -> PayoutDraft? { try? app.payoutDraft(id) }
+    func recordPayout(_ id: Int64, amountText: String, on date: CalendarDate) -> String? { run { try app.recordPayout(id, amount: MoneyInput.parse(amountText), on: date) } }
+    func closeScheme(_ id: Int64) -> String? { run { try app.closeScheme(id) } }
 
     func updatePreferences(_ change: (inout Preferences) -> Void) {
         _ = run { try app.updatePreferences(change) }

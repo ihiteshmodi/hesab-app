@@ -1,19 +1,71 @@
 import SwiftUI
 
+private enum AppTab: String, CaseIterable {
+    case activity = "Activity"
+    case bills = "Bills"
+    case portfolio = "Portfolio"
+    case reports = "Reports"
+    case trips = "Trips"
+    case search = "Search"
+
+    var icon: String {
+        switch self {
+        case .activity: "list.bullet.rectangle"
+        case .bills: "calendar"
+        case .portfolio: "chart.pie.fill"
+        case .reports: "chart.bar.fill"
+        case .trips: "suitcase.fill"
+        case .search: "magnifyingglass"
+        }
+    }
+}
+
+/// iOS folds a sixth tab into "More", so the bar is drawn here and the system one is hidden.
 struct RootView: View {
     let model: BudgetViewModel
+    @State private var tab = AppTab.activity
 
     var body: some View {
-        TabView {
-            BudgetScreen(model: model)
-                .tabItem { Label("Activity", systemImage: "list.bullet") }
-            BillsScreen(model: model)
-                .tabItem { Label("Bills", systemImage: "calendar") }
-                .badge(model.attention.badge)
-            ReportsScreen(model: model)
-                .tabItem { Label("Reports", systemImage: "chart.pie") }
-            SearchScreen(model: model)
-                .tabItem { Label("Search", systemImage: "magnifyingglass") }
+        TabView(selection: $tab) {
+            BudgetScreen(model: model).tag(AppTab.activity).toolbar(.hidden, for: .tabBar)
+            BillsScreen(model: model).tag(AppTab.bills).toolbar(.hidden, for: .tabBar)
+            PortfolioScreen(model: model).tag(AppTab.portfolio).toolbar(.hidden, for: .tabBar)
+            ReportsScreen(model: model).tag(AppTab.reports).toolbar(.hidden, for: .tabBar)
+            TripsScreen(model: model).tag(AppTab.trips).toolbar(.hidden, for: .tabBar)
+            SearchScreen(model: model).tag(AppTab.search).toolbar(.hidden, for: .tabBar)
         }
+        .safeAreaInset(edge: .bottom, spacing: 0) { bar }
+    }
+
+    private var bar: some View {
+        HStack(spacing: 0) {
+            ForEach(AppTab.allCases, id: \.self) { item in
+                Button { tab = item } label: {
+                    VStack(spacing: 2) {
+                        Image(systemName: item.icon).font(.system(size: 20))
+                        Text(item.rawValue).font(.system(size: 10, weight: .semibold))
+                    }
+                    .frame(maxWidth: .infinity, minHeight: 48)
+                    .foregroundStyle(tab == item ? Color.blue : Color.primary)
+                    .background(RoundedRectangle(cornerRadius: 24).fill(tab == item ? Color.gray.opacity(0.15) : .clear))
+                    .overlay(alignment: .topTrailing) {
+                        if item == .bills, model.attention.badge > 0 {
+                            Text("\(model.attention.badge)").font(.system(size: 11, weight: .bold)).foregroundStyle(.white)
+                                .padding(.horizontal, 5).frame(minWidth: 18, minHeight: 18)
+                                .background(Capsule().fill(.red)).offset(x: -4, y: -2)
+                        }
+                    }
+                }
+                .buttonStyle(.plain)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(item == .bills && model.attention.badge > 0 ? "\(item.rawValue), \(model.attention.badge)" : item.rawValue)
+                .accessibilityAddTraits(tab == item ? [.isButton, .isSelected] : .isButton)
+                .accessibilityIdentifier("tab-\(item.rawValue)")
+            }
+        }
+        .padding(.horizontal, 8).padding(.vertical, 6)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 30))
+        .shadow(color: .black.opacity(0.15), radius: 10, y: 4)
+        .padding(.horizontal, 12).padding(.bottom, 4)
     }
 }

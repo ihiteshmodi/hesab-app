@@ -220,6 +220,118 @@ public final class AppDatabase: Sendable {
             }
         }
 
+        migrator.registerMigration("v14-portfolio-and-schemes") { db in
+            try db.create(table: "holding") { table in
+                table.autoIncrementedPrimaryKey("id")
+                table.column("name", .text).notNull()
+                table.column("amount_paise", .integer).notNull()
+                table.column("currency", .text)
+            }
+            try db.create(table: "allocated_fund") { table in
+                table.autoIncrementedPrimaryKey("id")
+                table.column("name", .text).notNull()
+                table.column("amount_paise", .integer).notNull()
+            }
+            try db.create(table: "exchange_rate") { table in
+                table.primaryKey("currency", .text)
+                table.column("rate", .text).notNull()
+                table.column("set_on", .text).notNull()
+            }
+            try db.create(table: "payout_scheme") { table in
+                table.autoIncrementedPrimaryKey("id")
+                table.column("name", .text).notNull()
+                table.column("invested_paise", .integer).notNull()
+                table.column("payout_paise", .integer).notNull()
+                table.column("payout_day", .integer).notNull()
+                table.column("maturity", .text)
+                table.column("closed", .boolean).notNull().defaults(to: false)
+            }
+            try db.create(table: "payout_record") { table in
+                table.autoIncrementedPrimaryKey("id")
+                table.column("scheme_id", .integer).notNull().references("payout_scheme", onDelete: .cascade)
+                table.column("month", .text).notNull()
+                table.column("income_id", .integer).notNull().references("income_entry", onDelete: .cascade)
+                table.uniqueKey(["scheme_id", "month"])
+            }
+        }
+
+        migrator.registerMigration("v15-trips") { db in
+            try db.create(table: "trip") { table in
+                table.autoIncrementedPrimaryKey("id")
+                table.column("name", .text).notNull()
+                table.column("currency", .text)
+                table.column("rate", .text)
+                table.column("ledger_name", .text).notNull()
+                table.column("settled", .boolean).notNull().defaults(to: false)
+                table.column("category", .text).notNull()
+                table.column("sub_category", .text).notNull().defaults(to: "")
+                table.column("payment_name", .text).notNull()
+                table.column("payment_source", .text).notNull()
+                table.column("end_date", .text)
+                table.column("expense_id", .integer).references("expense", onDelete: .setNull)
+            }
+            try db.create(table: "trip_person") { table in
+                table.autoIncrementedPrimaryKey("id")
+                table.column("trip_id", .integer).notNull().references("trip", onDelete: .cascade)
+                table.column("name", .text).notNull().collate(.nocase)
+                table.uniqueKey(["trip_id", "name"])
+            }
+            try db.create(table: "trip_group") { table in
+                table.autoIncrementedPrimaryKey("id")
+                table.column("trip_id", .integer).notNull().references("trip", onDelete: .cascade)
+                table.column("name", .text).notNull().collate(.nocase)
+                table.uniqueKey(["trip_id", "name"])
+            }
+            try db.create(table: "trip_group_member") { table in
+                table.column("group_id", .integer).notNull().references("trip_group", onDelete: .cascade)
+                table.column("participant_id", .integer).notNull()
+                table.primaryKey(["group_id", "participant_id"])
+            }
+            try db.create(table: "trip_tag") { table in
+                table.primaryKey("name", .text).collate(.nocase)
+            }
+            try db.create(table: "trip_expense") { table in
+                table.autoIncrementedPrimaryKey("id")
+                table.column("trip_id", .integer).notNull().references("trip", onDelete: .cascade)
+                table.column("description", .text).notNull()
+                table.column("date", .text).notNull()
+                table.column("amount_paise", .integer).notNull()
+                table.column("paid_by", .integer).notNull()
+                table.column("paid_in_home_paise", .integer)
+                table.column("paid_with", .text).notNull().defaults(to: "bank")
+                table.column("tag", .text).notNull().defaults(to: "")
+                table.column("note", .text).notNull().defaults(to: "")
+            }
+            try db.create(table: "trip_receipt") { table in
+                table.primaryKey("expense_id", .integer).references("trip_expense", onDelete: .cascade)
+                table.column("image", .blob).notNull()
+            }
+            try db.create(table: "trip_share") { table in
+                table.column("trip_expense_id", .integer).notNull().references("trip_expense", onDelete: .cascade)
+                table.column("participant_id", .integer).notNull()
+                table.column("amount_paise", .integer).notNull()
+                table.primaryKey(["trip_expense_id", "participant_id"])
+            }
+            try db.create(table: "trip_settlement") { table in
+                table.autoIncrementedPrimaryKey("id")
+                table.column("trip_id", .integer).notNull().references("trip", onDelete: .cascade)
+                table.column("person_id", .integer).notNull()
+                table.column("date", .text).notNull()
+                table.column("amount_paise", .integer).notNull()
+                table.column("direction", .text).notNull()
+                table.column("method", .text).notNull().defaults(to: "bank")
+                table.column("cleared_paise", .integer).notNull()
+                table.column("written_off_paise", .integer).notNull().defaults(to: 0)
+            }
+            try db.create(table: "trip_cash_adjustment") { table in
+                table.autoIncrementedPrimaryKey("id")
+                table.column("trip_id", .integer).notNull().references("trip", onDelete: .cascade)
+                table.column("date", .text).notNull()
+                table.column("amount_paise", .integer).notNull()
+                table.column("note", .text).notNull()
+            }
+        }
+
         return migrator
     }
 }
