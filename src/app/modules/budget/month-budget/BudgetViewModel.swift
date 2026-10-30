@@ -24,11 +24,7 @@ final class BudgetViewModel {
     }
 
     /// Returns the message to show when the expense is refused, or nil when it was saved.
-    func addExpense(date: Date, description: String, amountText: String, category: String) -> String? {
-        let expense = NewExpense(
-            date: CalendarDate(date), description: description,
-            amount: MoneyInput.parse(amountText), category: category
-        )
+    func addExpense(_ expense: NewExpense) -> String? {
         do {
             try app.addExpense(expense)
             reload()
@@ -37,6 +33,19 @@ final class BudgetViewModel {
             return error.message
         } catch {
             return "Could not save this expense. Try again."
+        }
+    }
+
+    /// Returns the message to show when the entry is refused, or nil when it was saved.
+    func addIncome(_ income: NewIncome) -> String? {
+        do {
+            try app.addIncome(income)
+            reload()
+            return nil
+        } catch let error as IncomeValidationError {
+            return error.message
+        } catch {
+            return "Could not save this entry. Try again."
         }
     }
 }
