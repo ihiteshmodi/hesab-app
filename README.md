@@ -6,7 +6,7 @@
 
 > Track what is left to spend, where your money went and what you own, in one native app that never goes online. Your data lives in a single SQLite file on your phone.
 
-**Status: early.** The first slice works end to end: add an expense and see what is left to spend this month. The rest is specified in [`tests/`](tests) as Gherkin scenarios and will be built feature by feature (see [Roadmap](#roadmap)).
+**Status: early.** Expenses (with category, sub-category, entity, who it was for and tags) and income entries work end to end, and the Budget screen shows what is left to spend and what was spent and earned this month. The rest is specified in [`tests/`](tests) as Gherkin scenarios and will be built feature by feature (see [Roadmap](#roadmap)).
 
 ## Why it exists
 
@@ -26,7 +26,7 @@ swift test                # runs the core tests, no simulator needed
 Expected output:
 
 ```text
-✔ Test run with 25 tests in 8 suites passed after 0.01 seconds.
+✔ Test run with 45 tests in 11 suites passed after 0.02 seconds.
 ...
 Built build/Hisaab.ipa
 ```
