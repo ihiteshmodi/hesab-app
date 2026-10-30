@@ -38,6 +38,23 @@ Feature: Preferences
     When she taps the eye and authenticates with Face ID
     Then the Portfolio figures show until she leaves the tab
 
+  Scenario: Opening Portfolio never asks for Face ID by itself
+    When she opens the Portfolio tab
+    Then no Face ID prompt appears
+    And the figures are hidden until she presses the eye or "Show with Face ID"
+
+  Scenario Outline: Portfolio hides again whenever she leaves
+    Given the Portfolio figures are shown
+    When she <leaves>
+    And comes back to the Portfolio tab
+    Then the figures are hidden again and no Face ID prompt appears
+
+    Examples:
+      | leaves                       |
+      | switches to another tab      |
+      | opens a screen from Portfolio and goes back |
+      | sends the app to the background |
+
   Scenario: Failed authentication keeps the figures hidden
     Given the Portfolio tab is hidden
     When she taps the eye and Face ID does not match

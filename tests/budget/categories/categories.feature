@@ -16,8 +16,43 @@ Feature: Categories with sub-categories
   Scenario: A fresh install starts with a sensible default set
     Given Priya has just installed the app
     When she opens Categories
-    Then she sees parent categories such as "Home", "Food and Drink" and "Transport" each with sub-categories
+    Then she sees these parent categories, each with its sub-categories
+      | parent               | sub-categories                                                                                         |
+      | Home & Utilities     | Insurance, Electric, Gas, Internet, Mortgage, Rent, Home maintenance, Utilities, Cell phone, Ration, Milk |
+      | Food & Dining        | Restaurant, Food delivery, Groceries, Special occasions, Coffee, Alcohol                               |
+      | Health & Medical     | Vision, Health insurance, Therapy, Wellness, Fitness, Pharmacy, Dental, Personal care, Medical, Blood tests, Supplements |
+      | Transport & Vehicle  | Fuel, Car insurance, Train tickets, Rickshaw fare, Cab, Vehicle repairs, Parking                       |
+      | Lifestyle            | Subscriptions, Vacation, Concerts, Movies, Charity, Clothing, Gifts, Child care, Night life, Pets, Personal & Family |
+      | Shopping             | Needs, Wants                                                                                           |
+      | Technology & Gadgets |                                                                                                        |
+      | Insurance & Financial |                                                                                                       |
+      | Fixed Expenses       | Monthly, Annual                                                                                        |
+      | Savings              | Investment, Vacation savings, Down payment savings                                                     |
+      | Miscellaneous        | Miscellaneous, Loan payment, Credit card payment                                                       |
     And she can add, rename and delete any of them
+
+  # The default set is the reference app's categories merged with the spreadsheet's:
+  # spreadsheet parents keep their names so an import maps one to one; where both have the
+  # same idea, one sub-category is kept (Recharge into Cell phone, Gas Cylinder into Gas,
+  # Dining out into Restaurant, Online food order into Food delivery,
+  # Repairs & Maintenance into Home maintenance, Entertainment & Movies into Lifestyle > Movies).
+  # More Transport & Vehicle sub-categories from the reference app are still to be added.
+
+  Scenario Outline: Spreadsheet categories land in the merged set on import
+    When a spreadsheet row has the category "<sheet category>"
+    Then it is imported as "<parent>" and "<sub-category>"
+
+    Examples:
+      | sheet category         | parent               | sub-category      |
+      | Home & Utilities       | Home & Utilities     |                   |
+      | Fuel                   | Transport & Vehicle  | Fuel              |
+      | Shopping – Needs       | Shopping             | Needs             |
+      | Shopping – Wants       | Shopping             | Wants             |
+      | Personal & Family      | Lifestyle            | Personal & Family |
+      | Entertainment & Movies | Lifestyle            | Movies            |
+      | Monthly Fixed Expenses | Fixed Expenses       | Monthly           |
+      | Annual Fixed Expenses  | Fixed Expenses       | Annual            |
+      | Miscellaneous          | Miscellaneous        | Miscellaneous     |
 
   Scenario: Priya adds a parent category
     When she adds the parent category "Pets" with the colour orange and the paw icon
