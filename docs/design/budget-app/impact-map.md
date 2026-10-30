@@ -88,11 +88,18 @@ Priya books a 1,200 train ticket and marks it refundable. The trip is cancelled 
 2. App Lock (Face ID or Touch ID): stays in; to be checked inside LiveContainer when built.
 3. Cash in hand stays in the home currency (confirmed).
 4. **Entity prefix split** at import is driven by the personal mapping file, not guessed.
-5. **Categories:** the reference app's full category list is still to be supplied; the spreadsheet's 14 are the only ones in so far.
+5. **Categories:** final set agreed with the owner (see `tests/budget/categories/categories.feature`); Personal and Family are being split into two separate categories.
 
 Confirmed by the owner: repaying borrowed money lowers left to spend; card bill is amount minus received; one-tap payout recording; pending refunds all-time and settled amounts by month; no partial-ledger-payment modelling (a bill is paid from one source); cash expenses cannot be refunded (cash that has left the bank is gone); a refund on a ledger-paid expense goes back to that ledger; cash in hand and ledgers may go negative with a warning, never blocked.
 
+## Planned later: Splitwise-style balances (not started)
+When the app runs the way the owner wants for personal use, add a section that shows who owes whom and how much, like Splitwise:
+- a list of people with a balance each: they owe me, I owe them, or settled;
+- built on the "Spent for" field (an expense paid for someone else), ledgers and Amount to Repay, so most of the data already exists;
+- shared and split expenses (for example trips), settling up, and a running total per person.
+This needs its own `clarify-requirements` round and approved feature file before any build. Nothing in the current build should block it: keep "Spent for" as a person reference, not free text.
+
 ## Out of scope (now)
-- Shared trip expenses and who-owes-whom (planned as the next phase, after the owner verifies this app).
+- Splitwise-style balances and shared trip expenses (see "Planned later" above).
 - Notifications (reminders are an in-app tab).
 - Cloud sync, accounts, multi-user, UPI barcode sheet, live currency rates.
