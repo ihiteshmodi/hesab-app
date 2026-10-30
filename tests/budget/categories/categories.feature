@@ -28,7 +28,7 @@ Feature: Categories with sub-categories
       | Fuel                   |                                                                             |
       | Insurance              | Health insurance - Me, Health insurance - Mom, Term life, Vehicle insurance, Home insurance |
       | Entertainment & Movies |                                                                             |
-      | Personal & Family      |                                                                             |
+      | Personal & Family      | Family cash gifts                                                           |
       | Lifestyle              | Subscriptions, Vacation, Concerts, Charity, Clothing, Gifts, Child care, Night life, Pets |
       | Shopping - Needs       |                                                                             |
       | Shopping - Wants       |                                                                             |
