@@ -47,6 +47,24 @@ Feature: One-time spreadsheet import (Mac tool)
     Then both milk rows share one sub-category
     And "Fibre bill" is under "Home & Utilities"
 
+  Scenario: The mapping file places sub-categories under parent categories
+    Given the mapping says the old main category "Shopping - Needs" becomes the parent "Shopping" with the sub-category "Needs"
+    When Priya runs the tool
+    Then the parent "Shopping" exists with its sub-categories
+    And no expense is left without a parent category
+
+  Scenario: Entity prefixes in descriptions are split off using the mapping file
+    Given a row described "HIGHWAY DHABA - sev bhaji"
+    And the mapping lists "HIGHWAY DHABA" as an entity named "Highway Dhaba"
+    When Priya runs the tool
+    Then the expense is described "Sev bhaji" with the entity "Highway Dhaba"
+    And "Highway Dhaba" is saved in the entities list
+
+  Scenario: Rows without a listed entity are imported unchanged
+    Given a row described "Weekly groceries"
+    When Priya runs the tool
+    Then the expense is described "Weekly groceries" with no entity
+
   Scenario: The mapping file fixes known wrong rows
     Given the mapping re-dates an income row to 2026-04-30
     When Priya runs the tool
