@@ -28,7 +28,8 @@ Feature: Categories with sub-categories
       | Fuel                   |                                                                             |
       | Insurance              | Health insurance - Me, Health insurance - Mom, Term life, Vehicle insurance, Home insurance, Travel insurance |
       | Entertainment & Movies |                                                                             |
-      | Personal & Family      | Family cash gifts                                                           |
+      | Personal               |                                                                             |
+      | Family                 | Family cash gifts                                                           |
       | Lifestyle              | Subscriptions, Vacation, Concerts, Charity, Clothing, Gifts, Child care, Night life, Pets |
       | Shopping - Needs       |                                                                             |
       | Shopping - Wants       | Perfumes                                                                    |
@@ -57,13 +58,23 @@ Feature: Categories with sub-categories
       | Health & Medical       | Health & Medical       |
       | Fuel                   | Fuel                   |
       | Entertainment & Movies | Entertainment & Movies |
-      | Personal & Family      | Personal & Family      |
       | Shopping - Needs       | Shopping - Needs       |
       | Shopping - Wants       | Shopping - Wants       |
       | Technology & Gadgets   | Technology & Gadgets   |
       | Monthly Fixed Expenses | Monthly Fixed Expenses |
       | Annual Fixed Expenses  | Annual Fixed Expenses  |
       | Miscellaneous          | Miscellaneous          |
+
+  Scenario Outline: The old Personal & Family category is split by what the row is
+    Given a spreadsheet row with the main category "Personal & Family" described "<description>"
+    When Priya runs the import
+    Then it is imported under "<parent>"
+
+    Examples:
+      | description                    | parent   |
+      | Cash gift to a relative        | Family   |
+      | Birthday dinner for Mom        | Family   |
+      | Cash withdrawn for myself      | Personal |
 
   Scenario Outline: The old Transport & Vehicle category is split by what the row is
     Given a spreadsheet row with the main category "Transport & Vehicle" and the sub category "<sub category>"
