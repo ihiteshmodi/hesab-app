@@ -56,6 +56,7 @@ struct BudgetScreen: View {
             }
             .cardNavigation("Activity")
             .onDisappear { revealed = false; savingsShown = false }
+            .onChange(of: pane) { authMessage = nil }
             .onChange(of: scenePhase) {
                 if scenePhase != .active { revealed = false; savingsShown = false }
             }
@@ -137,9 +138,12 @@ struct BudgetScreen: View {
         HStack {
             CardCaption("Left to spend")
             Spacer()
-            Button(revealed ? "Hide" : "Show", systemImage: revealed ? "eye.slash" : "eye") { revealed.toggle() }
+            Button(revealed ? "Hide" : "Show with Face ID", systemImage: revealed ? "eye.slash" : "eye") { toggleRevealed() }
                 .labelStyle(.iconOnly).buttonStyle(.plain).foregroundStyle(Theme.secondary)
                 .accessibilityIdentifier("activityEyeButton")
+        }
+        if let authMessage, pane == .spending {
+            Text(authMessage).font(.footnote).foregroundStyle(Theme.red).accessibilityIdentifier("activityAuthMessage")
         }
         Text(shown(budget.leftToSpend))
             .font(.system(size: 42, weight: .bold)).monospacedDigit()
@@ -277,6 +281,19 @@ struct BudgetScreen: View {
     // MARK: Savings
 
     /// The savings bank balance stays hidden until Face ID says otherwise; the rest of this pane follows Hide Balances.
+    /// Hiding is instant; showing needs Face ID, like the Portfolio and Savings eyes.
+    private func toggleRevealed() {
+        guard !revealed else { revealed = false; return }
+        Task {
+            if await PrivacyGate.authenticate(reason: "Show your amounts") {
+                revealed = true
+                authMessage = nil
+            } else {
+                authMessage = "Try Again"
+            }
+        }
+    }
+
     @ViewBuilder private var savingsCard: some View {
         HStack {
             CardCaption("Savings bank balance")
