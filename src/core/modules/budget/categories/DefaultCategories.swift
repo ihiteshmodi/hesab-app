@@ -15,7 +15,7 @@ public enum DefaultCategories {
             "Medical", "Blood tests", "Skin & face", "Dental", "Personal care", "Fitness", "Supplements",
             "Vision", "Therapy", "Pharmacy", "Courses",
         ]),
-        CategoryGroup(name: "Transport", subCategories: ["Ride share", "Train tickets", "Travel", "Flight tickets"]),
+        CategoryGroup(name: "Transport", subCategories: ["Ride share", "Train tickets", "Metro tickets", "Travel", "Flight tickets"]),
         CategoryGroup(name: "Vehicle", subCategories: ["Vehicle service", "Vehicle repairs", "Vehicle loan", "Parking"]),
         CategoryGroup(name: "Fuel", subCategories: []),
         CategoryGroup(name: "Insurance", subCategories: [
@@ -25,6 +25,7 @@ public enum DefaultCategories {
         CategoryGroup(name: "Entertainment & Movies", subCategories: []),
         CategoryGroup(name: "Personal", subCategories: []),
         CategoryGroup(name: "Family", subCategories: ["Family cash gifts"]),
+        CategoryGroup(name: "Transfers", subCategories: []),
         CategoryGroup(name: "Lifestyle", subCategories: [
             "Subscriptions", "Vacation", "Concerts", "Charity", "Clothing", "Gifts", "Child care",
             "Night life", "Pets",
@@ -34,6 +35,7 @@ public enum DefaultCategories {
         CategoryGroup(name: "Technology & Gadgets", subCategories: ["Courses"]),
         CategoryGroup(name: "Monthly Fixed Expenses", subCategories: []),
         CategoryGroup(name: "Annual Fixed Expenses", subCategories: []),
+        CategoryGroup(name: "Trading account", subCategories: ["Money added", "Fees & charges"]),
         CategoryGroup(name: "Miscellaneous", subCategories: [
             "Special occasions", "Loan payment", "Credit card payment", "Bad expenses",
         ]),

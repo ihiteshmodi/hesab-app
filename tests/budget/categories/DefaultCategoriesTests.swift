@@ -7,17 +7,19 @@ struct DefaultCategoriesTests {
     @Test func aFreshInstallStartsWithTheAgreedParents() {
         #expect(DefaultCategories.tree.map(\.name) == [
             "Home & Utilities", "Food & Dining", "Groceries", "Health & Medical", "Transport", "Vehicle",
-            "Fuel", "Insurance", "Entertainment & Movies", "Personal", "Family", "Lifestyle",
+            "Fuel", "Insurance", "Entertainment & Movies", "Personal", "Family", "Transfers", "Lifestyle",
             "Shopping - Needs", "Shopping - Wants", "Technology & Gadgets", "Monthly Fixed Expenses",
-            "Annual Fixed Expenses", "Miscellaneous",
+            "Annual Fixed Expenses", "Trading account", "Miscellaneous",
         ])
     }
 
     @Test(arguments: [
         ("Home & Utilities", ["Electric", "Gas", "Internet", "Mortgage", "Rent", "Home maintenance", "Utilities", "Cell phone"]),
         ("Groceries", ["Ration", "Milk", "Biscuits"]),
-        ("Transport", ["Ride share", "Train tickets", "Travel", "Flight tickets"]),
+        ("Transport", ["Ride share", "Train tickets", "Metro tickets", "Travel", "Flight tickets"]),
         ("Family", ["Family cash gifts"]),
+        ("Transfers", []),
+        ("Trading account", ["Money added", "Fees & charges"]),
         ("Fuel", []),
         ("Shopping - Needs", []),
     ] as [(String, [String])])
