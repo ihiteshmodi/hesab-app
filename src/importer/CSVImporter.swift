@@ -21,6 +21,17 @@ public struct ImportReport: Equatable, Sendable {
     /// The sum of the imported expenses, to check against the spreadsheet.
     public let expenseTotal: Money
     public let leftToSpend: Money
+    public internal(set) var incomeEntries = 0
+    public internal(set) var bills = 0
+    public internal(set) var refundsSettled = 0
+    public internal(set) var refundsPending = 0
+    public internal(set) var plannedTotal = Money.zero
+    public internal(set) var ledgerBalances: [String: Money] = [:]
+    public internal(set) var bankBalance = Money.zero
+    public internal(set) var investments = Money.zero
+    public internal(set) var netWorth = Money.zero
+    /// The sum of the expenses after refunds, to check against the spreadsheet's Net Amount column.
+    public internal(set) var netExpenseTotal = Money.zero
 }
 
 public enum ImportError: Error, Equatable, Sendable {
@@ -41,8 +52,13 @@ public enum CSVImporter {
     /// Reads the CSV and writes a database file; with no `output` it only reports (a dry run).
     @discardableResult
     public static func run(csv: String, options: ImportOptions, output: URL?) throws -> ImportReport {
+        try run(bundle: ImportBundle(expenses: csv), options: options, output: output)
+    }
+
+    @discardableResult
+    public static func run(bundle: ImportBundle, options: ImportOptions, output: URL?) throws -> ImportReport {
         if let output, FileManager.default.fileExists(atPath: output.path) { throw ImportError.outputExists }
-        let plan = try Plan(records: CSV.parse(csv), options: options)
+        let plan = try Plan(records: CSV.parse(bundle.expenses), options: options, extras: try ExtraPlan(bundle))
 
         guard let output else { return try plan.write(to: try AppDatabase.inMemory(), options: options) }
 
@@ -64,16 +80,21 @@ public enum CSVImporter {
 }
 
 /// Every row checked and turned into a use-case input before anything is written.
-private struct Plan {
+struct Plan {
     enum Item {
-        case expense(NewExpense)
+        case expense(NewExpense, refund: Refund)
         case received(NewIncome)
     }
 
+    enum Refund { case none, pending, settled }
+
     var items: [Item] = []
     var skipped: [String] = []
+    let extras: ExtraPlan
 
-    init(records: [[String]], options: ImportOptions) throws {
+    init(records: [[String]], options: ImportOptions, extras: ExtraPlan) throws {
+        self.extras = extras
+        skipped = extras.skipped
         guard let header = records.first else { throw ImportError.missingColumn("date") }
         let columns = Dictionary(
             header.enumerated().map { ($1.trimmed.lowercased(), $0) }, uniquingKeysWith: { first, _ in first }
@@ -104,6 +125,8 @@ private struct Plan {
                 let magnitude = amount < .zero ? Money.zero - amount : amount
                 items.append(.received(NewIncome(date: date, kind: .moneyReceived, amount: magnitude, note: description)))
             } else {
+                let refundable = field("refundable").lowercased() == "yes"
+                let reimbursed = field("reimbursed").lowercased() == "yes"
                 items.append(.expense(NewExpense(
                     date: date, description: description, amount: amount, category: field("category"),
                     subCategory: field("sub_category"),
@@ -111,7 +134,7 @@ private struct Plan {
                     spentFor: field("spent_for"),
                     tags: field("tags").split(whereSeparator: { ",;|".contains($0) }).map(String.init),
                     paymentMethod: Self.payment(field("payment")), notes: field("my_note")
-                )))
+                ), refund: refundable ? (reimbursed ? .settled : .pending) : .none))
             }
         }
     }
@@ -124,25 +147,53 @@ private struct Plan {
         var expenseTotal = Money.zero
         var expenses = 0
         var received = 0
+        var settled = 0
+        var pending = 0
+        var netTotal = Money.zero
         for item in items {
             switch item {
-            case .expense(let expense):
-                try app.addExpense(expense)
+            case .expense(let expense, let refund):
+                let saved = try app.addExpense(expense)
                 expenseTotal = expenseTotal + (expense.amount ?? .zero)
                 expenses += 1
+                netTotal = netTotal + (refund == .settled ? .zero : (expense.amount ?? .zero))
+                if refund != .none, let id = saved.id {
+                    try app.markRefundable(id)
+                    if refund == .settled {
+                        try app.recordReceived(id, expense.amount ?? .zero)
+                        settled += 1
+                    } else {
+                        pending += 1
+                    }
+                }
             case .received(let income):
                 try app.addIncome(income)
                 received += 1
             }
         }
-        return ImportReport(
+        try extras.write(to: app)
+        var report = ImportReport(
             expenses: expenses, moneyReceived: received, skipped: skipped, cards: options.cards,
             expenseTotal: expenseTotal, leftToSpend: try app.monthBudget().leftToSpend
         )
+        let portfolio = try app.portfolio()
+        report.incomeEntries = extras.income.count
+        report.bills = extras.bills.count
+        report.refundsSettled = settled
+        report.refundsPending = pending
+        report.plannedTotal = try app.plannedItems().total
+        report.ledgerBalances = Dictionary(
+            uniqueKeysWithValues: try app.ledgers().ledgers.map { ($0.ledger.name, $0.balance) }
+        )
+        report.bankBalance = portfolio.bankBalance
+        report.investments = portfolio.investments
+        report.netWorth = portfolio.netWorth
+        report.netExpenseTotal = netTotal
+        return report
     }
 
     /// Exact amounts as typed; a long decimal such as 16984.059999999998 is spreadsheet noise and is rounded to paise.
-    private static func amount(_ text: String) -> Money? {
+    static func amount(_ text: String) -> Money? {
         if let exact = MoneyInput.parse(text) { return exact }
         guard text.wholeMatch(of: /-?[0-9]+\.[0-9]+/) != nil, var value = Decimal(string: text) else { return nil }
         var rounded = Decimal()
@@ -150,7 +201,7 @@ private struct Plan {
         return Money(paise: NSDecimalNumber(decimal: rounded * 100).intValue)
     }
 
-    private static func payment(_ name: String) -> PaymentMethod {
+    static func payment(_ name: String) -> PaymentMethod {
         switch name.lowercased() {
         case "upi", "": .upi
         case "cash withdrawal": .cashWithdrawal
@@ -160,6 +211,6 @@ private struct Plan {
     }
 }
 
-private extension String {
+extension String {
     var trimmed: String { trimmingCharacters(in: .whitespacesAndNewlines) }
 }
