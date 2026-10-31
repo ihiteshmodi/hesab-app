@@ -87,6 +87,15 @@ Feature: What is left to spend, and what was spent this month
     When she leaves the screen and comes back
     Then "Income in October" shows "₹ ••••" again
 
+  Scenario: The eye on the Activity screen asks for Face ID before showing
+    Given Priya recorded a salary of 1,50,000 this month
+    When she taps the eye and Face ID fails
+    Then "Income in October" still shows "₹ ••••" and she sees "Try Again"
+    When she taps the eye and Face ID succeeds
+    Then "Income in October" shows "₹1,50,000.00"
+    When she taps the eye again
+    Then the amounts hide at once without asking
+
   # Mockup 1: the month calendar shows what was spent each day.
   Scenario: The month calendar shows what was spent each day
     Given Priya spent in October

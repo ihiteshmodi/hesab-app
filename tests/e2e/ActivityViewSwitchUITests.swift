@@ -47,6 +47,20 @@ final class ActivityViewSwitchUITests: XCTestCase {
         XCTAssertEqual(app.staticTexts["incomeThisMonth"].label, "₹ ••••")
     }
 
+    @MainActor
+    func testAFailedFaceIDKeepsIncomeHiddenAndSaysTryAgain() {
+        let app = XCUIApplication()
+        app.launchArguments = ["-ui-testing", "-ui-auth-fail"]
+        app.launch()
+        addSalary(app, "150000")
+
+        app.buttons["activityEyeButton"].tap()
+
+        XCTAssertTrue(app.staticTexts["activityAuthMessage"].waitForExistence(timeout: 20))
+        XCTAssertEqual(app.staticTexts["activityAuthMessage"].label, "Try Again")
+        XCTAssertEqual(app.staticTexts["incomeThisMonth"].label, "₹ ••••")
+    }
+
     private var today: Int { Calendar.current.component(.day, from: Date()) }
 
     @MainActor
