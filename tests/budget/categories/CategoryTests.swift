@@ -103,6 +103,16 @@ struct CategoryTests {
         #expect(throws: CategoryError.nameTaken("groceries")) { try app.renameCategory(try parent(app, "Petrol").id, "groceries") }
     }
 
+    @Test func aRenameIsSeenEvenRightAfterTheExpensesWereRead() throws {
+        let app = try makeApp()
+        try spend(app, category: "Fuel")
+        _ = try app.monthBudget(for: .init(year: 2026, month: 10))
+
+        try app.renameCategory(try parent(app, "Fuel").id, "Petrol")
+
+        #expect(try app.monthBudget(for: .init(year: 2026, month: 10)).expenses.first?.category == "Petrol")
+    }
+
     @Test func renamingToAnExistingSiblingIsRefused() throws {
         let app = try makeApp()
         let internet = try sub(app, "Home & Utilities", "Internet")

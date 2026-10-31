@@ -115,6 +115,7 @@ enum BackupFile {
         configuration.readonly = true
         let source = try DatabaseQueue(path: file.path, configuration: configuration)
         try source.backup(to: database.writer)
+        database.contentsReplaced()
         try AppDatabase.migrator.migrate(database.writer)
     }
 }

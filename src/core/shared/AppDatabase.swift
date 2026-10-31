@@ -4,11 +4,19 @@ import GRDB
 /// The single SQLite file that holds everything. Schema changes are added as new migrations, never edited.
 public final class AppDatabase: Sendable {
     let writer: any DatabaseWriter
+    private let commits = CommitCounter()
 
     private init(writer: any DatabaseWriter) throws {
         self.writer = writer
         try Self.migrator.migrate(writer)
+        writer.add(transactionObserver: commits, extent: .databaseLifetime)
     }
+
+    /// Goes up after every committed write, whichever repository made it; lets a reader reuse what it loaded before.
+    var generation: Int { commits.value }
+
+    /// A restore copies pages in directly and fires no commit, so it must say so itself.
+    func contentsReplaced() { commits.bump() }
 
     public static func inMemory() throws -> AppDatabase {
         try AppDatabase(writer: try DatabaseQueue())
@@ -334,4 +342,17 @@ public final class AppDatabase: Sendable {
 
         return migrator
     }
+}
+
+private final class CommitCounter: TransactionObserver, @unchecked Sendable {
+    private let lock = NSLock()
+    private var count = 0
+
+    var value: Int { lock.withLock { count } }
+
+    func observes(eventsOfKind eventKind: DatabaseEventKind) -> Bool { true }
+    func databaseDidChange(with event: DatabaseEvent) {}
+    func databaseDidCommit(_ db: Database) { bump() }
+    func bump() { lock.withLock { count += 1 } }
+    func databaseDidRollback(_ db: Database) {}
 }

@@ -3,6 +3,8 @@ import GRDB
 
 final class ExpenseRepository: Sendable {
     private let database: AppDatabase
+    /// Every screen reads all expenses; they are decoded once per change to the file, not once per screen.
+    private let cache = ExpenseCache()
 
     init(database: AppDatabase) {
         self.database = database
@@ -36,8 +38,29 @@ final class ExpenseRepository: Sendable {
     }
 
     func all() throws -> [Expense] {
-        try database.writer.read { db in
+        let generation = database.generation
+        if let cached = cache.expenses(at: generation) { return cached }
+        let loaded = try database.writer.read { db in
             try ExpenseRecord.fetchAll(db).map { try $0.expense() }
+        }
+        cache.store(loaded, at: generation)
+        return loaded
+    }
+}
+
+private final class ExpenseCache: @unchecked Sendable {
+    private let lock = NSLock()
+    private var generation = -1
+    private var expenses: [Expense] = []
+
+    func expenses(at generation: Int) -> [Expense]? {
+        lock.withLock { self.generation == generation ? expenses : nil }
+    }
+
+    func store(_ expenses: [Expense], at generation: Int) {
+        lock.withLock {
+            self.generation = generation
+            self.expenses = expenses
         }
     }
 }
