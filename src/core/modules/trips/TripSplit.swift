@@ -64,3 +64,14 @@ enum TripSplit {
         return Dictionary(uniqueKeysWithValues: result.map { ($0.0, Money(paise: $0.1)) })
     }
 }
+
+/// While a split is being typed: when exactly one chosen person is left blank, they take what is left of the total.
+public enum SplitRemainder {
+    public static func fill(_ typed: [Participant: Int], chosen: [Participant], total: Int) -> [Participant: Int] {
+        let blank = chosen.filter { typed[$0] == nil }
+        guard blank.count == 1 else { return typed }
+        var filled = typed
+        filled[blank[0]] = total - chosen.compactMap { typed[$0] }.reduce(0, +)
+        return filled
+    }
+}

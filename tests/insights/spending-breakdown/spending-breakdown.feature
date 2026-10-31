@@ -52,3 +52,38 @@ Feature: Where the money went
   Scenario: Priya looks at all time
     When she chooses "All Time"
     Then the categories add up every month's net spending
+
+  # Reports show spending only. Income is never part of these totals.
+
+  Scenario Outline: Priya groups spending in other ways
+    Given expenses with entities, spent-for names, sub-categories and tags
+    When she groups by "<grouping>"
+    Then the rows are "<rows>"
+
+    Examples:
+      | grouping     | rows                                                        |
+      | Spent for    | Me, Mom                                                     |
+      | Sub-category | Restaurant (Food & Dining), Food & Dining (no sub-category) |
+      | Tag          | Dubai trip, No tag                                          |
+
+  Scenario: An expense with two tags is counted under each tag but once in the total
+    Given a 1,000 expense tagged "Avenger" and "Dominar"
+    When she groups by "Tag"
+    Then "Avenger" and "Dominar" each show 1,000
+    And the total is 1,000
+
+  Scenario: Priya opens any row, not only a category
+    When she taps "No entity" in the entity view
+    Then she sees the expenses with no entity, newest first
+    And their split by category
+
+  Scenario: Priya keeps only the rows that make up most of her spending
+    Given categories of 5,000, 3,000, 1,000 and 1,000
+    When she sets the slider to 80%
+    Then she sees the first two rows, which make 80%
+    And one "Everything else" row of 2,000
+
+  Scenario: The same slider keeps the biggest expenses inside a row
+    Given expenses of 600, 300 and 100 under Food & Dining
+    When she opens it with the slider at 80%
+    Then she sees the 600 and 300 expenses

@@ -129,6 +129,21 @@ Feature: Trips and shared expenses
 
   # Settled and insights
 
+  Scenario Outline: The last person left blank takes what is left
+    Given an expense of IDR 100,000 shared by "<mode>" between four people
+    When I type <typed> for the first three and leave the fourth blank
+    Then the fourth person gets <left>
+
+    Examples:
+      | mode        | typed                   | left   |
+      | amounts     | 25,000, 15,000, 20,000  | 40,000 |
+      | percentages | 30, 20, 10              | 40     |
+
+  Scenario: A payment can be changed after it was saved
+    Given Ana paid me 265 by bank
+    When I change that payment to 530
+    Then Ana owes nothing and there is one payment of 530
+
   Scenario: A trip can be marked settled and undone
     When I mark "Bali trip" settled
     Then it is listed after the open trips

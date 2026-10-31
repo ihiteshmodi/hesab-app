@@ -91,7 +91,11 @@ struct NewTripSheet: View {
     init(model: BudgetViewModel, editing trip: Trip?) {
         self.model = model
         self.editing = trip
-        guard let trip else { return }
+        guard let trip else {
+            _category = State(initialValue: "Lifestyle")
+            _subCategory = State(initialValue: "Vacation")
+            return
+        }
         _name = State(initialValue: trip.name)
         _currency = State(initialValue: trip.currency ?? "")
         _rateText = State(initialValue: trip.rate.map { "\($0)" } ?? "")
@@ -118,19 +122,10 @@ struct NewTripSheet: View {
             CardScreen {
                 CardGroup(footer: currency.isEmpty ? nil : "Used for expenses without a card charge, and for the amounts shown beside balances.") {
                     TextField("Trip name", text: $name).accessibilityIdentifier("tripNameField").rowPadding()
-                    FieldRow("Currency") {
-                        Picker("Currency", selection: $currency) {
-                            Text("Home currency").tag("")
-                            ForEach(model.currencies.filter { $0.code != model.preferences.homeCurrency }, id: \.code) {
-                                Text($0.code).tag($0.code)
-                            }
-                        }
-                        .labelsHidden()
-                        .accessibilityIdentifier("tripCurrencyPicker")
+                    CurrencyField(model: model, selection: $currency, identifier: "tripCurrencyPicker")
                         .onChange(of: currency) {
                             if !currency.isEmpty, rateText.isEmpty, let last = model.lastRate(for: currency) { rateText = "\(last)" }
                         }
-                    }
                     if !currency.isEmpty {
                         FieldRow("Rate (\(model.preferences.homeCurrency) per 1 \(currency))") {
                             TextField("0.0053", text: $rateText).keyboardType(.decimalPad).multilineTextAlignment(.trailing)

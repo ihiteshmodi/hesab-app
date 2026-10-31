@@ -73,6 +73,7 @@ public final class BudgetApp: Sendable {
     public let searchExpenses: SearchExpenses
     public let spendingBreakdown: GetSpendingBreakdown
     public let categoryBreakdown: GetCategoryBreakdown
+    public let groupBreakdown: GetGroupBreakdown
     public let currencies: GetCurrencies
     public let addCurrency: AddCurrency
     public let lastRate: GetLastRate
@@ -81,11 +82,14 @@ public final class BudgetApp: Sendable {
     public let setBankBalance: SetBankBalance
     public let setExchangeRate: SetExchangeRate
     public let addHolding: AddHolding
+    public let updateHolding: UpdateHolding
     public let deleteHolding: DeleteHolding
     public let addAllocatedFund: AddAllocatedFund
+    public let updateAllocatedFund: UpdateAllocatedFund
     public let deleteAllocatedFund: DeleteAllocatedFund
     public let setLedgerCountsTowardsNetWorth: SetLedgerCountsTowardsNetWorth
     public let addScheme: AddScheme
+    public let updateScheme: UpdateScheme
     public let payoutSchemes: GetPayoutSchemes
     public let upcomingIncome: GetUpcomingIncome
     public let payoutDraft: GetPayoutDraft
@@ -112,6 +116,7 @@ public final class BudgetApp: Sendable {
     public let setTripReceipt: SetTripReceipt
     public let tripReceipt: GetTripReceipt
     public let recordTripSettlement: RecordTripSettlement
+    public let updateTripSettlement: UpdateTripSettlement
     public let deleteTripSettlement: DeleteTripSettlement
     public let setTripCash: SetTripCash
 
@@ -191,7 +196,7 @@ public final class BudgetApp: Sendable {
         changeBillPlan = ChangeBillPlan(bills: billBook)
         bills = GetBills(store: billStore)
         upcoming = GetUpcoming(store: billStore)
-        billDraft = GetBillDraft(store: billStore)
+        billDraft = GetBillDraft(store: billStore, expenses: expenses)
         addBillOccurrence = AddBillOccurrence(store: billStore, addExpense: addExpense)
         billsToAdd = GetBillsToAdd(store: billStore)
         addSeveralBills = AddSeveralBills(store: billStore, addExpense: addExpense)
@@ -204,6 +209,7 @@ public final class BudgetApp: Sendable {
         searchExpenses = SearchExpenses(expenses: expenses)
         spendingBreakdown = GetSpendingBreakdown(expenses: expenses)
         categoryBreakdown = GetCategoryBreakdown(expenses: expenses)
+        groupBreakdown = GetGroupBreakdown(expenses: expenses)
         let currencyBook = CurrencyRepository(database: database)
         currencies = GetCurrencies(currencies: currencyBook)
         addCurrency = AddCurrency(currencies: currencyBook)
@@ -214,11 +220,14 @@ public final class BudgetApp: Sendable {
         setBankBalance = SetBankBalance(portfolio: portfolioBook, clock: clock)
         setExchangeRate = SetExchangeRate(portfolio: portfolioBook, clock: clock)
         addHolding = AddHolding(portfolio: portfolioBook, setRate: setExchangeRate)
+        updateHolding = UpdateHolding(portfolio: portfolioBook, setRate: setExchangeRate)
         deleteHolding = DeleteHolding(portfolio: portfolioBook)
         addAllocatedFund = AddAllocatedFund(portfolio: portfolioBook)
+        updateAllocatedFund = UpdateAllocatedFund(portfolio: portfolioBook)
         deleteAllocatedFund = DeleteAllocatedFund(portfolio: portfolioBook)
         setLedgerCountsTowardsNetWorth = SetLedgerCountsTowardsNetWorth(ledgers: ledgerBook)
         addScheme = AddScheme(schemes: schemeBook)
+        updateScheme = UpdateScheme(schemes: schemeBook)
         payoutSchemes = GetPayoutSchemes(schemes: schemeBook)
         upcomingIncome = GetUpcomingIncome(store: schemeStore)
         payoutDraft = GetPayoutDraft(store: schemeStore)
@@ -247,6 +256,7 @@ public final class BudgetApp: Sendable {
         setTripReceipt = SetTripReceipt(trips: tripBook)
         tripReceipt = GetTripReceipt(trips: tripBook)
         recordTripSettlement = RecordTripSettlement(store: tripStore)
+        updateTripSettlement = UpdateTripSettlement(store: tripStore, record: recordTripSettlement)
         deleteTripSettlement = DeleteTripSettlement(store: tripStore)
         setTripCash = SetTripCash(store: tripStore)
     }

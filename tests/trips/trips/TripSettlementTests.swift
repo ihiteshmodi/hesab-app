@@ -226,4 +226,40 @@ struct TripSettlementTests {
 
         #expect(throws: TripError.notAMember("That person")) { try b.app.tripPersonStatement(b.trip.id, 9_999) }
     }
+
+    @Test func aPaymentCanBeChangedAfterItWasSaved() throws {
+        let b = try dinner()
+        let payment = try b.app.recordTripSettlement(b.trip.id, personID: b.ana.id, .theyPaidMe, .rupees(265), method: .bank)
+
+        try b.app.updateTripSettlement(payment.id, personID: b.ana.id, .theyPaidMe, .rupees(530), method: .bank)
+
+        #expect(try b.owes(b.ana) == .zero)
+        let payments = try b.app.tripPersonStatement(b.trip.id, b.ana.id).lines.filter { $0.kind == .payment }
+        #expect(payments.count == 1)
+        #expect(try b.summary().receivedBankHome == .rupees(530))
+    }
+
+    @Test func aChangedPaymentThatIsRefusedLeavesTheOldOne() throws {
+        let b = try dinner()
+        let payment = try b.app.recordTripSettlement(b.trip.id, personID: b.ana.id, .theyPaidMe, .rupees(265), method: .bank)
+
+        #expect(throws: TripError.amountMissingOrZero) {
+            try b.app.updateTripSettlement(payment.id, personID: b.ana.id, .theyPaidMe, .zero, method: .bank)
+        }
+        #expect(try b.owes(b.ana) == .rupees(50_000))
+    }
+
+    @Test(arguments: [
+        ([2_500_000, 1_500_000, 2_000_000], 10_000_000, 4_000_000),
+        ([30, 20, 10], 100, 40),
+    ])
+    func theLastPersonLeftBlankTakesWhatIsLeft(typed: [Int], total: Int, left: Int) {
+        let people: [Participant] = [.me, .person(1), .person(2), .person(3)]
+        let given = Dictionary(uniqueKeysWithValues: zip(people, typed))
+
+        let filled = SplitRemainder.fill(given, chosen: people, total: total)
+
+        #expect(filled[.person(3)] == left)
+        #expect(SplitRemainder.fill([Participant.me: 30], chosen: people, total: 100)[.person(3)] == nil)
+    }
 }

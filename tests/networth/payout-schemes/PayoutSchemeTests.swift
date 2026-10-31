@@ -210,4 +210,33 @@ struct PayoutSchemeTests {
 
         #expect(try app.billsAttention().menuCount == 1)
     }
+
+    // MARK: editing
+
+    @Test func priyaEditsASchemeAndItsRecordedPayoutsAreKept() throws {
+        let (app, bond) = try background()
+        try app.recordPayout(bond.id, amount: .rupees(800), on: day("2026-10-24"))
+
+        try app.updateScheme(bond.id, NewPayoutScheme(
+            name: "Bond A", invested: .rupees(100_000), monthlyPayout: .rupees(850), payoutDay: 26,
+            maturity: day("2027-03-10")
+        ))
+
+        let edited = try #require(try app.payoutSchemes().schemes.first { $0.scheme.id == bond.id }).scheme
+        #expect(edited.maturity == day("2027-03-10"))
+        #expect(edited.monthlyPayout == .rupees(850))
+        #expect(edited.payoutDay == 26)
+        #expect(try app.payoutDraft(bond.id).expectedDate == day("2026-11-26"))
+    }
+
+    @Test func anEditedSchemeIsCheckedLikeANewOne() throws {
+        let (app, bond) = try background()
+
+        #expect(throws: PayoutSchemeError.amountMissingOrZero) {
+            try app.updateScheme(bond.id, NewPayoutScheme(
+                name: "Bond A", invested: .zero, monthlyPayout: .rupees(800), payoutDay: 24, maturity: nil
+            ))
+        }
+        #expect(try app.payoutSchemes().schemes.first { $0.scheme.id == bond.id }?.scheme.invested == .rupees(100_000))
+    }
 }

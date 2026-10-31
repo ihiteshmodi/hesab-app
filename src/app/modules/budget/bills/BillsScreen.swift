@@ -45,6 +45,7 @@ struct BillsScreen: View {
                 if filter == .planned {
                     planned
                 } else if let calendar = model.billsCalendar(for: month) {
+                    if filter != .income, filter != .upcomingIncome, filter != .receivedIncome { dueToAdd }
                     if showingList { list(calendar) } else { calendarView(calendar) }
                     if [.allTransactions, .income, .upcomingIncome].contains(filter) { upcomingIncome }
                     if filter != .income, filter != .upcomingIncome, filter != .receivedIncome { allBills }
@@ -224,20 +225,45 @@ struct BillsScreen: View {
         }
     }
 
+    /// Bills due within the upcoming window wait here until she adds each one with the amount actually paid.
+    @ViewBuilder private var dueToAdd: some View {
+        if !model.upcoming.items.isEmpty {
+            CardGroup(header: "Due to add", footer: "Add puts the bill in Activity. Change the amount there if this month's bill is different.") {
+                ForEach(model.upcoming.items, id: \.bill.id) { item in
+                    CardRow(title: item.bill.name, subtitle: item.label) {
+                        Button("Add") { billToAdd = item.bill.id }.buttonStyle(AddPillStyle())
+                            .accessibilityIdentifier("addDueBillButton")
+                    }
+                    .accessibilityElement(children: .contain)
+                    .accessibilityIdentifier("dueBillRow")
+                }
+            }
+        }
+    }
+
     @ViewBuilder private var allBills: some View {
         if !model.bills.isEmpty {
-            CardGroup(header: "All bills", footer: "Tap a bill to change it, change its plan or delete it.") {
+            CardGroup(header: "All bills", footer: "Tap a bill to change its usual amount, plan or end date. Use Add to put one month's bill in Activity.") {
                 ForEach(model.bills, id: \.bill.id) { summary in
-                    ButtonRow(title: summary.bill.name, subtitle: detail(summary), value: IndianMoneyFormat.string(summary.bill.amount)) {
-                        editingBill = summary.bill.id
+                    HStack(spacing: 8) {
+                        ButtonRow(title: summary.bill.name, subtitle: detail(summary), value: IndianMoneyFormat.string(summary.bill.amount)) {
+                            editingBill = summary.bill.id
+                        }
+                        if summary.nextDue != nil {
+                            Button("Add") { billToAdd = summary.bill.id }.buttonStyle(AddPillStyle())
+                                .padding(.trailing, 14)
+                                .accessibilityIdentifier("addBillRowButton")
+                        }
                     }
                     .accessibilityIdentifier("billRow")
                 }
             }
         }
-        CardGroup {
-            LinkRow(title: "Auto-added", value: model.attention.autoAddedUnseen > 0 ? "\(model.attention.autoAddedUnseen) new" : "",
-                    identifier: "autoAddedLink") { AutoAddedScreen(model: model) }
+        if !model.autoAdded.isEmpty {
+            CardGroup {
+                LinkRow(title: "Auto-added", value: model.attention.autoAddedUnseen > 0 ? "\(model.attention.autoAddedUnseen) new" : "",
+                        identifier: "autoAddedLink") { AutoAddedScreen(model: model) }
+            }
         }
     }
 

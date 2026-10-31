@@ -112,4 +112,83 @@ struct SpendingBreakdownTests {
         #expect(detail.expenses.count == 2)
         #expect(detail.total == .rupees(3_000))
     }
+
+    // MARK: other groupings, any row opens, top share
+
+    private func tagged(
+        _ app: BudgetApp, _ rupees: Int, category: String = "Food & Dining", sub: String = "",
+        spentFor: String = "", tags: [String] = [], entity: String = ""
+    ) throws {
+        try app.addExpense(NewExpense(
+            date: day("2026-10-12"), description: "Item", amount: .rupees(rupees), category: category, subCategory: sub,
+            entity: entity, spentFor: spentFor, tags: tags
+        ))
+    }
+
+    @Test func spendingCanBeGroupedBySpentForSubCategoryAndTag() throws {
+        let app = try makeApp()
+        try tagged(app, 700, sub: "Restaurant", spentFor: "Mom", tags: ["Dubai trip"])
+        try tagged(app, 300)
+
+        #expect(try app.spendingBreakdown(.month(october), by: .spentFor).rows.map(\.name) == ["Mom", "Me"])
+        #expect(try app.spendingBreakdown(.month(october), by: .subCategory).rows.map(\.name)
+            == ["Restaurant (Food & Dining)", "Food & Dining (no sub-category)"])
+        #expect(try app.spendingBreakdown(.month(october), by: .tag).rows.map(\.name) == ["Dubai trip", "No tag"])
+    }
+
+    @Test func anExpenseWithTwoTagsCountsUnderEachTagButOnceInTheTotal() throws {
+        let app = try makeApp()
+        try tagged(app, 1_000, tags: ["Avenger", "Dominar"])
+
+        let report = try app.spendingBreakdown(.month(october), by: .tag)
+
+        #expect(report.rows.map(\.amount) == [.rupees(1_000), .rupees(1_000)])
+        #expect(report.total == .rupees(1_000))
+    }
+
+    @Test func anyRowOpensToItsExpensesAndTheirCategories() throws {
+        let app = try makeApp()
+        try tagged(app, 500, category: "Groceries")
+        try tagged(app, 200, category: "Transport")
+        try tagged(app, 900, category: "Transport", entity: "Uber")
+
+        let detail = try app.groupBreakdown(.entity, "No entity", .month(october))
+
+        #expect(detail.expenses.map(\.amount) == [.rupees(200), .rupees(500)])
+        #expect(detail.rows.map(\.name) == ["Groceries", "Transport"])
+        #expect(detail.total == .rupees(700))
+    }
+
+    @Test func aCategoryOpensToItsSubCategories() throws {
+        let app = try makeApp()
+        try tagged(app, 500, sub: "Restaurant")
+        try tagged(app, 200)
+
+        let detail = try app.groupBreakdown(.category, "Food & Dining", .month(october))
+
+        #expect(detail.rows.map(\.name) == ["Restaurant", "No sub-category"])
+    }
+
+    @Test func theSliderKeepsTheRowsThatMakeUpTheChosenShare() throws {
+        let app = try makeApp()
+        for (category, rupees) in [("Home & Utilities", 5_000), ("Food & Dining", 3_000), ("Transport", 1_000), ("Fuel", 1_000)] {
+            try tagged(app, rupees, category: category)
+        }
+
+        let top = try app.spendingBreakdown(.month(october), by: .category).top(percent: 80)
+
+        #expect(top.rows.map(\.name) == ["Home & Utilities", "Food & Dining"])
+        #expect(top.rest == .rupees(2_000))
+        #expect(try app.spendingBreakdown(.month(october), by: .category).top(percent: 100).rest == .zero)
+    }
+
+    @Test func theSliderKeepsTheBiggestExpensesInsideARow() throws {
+        let app = try makeApp()
+        for rupees in [100, 600, 300] { try tagged(app, rupees) }
+
+        let detail = try app.groupBreakdown(.category, "Food & Dining", .month(october))
+
+        #expect(detail.topExpenses(percent: 80).map(\.amount) == [.rupees(600), .rupees(300)])
+        #expect(detail.topExpenses(percent: 100).count == 3)
+    }
 }

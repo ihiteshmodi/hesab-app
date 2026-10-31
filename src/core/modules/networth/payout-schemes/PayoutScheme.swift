@@ -122,6 +122,16 @@ final class PayoutSchemeRepository: Sendable {
         return found
     }
 
+    func update(_ id: Int64, _ new: NewPayoutScheme, name: String, invested: Money, payout: Money) throws {
+        try database.writer.write { db in
+            try db.execute(sql: """
+                UPDATE payout_scheme SET name = ?, invested_paise = ?, payout_paise = ?, payout_day = ?, maturity = ?
+                WHERE id = ?
+                """, arguments: [name, invested.paise, payout.paise, new.payoutDay, new.maturity?.isoString, id])
+            guard db.changesCount > 0 else { throw PayoutSchemeError.notFound(id) }
+        }
+    }
+
     func close(_ id: Int64) throws {
         _ = try scheme(id)
         try database.writer.write { db in try db.execute(sql: "UPDATE payout_scheme SET closed = 1 WHERE id = ?", arguments: [id]) }
@@ -224,13 +234,28 @@ public struct AddScheme: Sendable {
 
     @discardableResult
     public func callAsFunction(_ new: NewPayoutScheme) throws -> PayoutScheme {
-        let name = new.name.trimmed
-        guard !name.isEmpty else { throw PayoutSchemeError.nameMissing }
-        guard let invested = new.invested, invested > .zero else { throw PayoutSchemeError.amountMissingOrZero }
-        guard let payout = new.monthlyPayout, payout >= .zero else { throw PayoutSchemeError.payoutInvalid }
-        guard (1...31).contains(new.payoutDay) else { throw PayoutSchemeError.payoutDayInvalid }
-        return try schemes.add(new, name: name, invested: invested, payout: payout)
+        let checked = try validatedScheme(new)
+        return try schemes.add(new, name: checked.name, invested: checked.invested, payout: checked.payout)
     }
+}
+
+/// Changes every field of a scheme; payouts already recorded stay linked to it.
+public struct UpdateScheme: Sendable {
+    let schemes: PayoutSchemeRepository
+
+    public func callAsFunction(_ id: Int64, _ new: NewPayoutScheme) throws {
+        let checked = try validatedScheme(new)
+        try schemes.update(id, new, name: checked.name, invested: checked.invested, payout: checked.payout)
+    }
+}
+
+private func validatedScheme(_ new: NewPayoutScheme) throws -> (name: String, invested: Money, payout: Money) {
+    let name = new.name.trimmed
+    guard !name.isEmpty else { throw PayoutSchemeError.nameMissing }
+    guard let invested = new.invested, invested > .zero else { throw PayoutSchemeError.amountMissingOrZero }
+    guard let payout = new.monthlyPayout, payout >= .zero else { throw PayoutSchemeError.payoutInvalid }
+    guard (1...31).contains(new.payoutDay) else { throw PayoutSchemeError.payoutDayInvalid }
+    return (name, invested, payout)
 }
 
 public struct GetPayoutSchemes: Sendable {

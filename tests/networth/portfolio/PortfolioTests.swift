@@ -176,4 +176,26 @@ struct PortfolioTests {
         #expect(try app.portfolio().investments == .rupees(46_000))
         #expect(try app.payoutSchemes().schemes.count == 1)
     }
+
+    // MARK: editing
+
+    @Test func priyaEditsAnInvestment() throws {
+        let app = try background()
+        let stocks = try #require(try app.portfolio().holdings.first { $0.holding.name == "Stocks" }).holding
+
+        try app.updateHolding(stocks.id, NewHolding(name: "Index fund", amount: .rupees(12_000)))
+
+        let portfolio = try app.portfolio()
+        #expect(portfolio.holdings.first { $0.holding.id == stocks.id }?.holding.name == "Index fund")
+        #expect(portfolio.investments == .rupees(1_048_000))
+    }
+
+    @Test func priyaEditsAnAllocation() throws {
+        let app = try background()
+        let trip = try #require(try app.portfolio().allocatedFunds.first { $0.name == "Trip" })
+
+        try app.updateAllocatedFund(trip.id, name: "Trip", amount: .rupees(25_000))
+
+        #expect(try app.portfolio().availableForAllocation == .rupees(165_000))
+    }
 }

@@ -46,7 +46,7 @@ final class ActivityAndBillsUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["upcomingEmpty"].waitForExistence(timeout: 20))
 
         app.buttons["createBillButton"].tap()
-        fillBill(app, "Rent", "20000", automatic: false)
+        fillBill(app, "Rent", "20000")
 
         XCTAssertTrue(app.descendants(matching: .any)["upcomingRow"].waitForExistence(timeout: 20))
         app.buttons["addUpcomingBillButton"].tap()
@@ -61,21 +61,17 @@ final class ActivityAndBillsUITests: XCTestCase {
     }
 
     @MainActor
-    func testABillThatAddsItselfGoesInWhenSavedAndIsNotListedInUpcoming() {
+    func testANewBillWaitsToBeAddedAndNeverAddsItself() {
         let app = launchApp()
         app.buttons["Upcoming"].tap()
         app.buttons["createBillButton"].tap()
-        fillBill(app, "Internet", "800", automatic: true)
+        fillBill(app, "Internet", "800")
 
-        let note = app.staticTexts["automaticBillsNote"]
-        XCTAssertTrue(note.waitForExistence(timeout: 20))
-        XCTAssertTrue(note.label.contains("Internet"))
-        XCTAssertFalse(app.descendants(matching: .any)["upcomingRow"].exists)
+        let row = app.descendants(matching: .any)["upcomingRow"]
+        XCTAssertTrue(row.waitForExistence(timeout: 20))
+        XCTAssertTrue(row.staticTexts["Internet"].exists)
         app.buttons["Spending"].tap()
-        let notice = app.staticTexts["autoNotice"]
-        XCTAssertTrue(notice.waitForExistence(timeout: 20))
-        XCTAssertTrue(notice.label.contains("Internet"))
-        XCTAssertTrue(app.descendants(matching: .any)["expenseRow"].label.contains("Internet"))
+        XCTAssertFalse(app.descendants(matching: .any)["expenseRow"].exists)
     }
 
     @MainActor
@@ -84,7 +80,7 @@ final class ActivityAndBillsUITests: XCTestCase {
         selectTab(app, "Bills")
         app.buttons["billsAddMenu"].tap()
         app.buttons["newBillButton"].tap()
-        fillBill(app, "Rent", "20000", automatic: false)
+        fillBill(app, "Rent", "20000")
 
         let day = app.buttons["billDay-\(today)"]
         XCTAssertTrue(day.waitForExistence(timeout: 20))
@@ -153,18 +149,13 @@ final class ActivityAndBillsUITests: XCTestCase {
     // MARK: helpers
 
     @MainActor
-    private func fillBill(_ app: XCUIApplication, _ name: String, _ amount: String, automatic: Bool) {
+    private func fillBill(_ app: XCUIApplication, _ name: String, _ amount: String) {
         type(app.textFields["billNameField"], name)
         type(app.textFields["billAmountField"], amount)
         app.buttons["billCategoryPicker"].tap()
         app.buttons["Home & Utilities"].tap()
         let done = app.buttons["keyboardDoneButton"]
         if done.waitForExistence(timeout: 3) { done.tap() }
-        let auto = app.switches["billAutoToggle"]
-        XCTAssertTrue(auto.waitForExistence(timeout: 20))
-        if (auto.value as? String == "1") != automatic {
-            auto.coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: 0.5)).tap()
-        }
         app.buttons["saveBillButton"].tap()
         XCTAssertTrue(waitForAbsence(app.buttons["saveBillButton"]), "the bill was not saved")
     }

@@ -71,3 +71,12 @@ Feature: Portfolio and net worth
   Scenario: Priya removes a holding
     When she chooses "Delete Holding" on "Stocks" and confirms
     Then "Investments" shows 1,036,000
+
+  Scenario: Priya edits an investment
+    When Priya changes "Stocks" to "Index fund" worth 12,000
+    Then the investments list shows "Index fund" at 12,000
+    And investments are 1,048,000
+
+  Scenario: Priya edits an allocation
+    When Priya changes "Trip" to 25,000
+    Then available for allocation is 165,000

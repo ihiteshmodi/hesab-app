@@ -146,6 +146,8 @@ struct TripExpenseSheet: View {
                     .pickerStyle(.segmented)
                     .accessibilityIdentifier("tripSplitKindPicker")
                     .rowPadding()
+                    // Numbers typed for one way of splitting mean something else in another, so a new way starts empty.
+                    .onChange(of: kind) { weights = [:] }
                     if kind != .items {
                         groupChips
                         ForEach(participants, id: \.self) { who in personRow(who) }
@@ -238,8 +240,8 @@ struct TripExpenseSheet: View {
                 switch kind {
                 case .equally: Text(equalShareText).foregroundStyle(Theme.secondary).monospacedDigit()
                 case .shares: weightField(who, placeholder: "1", suffix: "shares")
-                case .amounts: weightField(who, placeholder: "0", suffix: "")
-                case .percent: weightField(who, placeholder: "0", suffix: "%")
+                case .amounts: weightField(who, placeholder: autoText(who) ?? "0", suffix: "")
+                case .percent: weightField(who, placeholder: autoText(who) ?? "0", suffix: "%")
                 case .items: EmptyView()
                 }
             }
@@ -247,6 +249,24 @@ struct TripExpenseSheet: View {
         .rowPadding()
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("splitRow-\(name(who))")
+    }
+
+    /// The typed numbers as whole paise (amounts) or whole percent, with the one blank person given the rest.
+    private var filled: [Participant: Int] {
+        let chosen = participants.filter { selected.contains($0) }
+        var typed: [Participant: Int] = [:]
+        for who in chosen {
+            let text = (weights[who] ?? "").trimmingCharacters(in: .whitespaces)
+            guard !text.isEmpty else { continue }
+            typed[who] = kind == .percent ? Int(text) ?? 0 : MoneyInput.parse(text)?.paise ?? 0
+        }
+        let total = kind == .percent ? 100 : MoneyInput.parse(amountText)?.paise ?? 0
+        return SplitRemainder.fill(typed, chosen: chosen, total: total)
+    }
+
+    private func autoText(_ who: Participant) -> String? {
+        guard (weights[who] ?? "").trimmingCharacters(in: .whitespaces).isEmpty, let value = filled[who] else { return nil }
+        return kind == .percent ? "\(value)" : IndianMoneyFormat.plain(Money(paise: value))
     }
 
     private var equalShareText: String {
@@ -299,8 +319,8 @@ struct TripExpenseSheet: View {
         switch kind {
         case .equally: return .equal(Set(chosen))
         case .shares: return .shares(Dictionary(uniqueKeysWithValues: chosen.map { ($0, Int(weights[$0] ?? "") ?? 1) }))
-        case .amounts: return .exact(Dictionary(uniqueKeysWithValues: chosen.map { ($0, MoneyInput.parse(weights[$0] ?? "") ?? .zero) }))
-        case .percent: return .percentage(Dictionary(uniqueKeysWithValues: chosen.map { ($0, Int(weights[$0] ?? "") ?? 0) }))
+        case .amounts: return .exact(Dictionary(uniqueKeysWithValues: chosen.map { ($0, Money(paise: filled[$0] ?? 0)) }))
+        case .percent: return .percentage(Dictionary(uniqueKeysWithValues: chosen.map { ($0, filled[$0] ?? 0) }))
         case .items:
             return .items(
                 items.map { SplitItem(name: $0.name, amount: MoneyInput.parse($0.amountText) ?? .zero, people: $0.people) },

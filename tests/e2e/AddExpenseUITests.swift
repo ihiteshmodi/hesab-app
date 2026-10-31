@@ -314,9 +314,6 @@ final class AddExpenseUITests: XCTestCase {
         app.buttons["Home & Utilities"].tap()
         let done = app.buttons["keyboardDoneButton"]
         if done.waitForExistence(timeout: 3) { done.tap() }
-        let automatic = app.switches["billAutoToggle"]
-        XCTAssertTrue(automatic.waitForExistence(timeout: 20))
-        automatic.coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: 0.5)).tap()
         app.buttons["saveBillButton"].tap()
 
         let add = app.buttons["addCalendarBillButton"]

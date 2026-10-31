@@ -337,6 +337,35 @@ public struct RecordTripSettlement: Sendable {
     }
 }
 
+/// Replaces a saved payment; if the new one is refused, the old one is put back.
+public struct UpdateTripSettlement: Sendable {
+    let store: TripStore
+    let record: RecordTripSettlement
+
+    @discardableResult
+    public func callAsFunction(
+        _ id: Int64, personID: Int64, _ direction: SettlementDirection, _ amount: Money?,
+        method: SettlementMethod = .bank, atRate rate: Decimal? = nil, fullSettlement: Bool = false, on date: CalendarDate? = nil
+    ) throws -> TripSettlement {
+        let tripID = try store.trips.tripID(ofSettlement: id)
+        guard let old = try store.trips.settlements(of: tripID).first(where: { $0.id == id }) else { throw TripError.notFound(id) }
+        try store.trips.deleteSettlement(id)
+        do {
+            return try record(
+                tripID, personID: personID, direction, amount, method: method, atRate: rate, fullSettlement: fullSettlement,
+                on: date ?? old.date
+            )
+        } catch {
+            _ = try store.trips.addSettlement(
+                tripID: tripID, personID: old.personID, date: old.date, direction: old.direction, method: old.method,
+                received: old.received, cleared: old.cleared, writtenOff: old.writtenOff
+            )
+            try store.syncMainLedger(tripID)
+            throw error
+        }
+    }
+}
+
 public struct DeleteTripSettlement: Sendable {
     let store: TripStore
 

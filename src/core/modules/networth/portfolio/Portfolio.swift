@@ -111,6 +111,16 @@ final class PortfolioRepository: Sendable {
         }
     }
 
+    func updateHolding(_ id: Int64, name: String, amount: Money, currency: String?) throws {
+        try database.writer.write { db in
+            try db.execute(
+                sql: "UPDATE holding SET name = ?, amount_paise = ?, currency = ? WHERE id = ?",
+                arguments: [name, amount.paise, currency, id]
+            )
+            guard db.changesCount > 0 else { throw PortfolioError.notFound(id) }
+        }
+    }
+
     func deleteHolding(_ id: Int64) throws {
         try database.writer.write { db in
             try db.execute(sql: "DELETE FROM holding WHERE id = ?", arguments: [id])
@@ -129,6 +139,13 @@ final class PortfolioRepository: Sendable {
     func addFund(name: String, amount: Money) throws {
         try database.writer.write { db in
             try db.execute(sql: "INSERT INTO allocated_fund (name, amount_paise) VALUES (?, ?)", arguments: [name, amount.paise])
+        }
+    }
+
+    func updateFund(_ id: Int64, name: String, amount: Money) throws {
+        try database.writer.write { db in
+            try db.execute(sql: "UPDATE allocated_fund SET name = ?, amount_paise = ? WHERE id = ?", arguments: [name, amount.paise, id])
+            guard db.changesCount > 0 else { throw PortfolioError.notFound(id) }
         }
     }
 
@@ -218,18 +235,35 @@ public struct AddHolding: Sendable {
     let setRate: SetExchangeRate
 
     public func callAsFunction(_ new: NewHolding) throws {
-        let name = new.name.trimmed
-        guard !name.isEmpty else { throw PortfolioError.nameMissing }
-        guard let amount = new.amount, amount >= .zero else { throw PortfolioError.amountInvalid }
-        if let currency = new.currency {
-            if let rate = new.rate {
-                try setRate(currency, rate)
-            } else if try !portfolio.rates().contains(where: { $0.currency == currency }) {
-                throw PortfolioError.rateMissing
-            }
-        }
+        let (name, amount) = try validatedHolding(new, portfolio: portfolio, setRate: setRate)
         try portfolio.addHolding(name: name, amount: amount, currency: new.currency)
     }
+}
+
+public struct UpdateHolding: Sendable {
+    let portfolio: PortfolioRepository
+    let setRate: SetExchangeRate
+
+    public func callAsFunction(_ id: Int64, _ new: NewHolding) throws {
+        let (name, amount) = try validatedHolding(new, portfolio: portfolio, setRate: setRate)
+        try portfolio.updateHolding(id, name: name, amount: amount, currency: new.currency)
+    }
+}
+
+private func validatedHolding(
+    _ new: NewHolding, portfolio: PortfolioRepository, setRate: SetExchangeRate
+) throws -> (name: String, amount: Money) {
+    let name = new.name.trimmed
+    guard !name.isEmpty else { throw PortfolioError.nameMissing }
+    guard let amount = new.amount, amount >= .zero else { throw PortfolioError.amountInvalid }
+    if let currency = new.currency {
+        if let rate = new.rate {
+            try setRate(currency, rate)
+        } else if try !portfolio.rates().contains(where: { $0.currency == currency }) {
+            throw PortfolioError.rateMissing
+        }
+    }
+    return (name, amount)
 }
 
 public struct DeleteHolding: Sendable {
@@ -247,6 +281,16 @@ public struct AddAllocatedFund: Sendable {
         guard !name.trimmed.isEmpty else { throw PortfolioError.nameMissing }
         guard let amount, amount >= .zero else { throw PortfolioError.amountInvalid }
         try portfolio.addFund(name: name.trimmed, amount: amount)
+    }
+}
+
+public struct UpdateAllocatedFund: Sendable {
+    let portfolio: PortfolioRepository
+
+    public func callAsFunction(_ id: Int64, name: String, amount: Money?) throws {
+        guard !name.trimmed.isEmpty else { throw PortfolioError.nameMissing }
+        guard let amount, amount >= .zero else { throw PortfolioError.amountInvalid }
+        try portfolio.updateFund(id, name: name.trimmed, amount: amount)
     }
 }
 
