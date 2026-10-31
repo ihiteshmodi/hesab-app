@@ -75,7 +75,9 @@ struct TripDetailScreen: View {
                             Image(systemName: "plus").font(.title2.bold()).foregroundStyle(.white)
                                 .frame(width: 56, height: 56).background(Circle().fill(Theme.blue))
                         }
-                        .padding(20)
+                        // The floating tab bar of RootView covers the bottom of pushed screens, so lift the button above it.
+                        .padding(.trailing, 20)
+                        .padding(.bottom, 96)
                         .accessibilityLabel("Add")
                         .accessibilityIdentifier("addTripEntryButton")
                     }
