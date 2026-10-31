@@ -1,15 +1,16 @@
 # How we build apps together: the playbook
 
-Read this first. It describes the working method that produced a finished, tested, personal iPhone app (a fitness tracker with workouts, body metrics, calories and a diet tracker) with one person and one AI agent. It is **not specific to that app**. Follow it for the next one.
+Read this first. It describes the working method that produced two finished, tested, personal iPhone apps with one person and one AI agent: a fitness tracker (workouts, body metrics, calories, diet) and a budget app (expenses, bills with a calendar, net worth, trips split with friends, Face ID privacy). It is **not specific to either app**. Follow it for the next one.
 
 The short version:
 
 1. **Understand the person and the job before any code.** Who is it for, why, what changes for them.
-2. **Show it before you build it.** Concrete examples, then an HTML mockup with the person's real data. Get a yes.
+2. **Show it before you build it.** Concrete examples, then an HTML mockup with the person's real data. Get a yes. Then build **what the mockup shows**, including its look.
 3. **Write the tests from the agreed examples first.** See each fail once, then make it pass.
 4. **Keep the logic in a plain, testable core.** The screens stay thin.
 5. **One feature per commit, only when green.** Never push without being asked.
 6. **Keep personal data out of the repository.** Always.
+7. **Never leave a gap unannounced.** Anything not built, or built differently from the mockup, is reported before the person has to ask.
 
 ---
 
@@ -46,6 +47,10 @@ Use short forms with a few concrete options and a sensible default marked. Group
 - Report honestly: what passed, what failed, what you skipped, what you assumed.
 - Link to files and name exact commands. Give step-by-step instructions for anything the person must do themselves (merging a PR, installing a build), with where to click.
 - When the person changes their mind or adds a requirement mid-way, **pause, restate the change, update the mockups/specs, get a yes, then continue**. Do not quietly absorb it.
+- **Keep a running "not built yet / differs from the mockup" list** and put it in every end-of-session report, unasked. Finding a missing feature (or a screen that looks nothing like the approved mockup) on their own costs the person's trust far more than the gap itself. Say "this is a best-effort list" rather than promising it is complete.
+- **Stay with long-running work until it finishes.** Do not end a turn with "I'll check later" while a build or test run is still going; wait in the same turn and report the result.
+- **Show progress as numbers.** For anything that takes minutes, print `done/total`, a percentage, passes, failures and what is running now (see the heartbeat in section 4). "How many are there in total?" should never need asking.
+- **When the machine struggles** (heat, fans, the person says "stop everything"): stop every build and test run at once, then run one thing at a time on one simulator.
 
 ---
 
@@ -81,6 +86,9 @@ Gate: **the person approves the examples.** Humans own the spec.
 - **Mockups first.** Build a clickable-looking HTML page of the screens with the person's real foods/exercises/numbers, render it, screenshot it, check it yourself, then show it. Keep it out of the repository if it holds personal data. Iterate until they say it looks good. This is far cheaper than changing an app. Show every screen and every state that matters (empty, normal, changed, error, an edge case).
 - **Show the whole screen when you change part of it.** The person worries that unchanged parts were removed; draw the full screen and say what stays.
 - **Write the assumptions down** next to the mockup and ask them to confirm each ("plan starts on the 26th", "editing a food recalculates past days"). Unconfirmed assumptions become bugs.
+- **Number every mockup screen** ("mockup 43: Settings"). The person and the agent can then point at exactly one screen, and the gap list can say "mockup 6 (Bills calendar) not built yet".
+- **The mockup's look is part of the spec.** If it shows white rounded cards on a grey page, the app shows that, not the platform's default list and form style. Before building screens, turn the mockup's CSS (colours, corner radii, spacing, button shapes) into a small design-system file in the app (page, card, card group, row, form row, pill buttons, status pills) and build every screen from those pieces. Retrofitting the look onto thirty finished screens later is a large, risky job.
+- **When an approved mockup contradicts an existing test or scenario**, update the `.feature` file and the old test openly (and say so), rather than leaving both.
 - **Architecture:** broad strokes only (see section 3). Decide storage, platform, offline or not, how tests plug in. Hard-to-reverse choices need the person's approval.
 - **Slice the work** into features that each deliver something visible and testable. Order them so each commit leaves the app working.
 
@@ -91,11 +99,13 @@ For each feature (this is the heart of the method):
 1. **Specify:** turn the approved scenarios into tests. Write the **assert first** (the result you expect), then the call, then the setup. If a scenario is awkward to test, the design is awkward; fix the design.
 2. **See it fail** for the right reason (the behaviour is missing), not because of a typo or a missing import.
 3. **Make it pass** with the simplest honest code.
-4. **Prove the test can fail** (a quick mutation check): break the code on purpose, watch the tests go red, restore. Do this at least once per feature. A test that cannot fail proves nothing.
+4. **Prove the test can fail** (a quick mutation check): break the code on purpose, watch the tests go red, restore. Do this at least once per feature. A test that cannot fail proves nothing. Apply mutations with an exact string replace (a few lines of Python), not `sed`/`perl` regexes: regex characters like `$0`, `?.`, `[` silently fail to match, the code is unchanged, and the mutant falsely "survives". A mutant that truly survives often means the code it removed was redundant; delete that code.
 5. **Refactor** only when the same thing has appeared three times. Never mix refactoring and new behaviour in one commit.
 6. **Commit** on green, one feature per commit.
 
 Work from the inside out: pure logic first (maths, rules, state), then storage, then the services that combine them, then the screens, then UI tests. The core is where about 90% of the testing happens. The UI is thin.
+
+**Splitting a big UI job across helper agents.** When many files need the same mechanical change (for example moving thirty screens onto the design system), give each helper a disjoint set of files and a precise brief: the design-system API, the conversion rules, every accessibility identifier and visible label the UI tests rely on, "do not build, do not run tests, do not touch other files, do not use git". Then build once yourself. Helpers editing in parallel have left half-replaced code behind (`NaviCardScreen {`, an unclosed `.navigationTitle("x"`); fix it by comparing with `git show HEAD:<file>`, and read the helpers' reports for anything they restructured.
 
 ### Phase 4: Review (before every commit that matters)
 
@@ -108,7 +118,8 @@ A short checklist, in this order:
 5. Every fake has a contract test (see section 5).
 6. UI changed? Is logic in a view model or the core, not in the view?
 7. Backend/config/data changed? Failure modes, defaults, migrations, backups?
-8. Personal data not in the diff (`git show --stat`, check file names).
+8. Personal data not in the diff (`git show --stat`, check file names). Grep the staged diff for the person's names, places and amounts from their real data before every push.
+9. Gap list updated: anything still missing or different from the mockups is written down for the report.
 
 ### Phase 5: Ship (only when asked)
 
@@ -159,6 +170,9 @@ A reader should see **what the app does** from the folder tree, not "controllers
 - **Per-day overrides beat edits.** Let the person change one day without touching the plan (untick, replace, add an extra). Store the override, not a copy of the day.
 - **Compute, do not copy.** Totals, costs and recipe nutrition are worked out from current data every time, so correcting one input fixes history. Say this in the design and get it approved, because it also means history changes.
 - **Explicit "unknown" instead of zero** (a missing price must not look free). Carry a "complete?" flag through the sums.
+- **Money as whole minor units** (paise, cents) in integers, never floating point. Splitting a total among people uses largest-remainder distribution so the parts always add back up to the total.
+- **Dates as calendar days**, not instants, for anything a person thinks of as "on the 1st". Repeating things (bills, payouts) keep their anchor day (the 31st becomes the 28th in February, then the 31st again).
+- **A migration ladder edited in place only while unreleased.** Once a build with that schema is on the person's phone, add a new step instead.
 - **Pure presentation logic in the core** when it has real rules (cycle descriptions, calendar rows, which input modes a food offers). Plain string formatting can stay in the app.
 - **Model states and forbidden transitions** when something has a lifecycle ("only after", "never again"). One test per allowed arrow and per forbidden arrow.
 - **Time-based features** ("after X do Y", reminders, retries): model them as events with handlers; never append awaited side effects to a command.
@@ -168,6 +182,8 @@ A reader should see **what the app does** from the folder tree, not "controllers
 ### Offline-first personal apps
 
 When the app is for one person on one phone: local SQLite, no backend, no accounts. Add **export and import of the database file** early; it is the backup, the migration path, and how the person moves data between builds. Make import safe (validate, back up the current file first).
+
+**Privacy on the phone itself** (money, health): offer "hide balances" (figures show `₹ ••••` until an eye is tapped), put the most sensitive figures behind Face ID on every visit (they hide again when the person leaves the screen or the app), and an app lock that asks for Face ID when the app opens or comes back. Only allow turning the lock on after Face ID has succeeded once, so nobody locks themselves out. While locked, **replace** the screens with the lock screen; an overlay on top still leaves the figures readable to accessibility tools. Put the biometric call behind one small gate type so UI tests can make it succeed or fail with a launch argument. Sideloaded builds (LiveContainer, AltStore) still need a real-device check of Face ID and the camera.
 
 ---
 
@@ -205,7 +221,55 @@ Test **behaviour through the public API**, not private helpers. One behaviour pe
 - The simulator cannot read files on `~/Desktop` (a privacy prompt hangs the app). Stage the test database in a shared folder (`/Users/Shared`) and delete it afterwards.
 - Shut simulators down when finished. Large simulators eat disk; a person may not want a particular device.
 - A simulator's own system daemons (for example the wallpaper process) can crash in the background. That is noise, not an app bug.
-- Run a long test run in the background and keep doing useful work.
+- Run a long test run in the background and keep doing useful work, but come back to it in the same turn (see the heartbeat below).
+- **Switches in a row:** tap the switch itself (`coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: 0.5))`); tapping the middle of the row hits the label and does nothing.
+- **Back navigation:** the system back button is `app.buttons["BackButton"]`.
+- **Coordinate taps do not scroll** and the keyboard covers the bottom of a form. The number pad has no return key, so give number fields a keyboard toolbar "Done" with its own identifier, and tap it before reaching for controls lower down.
+- **Lazy stacks and grids do not create off-screen rows**, so a test cannot find them. Use a plain (non-lazy) layout for small things a test checks, such as a month calendar.
+- **`ForEach` ids must be unique within one container.** Blank calendar cells numbered 0, 1, 2 collided with days 1, 2, 3 and those days silently disappeared.
+- **Swipe actions only exist inside `List`.** With custom card layouts use a touch-and-hold context menu and test it with `press(forDuration:)`.
+- **Critical buttons belong in the content**, not only in a sheet's toolbar: on some simulator layouts toolbar items vanished from the accessibility tree. A Save button pinned to the bottom (`safeAreaInset(edge: .bottom)`) is always reachable.
+- **Launch arguments set up state** the test cannot reach by tapping: an in-memory database (`-ui-testing`), a preference already on (`-ui-app-lock`), Face ID failing (`-ui-auth-fail`). Read them only in the composition root.
+- **Visual check with screenshots:** a temporary UI test that walks the main screens and writes `XCUIScreen.main.screenshot()` PNGs to `/tmp`; combine them into a few contact sheets (Pillow) and compare with the mockups. Delete the temporary test before committing.
+- **Run new and changed tests first** (`-only-testing:`), fix them, then run the **whole suite once** at the end on the final build.
+- **Never overlap runs.** Check `pgrep -f "[x]codebuild"` before starting; a new run started while the last one is still tearing down fails with "Mach error -308 (ipc/mig) server died". Wait a few seconds and start again.
+- **After Xcode updates itself** (it can happen overnight), the simulator may stop with "CoreSimulator is out of date". `xcodebuild -checkFirstLaunchStatus` exits 69 when this is the cause. The fix needs admin rights, so ask the person to run `sudo xcodebuild -runFirstLaunch`, then continue.
+
+#### The heartbeat for long test runs
+
+A full UI suite can take twenty minutes. Run it through a small script that prints one line every 20 seconds, so the person always knows it is alive and how far it got:
+
+```text
+[07:04:48] 5/33 done (15%) · 5 passed · 0 failed · 7m04s · now: ActivityAndBillsUITests.testThePlannedFilter…
+[07:18:12] 33/33 done (100%) · 33 passed · 0 failed · 20m28s · now: TripsUITests.testTheTripsTabSitsFifth…
+---- finished ----
+```
+
+```zsh
+#!/bin/zsh
+# ui-heartbeat.sh: run the UI suite once, print progress every 20 seconds.
+log=/tmp/ui-full.log
+total=$(grep -h "func test" tests/e2e/*.swift | wc -l | tr -d ' ')
+rm -f $log
+(xcodebuild test-without-building -project App.xcodeproj -scheme App \
+   -destination "platform=iOS Simulator,id=$SIM_ID" -derivedDataPath build/DerivedData > $log 2>&1
+ echo "RUN-ENDED exit=$?" >> $log) &
+start=$(date +%s)
+while ! grep -q "RUN-ENDED" $log 2>/dev/null; do
+  sleep 20
+  done_count=$(grep -cE "^Test Case .*(passed|failed) \(" $log)
+  passed=$(grep -cE "^Test Case .* passed \(" $log)
+  failed=$(grep -cE "^Test Case .* failed \(" $log)
+  now=$(grep -E "^Test Case .* started" $log | tail -1 | sed -E 's/.*\.([A-Za-z]+) (test[A-Za-z]+)\]. started.*/\1.\2/')
+  elapsed=$(( $(date +%s) - start ))
+  printf "[%s] %d/%d done (%d%%) · %d passed · %d failed · %dm%02ds · now: %s\n" "$(date +%H:%M:%S)" \
+    $done_count $total $(( done_count * 100 / total )) $passed $failed $(( elapsed / 60 )) $(( elapsed % 60 )) "$now"
+done
+echo "---- finished ----"
+grep -E "error:|Executed .* tests" $log | sort -u | tail -20
+```
+
+Build once with `xcodebuild build-for-testing`, then run this. Use the same idea (a counter and a percentage) for any loop that takes minutes: imports, mutation runs, migrations.
 
 ---
 
@@ -223,6 +287,8 @@ A fake (an in-memory repository, a fixed clock) is only trustworthy if the **sam
 - First line says what the person gets, not how.
 - Add the agent co-author trailer if the project asks for it.
 - **Never commit:** databases, spreadsheets, notebooks, builds/binaries, `.env`/secrets, the person's real data. Add them to `.gitignore` on day one and check `git show --stat` before pushing.
+- **Stage explicit paths** (`git add src tests README.md project.yml`), never `git add -A`. Editor and tool integrations add folders (`.vscode/`, `.github/instructions/`) and touch `.gitignore`; leave those alone unless the person asks.
+- When the project keeps a code knowledge graph (for example code-review-graph), update it after each push so the next session starts from the current code.
 - Never push, force-push or rewrite shared history unless asked. After a push, say exactly which branch and give the compare/PR link.
 - A feature branch per piece of work; the person merges.
 
@@ -252,6 +318,11 @@ A fake (an in-memory repository, a fixed clock) is only trustworthy if the **sam
 - **Delegate** only work that needs a large separate context. Do not hand a single continuous investigation to a helper.
 - Quick progress notes between phases; avoid silent long gaps.
 - Clean up temporary files and shut down what you started.
+- **Name app types so they never clash with core types.** A view called `Card` collided with the core's credit-card model `Card`, and Swift reported "generic parameter could not be inferred" at an unrelated line. Prefer specific names (`CardPanel`).
+- **Observable view models:** a method that computes from the store (for example "the calendar for this month") must first read the observed properties it depends on, or the screen will not refresh after a change.
+- **Swift 6 strict concurrency:** a main-actor view helper used inside a closure the system calls off the main actor (for example a photo picker's label) does not compile; apply the helper outside the closure.
+- **Keep a short session notes file** while working (what is done, what is next, what is blocked). Long sessions get summarised, and the notes are what survives.
+- **Remember lessons across projects** in a personal notes file (environment fixes, tool quirks), so the same problem is solved once.
 
 ---
 
@@ -281,6 +352,16 @@ A fake (an in-memory repository, a fixed clock) is only trustworthy if the **sam
 | A third-party editor integration modified `.gitignore`/added folders | Do not commit changes you did not make; mention them |
 | New requirement arrived mid-build | Pause, update examples and mockups, get a yes, continue |
 | Old process leaked into public README | Write README for strangers; keep private history out |
+| Screens shipped in the platform's default list style while the approved mockups showed cards | Build a design-system file from the mockup CSS before the first screen; check screenshots against the mockups |
+| Missing features discovered by the person, not reported | Keep a gap list and report it every session, unasked |
+| Agent ended a turn saying "I'll check the run later"; overlapping runs piled up and slowed the machine | Wait in the same turn; one run at a time; heartbeat with a percentage |
+| A lock-screen overlay still let tests (and screen readers) read the balances underneath | Replace the content while locked |
+| Calendar showed days 4 to 31 only | `ForEach` id collision between blank cells and day numbers; give blanks their own ids |
+| UI test could not find a calendar day further down the page | Lazy grid never created it; use a non-lazy layout |
+| Toggle near the bottom of a form never flipped in a test | The keyboard covered it; add a keyboard Done button and tap it first |
+| Simulator unusable one morning | Xcode had updated itself; the person runs `sudo xcodebuild -runFirstLaunch` |
+| Mutation "survived" because the sed pattern never matched | Exact string replacement in Python; confirm the file actually changed |
+| Parallel helper edits left broken half-replaced code | Disjoint files per helper, build afterwards, diff against `HEAD` to repair |
 
 ---
 
@@ -293,6 +374,7 @@ A fake (an in-memory repository, a fixed clock) is only trustworthy if the **sam
 5. Create the repo skeleton: `.gitignore` (private folders, builds), `AGENTS.md` (the rules below), `README.md`, folder layout, test target, a "hello" test that runs, the build command, and the schema with a version number.
 6. **Walking skeleton:** the thinnest slice that goes through every layer and launches on the target device, with one end-to-end check. Do this **before** feature work so build problems show up on day one.
 7. Mockups for the first feature with the person's real data, approval, then loops.
+8. **Before the first screen**, write the design-system file from the approved mockups (colours, cards, rows, buttons) so every screen starts with the right look.
 
 ### Repo rules file (put in `AGENTS.md`)
 
@@ -309,6 +391,8 @@ Copy these into the new repo so any agent follows them:
 - Every outgoing call has a timeout; retries bounded; fallbacks visible.
 - Missing required config stops startup; never log secrets.
 - New requirement mid-build: pause, update specs and mockups, get approval, resume.
+- Build what the approved mockups show, including their look; report every gap, unasked.
+- Long runs: wait in the same turn, never overlap them, print a heartbeat with a percentage.
 
 ### Optional: reusable skills
 
@@ -319,10 +403,12 @@ The fitness app keeps its method as small "skills" (short instruction files the 
 ## 12. Definition of done for a feature
 
 - [ ] Examples agreed with the person; mockup approved.
+- [ ] The screens match the approved mockup (checked on screenshots), or the differences are listed.
 - [ ] Every scenario has a test, each seen failing once; mutation check done.
-- [ ] All tests pass (core, tool tests, and the relevant UI tests).
+- [ ] All tests pass (core, tool tests, and the relevant UI tests), and the whole UI suite once on the final build.
+- [ ] Anything that only a real device can prove (Face ID, camera) is named for the person to check.
 - [ ] The app builds for the real device target and launches.
 - [ ] Checked against the person's real data where relevant, and the numbers match.
 - [ ] Review checklist passed; no personal data in the diff.
 - [ ] Committed locally, one feature per commit; README updated if user-visible.
-- [ ] Summary delivered: what was built, how it was tested, what was skipped, decisions, open questions, next steps.
+- [ ] Summary delivered: what was built, how it was tested, what was skipped, what is still missing or different from the mockups, decisions, open questions, next steps.
