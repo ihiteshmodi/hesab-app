@@ -9,6 +9,8 @@ struct PortfolioScreen: View {
     @State private var settingBank = false
     @State private var addingHolding = false
     @State private var addingFund = false
+    @State private var editingHolding: Holding?
+    @State private var editingFund: AllocatedFund?
     @State private var errorMessage: String?
 
     private func money(_ value: Money) -> String { hidden ? "••••••" : IndianMoneyFormat.string(value) }
@@ -57,27 +59,29 @@ struct PortfolioScreen: View {
                                 .accessibilityIdentifier("freeToAllocate")
                         }
                     }
-                    CardGroup(header: "Allocated", footer: portfolio.allocatedFunds.isEmpty ? nil : "Touch and hold an allocation to delete it.") {
+                    CardGroup(header: "Allocated", footer: portfolio.allocatedFunds.isEmpty ? nil : "Touch and hold an allocation to edit or delete it.") {
                         ForEach(portfolio.allocatedFunds, id: \.id) { fund in
                             CardRow(title: fund.name) { Text(money(fund.amount)).monospacedDigit() }
                                 .contextMenu {
+                                    Button("Edit", systemImage: "pencil") { editingFund = fund }
                                     Button("Delete", systemImage: "trash", role: .destructive) { errorMessage = model.deleteAllocatedFund(fund.id) }
                                 }
                         }
                         addButton("Add Allocation", identifier: "addFundButton") { addingFund = true }
                     }
-                    CardGroup(header: "Investments", footer: portfolio.holdings.isEmpty ? nil : "Touch and hold an investment to delete it.") {
+                    CardGroup(header: "Investments", footer: portfolio.holdings.isEmpty ? nil : "Touch and hold an investment to edit or delete it.") {
                         ForEach(portfolio.holdings, id: \.holding.id) { line in
                             CardRow(title: line.holding.name,
                                     subtitle: line.holding.currency.map { "\($0) \(IndianMoneyFormat.plain(line.holding.amount))" }) {
                                 Text(money(line.valueInHome)).monospacedDigit()
                             }
                             .contextMenu {
+                                Button("Edit", systemImage: "pencil") { editingHolding = line.holding }
                                 Button("Delete", systemImage: "trash", role: .destructive) { errorMessage = model.deleteHolding(line.holding.id) }
                             }
                         }
                         LinkRow(title: "Payout schemes", value: money(model.payouts.investedTotal), identifier: "payoutSchemesLink") {
-                            PayoutSchemesScreen(model: model, hidden: hidden)
+                            PayoutSchemesScreen(model: model, hidden: $hidden, toggleHidden: toggle)
                         }
                         addButton("Add Investment", identifier: "addHoldingButton") { addingHolding = true }
                     }
@@ -93,8 +97,6 @@ struct PortfolioScreen: View {
                 }
             }
             .cardNavigation("Portfolio", large: true)
-            .onDisappear { hidden = true }
-            .onChange(of: scenePhase) { if scenePhase != .active { hidden = true } }
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     Button(hidden ? "Show" : "Hide", systemImage: hidden ? "eye" : "eye.slash") { toggle() }
@@ -104,7 +106,12 @@ struct PortfolioScreen: View {
             .sheet(isPresented: $settingBank) { BankBalanceSheet(model: model) }
             .sheet(isPresented: $addingHolding) { HoldingSheet(model: model) }
             .sheet(isPresented: $addingFund) { FundSheet(model: model) }
+            .sheet(item: $editingHolding) { HoldingSheet(model: model, editing: $0) }
+            .sheet(item: $editingFund) { FundSheet(model: model, editing: $0) }
         }
+        // On the stack, not the root: pushing Payout Schemes must not hide the amounts again.
+        .onDisappear { hidden = true }
+        .onChange(of: scenePhase) { if scenePhase != .active { hidden = true } }
     }
 
     private func addButton(_ title: String, identifier: String, action: @escaping () -> Void) -> some View {
@@ -155,8 +162,12 @@ private struct BankBalanceSheet: View {
     }
 }
 
+extension Holding: @retroactive Identifiable {}
+extension AllocatedFund: @retroactive Identifiable {}
+
 private struct FundSheet: View {
     let model: BudgetViewModel
+    var editing: AllocatedFund?
     @Environment(\.dismiss) private var dismiss
     @State private var name = ""
     @State private var amountText = ""
@@ -171,12 +182,18 @@ private struct FundSheet: View {
                     if let errorMessage { Text(errorMessage).foregroundStyle(Theme.red).rowPadding() }
                 }
             }
-            .cardNavigation("Add Allocation")
+            .cardNavigation(editing == nil ? "Add Allocation" : "Edit Allocation")
+            .onAppear {
+                guard let editing, name.isEmpty else { return }
+                name = editing.name
+                amountText = IndianMoneyFormat.plain(editing.amount)
+            }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
-                        errorMessage = model.addAllocatedFund(name: name, amountText: amountText)
+                        errorMessage = editing.map { model.updateAllocatedFund($0.id, name: name, amountText: amountText) }
+                            ?? model.addAllocatedFund(name: name, amountText: amountText)
                         if errorMessage == nil { dismiss() }
                     }
                     .accessibilityIdentifier("saveFundButton")
@@ -188,6 +205,7 @@ private struct FundSheet: View {
 
 private struct HoldingSheet: View {
     let model: BudgetViewModel
+    var editing: Holding?
     @Environment(\.dismiss) private var dismiss
     @State private var name = ""
     @State private var amountText = ""
@@ -201,13 +219,7 @@ private struct HoldingSheet: View {
                 CardGroup {
                     TextField("Name", text: $name).rowPadding().accessibilityIdentifier("holdingNameField")
                     TextField("Amount", text: $amountText).keyboardType(.decimalPad).rowPadding().accessibilityIdentifier("holdingAmountField")
-                    FieldRow("Currency") {
-                        Picker("Currency", selection: $currency) {
-                            Text("Home currency").tag("")
-                            ForEach(model.currencies.filter { $0.code != model.preferences.homeCurrency }, id: \.code) { Text($0.code).tag($0.code) }
-                        }
-                        .labelsHidden()
-                    }
+                    CurrencyField(model: model, selection: $currency, identifier: "holdingCurrencyPicker")
                     if !currency.isEmpty {
                         TextField("Rate (\(model.preferences.homeCurrency) per 1 \(currency))", text: $rateText).keyboardType(.decimalPad)
                             .rowPadding()
@@ -216,12 +228,21 @@ private struct HoldingSheet: View {
                     if let errorMessage { Text(errorMessage).foregroundStyle(Theme.red).rowPadding() }
                 }
             }
-            .cardNavigation("Add Investment")
+            .cardNavigation(editing == nil ? "Add Investment" : "Edit Investment")
+            .onAppear {
+                guard let editing, name.isEmpty else { return }
+                name = editing.name
+                amountText = IndianMoneyFormat.plain(editing.amount)
+                currency = editing.currency ?? ""
+            }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
-                        errorMessage = model.addHolding(name: name, amountText: amountText, currency: currency.isEmpty ? nil : currency, rateText: rateText)
+                        let chosen = currency.isEmpty ? nil : currency
+                        errorMessage = editing.map {
+                            model.updateHolding($0.id, name: name, amountText: amountText, currency: chosen, rateText: rateText)
+                        } ?? model.addHolding(name: name, amountText: amountText, currency: chosen, rateText: rateText)
                         if errorMessage == nil { dismiss() }
                     }
                     .accessibilityIdentifier("saveHoldingButton")

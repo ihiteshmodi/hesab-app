@@ -5,6 +5,7 @@ struct TripTransferSheet: View {
     let model: BudgetViewModel
     let summary: TripSummary
     let switchToExpense: () -> Void
+    var editing: TripSettlement?
     @Environment(\.dismiss) private var dismiss
     @State private var personID: Int64
     @State private var direction = SettlementDirection.theyPaidMe
@@ -18,12 +19,26 @@ struct TripTransferSheet: View {
 
     private enum Field { case amount, rate }
 
-    init(model: BudgetViewModel, summary: TripSummary, personID: Int64?, switchToExpense: @escaping () -> Void) {
+    init(
+        model: BudgetViewModel, summary: TripSummary, personID: Int64?, editing: TripSettlement? = nil,
+        switchToExpense: @escaping () -> Void
+    ) {
         self.model = model
         self.summary = summary
         self.switchToExpense = switchToExpense
-        _personID = State(initialValue: personID ?? summary.members.first?.id ?? 0)
+        self.editing = editing
+        _personID = State(initialValue: editing?.personID ?? personID ?? summary.members.first?.id ?? 0)
         _rateText = State(initialValue: summary.trip.rate.map { "\($0)" } ?? "")
+        guard let editing else { return }
+        _direction = State(initialValue: editing.direction)
+        _method = State(initialValue: editing.method)
+        _amountText = State(initialValue: IndianMoneyFormat.plain(editing.received))
+        _date = State(initialValue: editing.date.instant())
+        if editing.method == .bank || editing.method == .cashHome, summary.trip.currency != nil, editing.cleared > .zero {
+            // The rate it was saved at: rupees received per unit of trip currency cleared.
+            _rateText = State(initialValue: "\(Decimal(editing.received.paise) / Decimal(editing.cleared.paise))")
+        }
+        _full = State(initialValue: editing.writtenOff != .zero)
     }
 
     private var trip: Trip { summary.trip }
@@ -54,9 +69,11 @@ struct TripTransferSheet: View {
                 HStack {
                     Button("Cancel") { dismiss() }.buttonStyle(.borderless).accessibilityIdentifier("cancelTransferButton")
                     Spacer()
-                    Text("Transfer").fontWeight(.semibold)
+                    Text(editing == nil ? "Transfer" : "Edit Payment").fontWeight(.semibold)
                     Spacer()
-                    Button("Expense") { switchToExpense() }.buttonStyle(.borderless).accessibilityIdentifier("switchToExpenseButton")
+                    if editing == nil {
+                        Button("Expense") { switchToExpense() }.buttonStyle(.borderless).accessibilityIdentifier("switchToExpenseButton")
+                    }
                 }
                 .padding(.horizontal, 4).padding(.top, 8)
                 CardGroup {
@@ -159,10 +176,17 @@ struct TripTransferSheet: View {
     }
 
     private func save() {
-        errorMessage = model.recordTripSettlement(
-            trip.id, personID: personID, direction, amountText: amountText, method: method, rateText: rateText, fullSettlement: full,
-            on: CalendarDate(date)
-        )
+        if let editing {
+            errorMessage = model.updateTripSettlement(
+                editing.id, personID: personID, direction, amountText: amountText, method: method, rateText: rateText,
+                fullSettlement: full, on: CalendarDate(date)
+            )
+        } else {
+            errorMessage = model.recordTripSettlement(
+                trip.id, personID: personID, direction, amountText: amountText, method: method, rateText: rateText, fullSettlement: full,
+                on: CalendarDate(date)
+            )
+        }
         if errorMessage == nil { dismiss() }
     }
 }

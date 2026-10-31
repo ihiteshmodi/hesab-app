@@ -102,6 +102,8 @@ enum TripValue {
     }
 }
 
+extension TripSettlement: @retroactive Identifiable {}
+
 struct PersonStatementScreen: View {
     let model: BudgetViewModel
     let tripID: Int64
@@ -109,6 +111,7 @@ struct PersonStatementScreen: View {
     let onSettle: (Int64) -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var errorMessage: String?
+    @State private var editingPayment: TripSettlement?
 
     var body: some View {
         if let summary = model.tripSummary(tripID), let page = model.tripStatement(tripID, personID) {
@@ -140,6 +143,9 @@ struct PersonStatementScreen: View {
                     Button("Settle") { onSettle(personID); dismiss() }.accessibilityIdentifier("statementSettleButton")
                 }
             }
+            .sheet(item: $editingPayment) { payment in
+                TripTransferSheet(model: model, summary: summary, personID: personID, editing: payment) {}
+            }
         } else {
             Text("That person is no longer in this trip.").foregroundStyle(Theme.secondary)
         }
@@ -147,11 +153,16 @@ struct PersonStatementScreen: View {
 
     @ViewBuilder private func section(_ title: String, _ lines: [StatementLine], _ trip: Trip, deletable: Bool = false) -> some View {
         if !lines.isEmpty {
-            CardGroup(header: title, footer: deletable ? "Touch and hold a payment to undo it." : nil) {
+            CardGroup(header: title, footer: deletable ? "Tap a payment to change it. Touch and hold it to undo it." : nil) {
                 ForEach(Array(lines.enumerated()), id: \.offset) { _, line in
                     CardRow(title: line.title, subtitle: line.date.shortTitle) {
                         Text((line.amount > .zero ? "+ " : "− ") + model.tripText(line.amount < .zero ? .zero - line.amount : line.amount, trip))
                             .monospacedDigit()
+                    }
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        guard deletable, let id = line.settlementID else { return }
+                        editingPayment = model.tripSummary(tripID)?.settlements.first { $0.id == id }
                     }
                     .contextMenu {
                         if deletable, let id = line.settlementID {
@@ -304,8 +315,8 @@ struct TripInsightsScreen: View {
 struct TripPeopleScreen: View {
     let model: BudgetViewModel
     let tripID: Int64
-    @State private var adding = false
     @State private var newName = ""
+    @FocusState private var nameFocused: Bool
     @State private var editingGroup: GroupDraft?
     @State private var errorMessage: String?
 
@@ -324,11 +335,23 @@ struct TripPeopleScreen: View {
                             }
                             .accessibilityIdentifier("personRow")
                     }
-                    Button { adding = true } label: { Text("Add Person").rowPadding() }.accessibilityIdentifier("addPersonButton")
+                    // Typed in place, not in an alert, so several people can be added one after another.
+                    HStack {
+                        TextField("Add a person", text: $newName)
+                            .focused($nameFocused)
+                            .submitLabel(.next)
+                            .onSubmit(add)
+                            .accessibilityIdentifier("newPersonField")
+                        Button("Add", action: add)
+                            .buttonStyle(AddPillStyle())
+                            .disabled(newName.trimmingCharacters(in: .whitespaces).isEmpty)
+                            .accessibilityIdentifier("confirmAddPersonButton")
+                    }
+                    .rowPadding()
                 }
                 CardGroup(
                     header: "Groups",
-                    footer: "A group only saves taps in the split. It never changes who owes what."
+                    footer: "A group picks these people in one tap when you split an expense. The amounts are set on each expense."
                         + (summary.groups.isEmpty ? "" : " Touch and hold a group to delete it.")
                 ) {
                     ForEach(summary.groups, id: \.id) { group in
@@ -345,17 +368,15 @@ struct TripPeopleScreen: View {
                 }
             }
             .cardNavigation("People")
-            .alert("Add Person", isPresented: $adding) {
-                TextField("Name", text: $newName).accessibilityIdentifier("newPersonField")
-                Button("Add") {
-                    errorMessage = model.addPerson(tripID, newName)
-                    newName = ""
-                }
-                .accessibilityIdentifier("confirmAddPersonButton")
-                Button("Cancel", role: .cancel) { newName = "" }
-            }
             .sheet(item: $editingGroup) { GroupSheet(model: model, summary: summary, draft: $0) }
         }
+    }
+
+    private func add() {
+        guard !newName.trimmingCharacters(in: .whitespaces).isEmpty else { return }
+        errorMessage = model.addPerson(tripID, newName)
+        if errorMessage == nil { newName = "" }
+        nameFocused = true
     }
 
     private func names(_ members: Set<Participant>, _ summary: TripSummary) -> String {

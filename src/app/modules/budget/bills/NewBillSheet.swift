@@ -18,7 +18,6 @@ struct NewBillSheet: View {
     @State private var repeats = BillRepeat.monthly
     @State private var hasEnd = false
     @State private var endDate = Date()
-    @State private var automatic = true
     @State private var alert = BillAlert.none
     @State private var notes = ""
     @State private var errorMessage: String?
@@ -34,7 +33,6 @@ struct NewBillSheet: View {
             _name = State(initialValue: item.description)
             _amountText = State(initialValue: IndianMoneyFormat.plain(item.amount))
             _repeats = State(initialValue: .never)
-            _automatic = State(initialValue: false)
         }
         if let id, let bill = model.bills.first(where: { $0.bill.id == id })?.bill {
             _name = State(initialValue: bill.name)
@@ -47,7 +45,6 @@ struct NewBillSheet: View {
             _repeats = State(initialValue: bill.repeats)
             _hasEnd = State(initialValue: bill.endsOn != nil)
             _endDate = State(initialValue: bill.endsOn?.instant() ?? Date())
-            _automatic = State(initialValue: bill.addAutomatically)
             _alert = State(initialValue: bill.alert)
             _notes = State(initialValue: bill.notes)
         }
@@ -117,10 +114,6 @@ struct NewBillSheet: View {
                             }
                         }
                     }
-                    Toggle("Add automatically", isOn: automaticBinding)
-                        .disabled(repeats == .never)
-                        .rowPadding()
-                        .accessibilityIdentifier("billAutoToggle")
                     FieldRow("Alert") {
                         Picker("Alert", selection: $alert) {
                             ForEach(BillAlert.allCases, id: \.self) { Text($0.title).tag($0) }
@@ -139,7 +132,6 @@ struct NewBillSheet: View {
                 }
             }
             .cardNavigation(editingID == nil ? "New Bill" : "Edit Bill")
-            .onChange(of: repeats) { automatic = repeats != .never }
             .toolbar {
                 ToolbarItemGroup(placement: .keyboard) {
                     Spacer()
@@ -162,16 +154,13 @@ struct NewBillSheet: View {
         }
     }
 
-    private var automaticBinding: Binding<Bool> {
-        Binding(get: { automatic && repeats != .never }, set: { automatic = $0 })
-    }
 
     private func save() {
         let bill = NewBill(
             name: name, amount: MoneyInput.parse(amountText), category: category, subCategory: subCategory,
             entity: entity, paymentMethod: payment.method, dueDate: CalendarDate(dueDate), repeats: repeats,
             endsOn: hasEnd && repeats != .never ? CalendarDate(endDate) : nil,
-            addAutomatically: automatic && repeats != .never, alert: alert, notes: notes
+            addAutomatically: false, alert: alert, notes: notes
         )
         if let editingID {
             errorMessage = model.updateBill(editingID, bill)
@@ -218,7 +207,7 @@ private struct ChangePlanSheet: View {
                         let replacement = NewBill(
                             name: name, amount: MoneyInput.parse(amountText), category: old.category,
                             subCategory: old.subCategory, entity: old.entity, paymentMethod: old.paymentMethod,
-                            dueDate: CalendarDate(newStarts), repeats: old.repeats, addAutomatically: old.addAutomatically,
+                            dueDate: CalendarDate(newStarts), repeats: old.repeats, addAutomatically: false,
                             alert: old.alert, notes: old.notes
                         )
                         errorMessage = model.changeBillPlan(billID, endsOn: CalendarDate(oldEnds), startingWith: replacement)

@@ -152,6 +152,7 @@ public struct GetUpcoming: Sendable {
 
 public struct GetBillDraft: Sendable {
     let store: BillStore
+    let expenses: ExpenseRepository
 
     /// The expense form for the bill's next due date; the date is nil when the setting says to ask.
     public func callAsFunction(_ id: Int64) throws -> NewExpense {
@@ -163,8 +164,11 @@ public struct GetBillDraft: Sendable {
         case .useToday: book.today
         case .askEachTime: nil
         }
+        // Bills like electricity change every month; start from what was actually paid last time.
+        let lastPaid = book.occurrences.filter { $0.billID == id }.max { $0.dueDate < $1.dueDate }
+            .flatMap { occurrence in try? expenses.all().first { $0.id == occurrence.expenseID }?.amount }
         return NewExpense(
-            date: date, description: bill.name, amount: bill.amount, category: bill.category,
+            date: date, description: bill.name, amount: lastPaid ?? bill.amount, category: bill.category,
             subCategory: bill.subCategory, entity: bill.entity, paymentMethod: bill.paymentMethod, notes: bill.notes
         )
     }

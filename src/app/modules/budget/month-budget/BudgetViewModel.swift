@@ -40,7 +40,6 @@ final class BudgetViewModel {
 
     init(app: BudgetApp) {
         self.app = app
-        notices = (try? app.runAutomaticBills()) ?? []
         reload()
     }
 
@@ -146,11 +145,8 @@ final class BudgetViewModel {
     func deletePlanned(_ id: Int64) -> String? { run { try app.deletePlannedItem(id) } }
     func addPlannedAsExpense(_ id: Int64, _ expense: NewExpense) -> String? { run { try app.addPlannedAsExpense(id, expense) } }
 
-    /// A bill that adds itself and is already due goes in at once, so it never waits for the next launch.
-    func addBill(_ bill: NewBill) -> String? { run { try app.addBill(bill); notices += try app.runAutomaticBills() } }
-    func updateBill(_ id: Int64, _ bill: NewBill) -> String? {
-        run { try app.updateBill(id, bill); notices += try app.runAutomaticBills() }
-    }
+    func addBill(_ bill: NewBill) -> String? { run { try app.addBill(bill) } }
+    func updateBill(_ id: Int64, _ bill: NewBill) -> String? { run { try app.updateBill(id, bill) } }
     func deleteBill(_ id: Int64) -> String? { run { try app.deleteBill(id) } }
 
     func changeBillPlan(_ id: Int64, endsOn: CalendarDate, startingWith bill: NewBill) -> String? {
@@ -217,6 +213,19 @@ final class BudgetViewModel {
     func deleteTripSettlement(_ id: Int64) -> String? { run { try app.deleteTripSettlement(id) } }
     func setTripCash(_ tripID: Int64, text: String) -> String? { run { try app.setTripCash(tripID, to: MoneyInput.parse(text)) } }
 
+    func updateTripSettlement(
+        _ id: Int64, personID: Int64, _ direction: SettlementDirection, amountText: String, method: SettlementMethod,
+        rateText: String, fullSettlement: Bool, on date: CalendarDate
+    ) -> String? {
+        let rate = Decimal(string: rateText.trimmingCharacters(in: .whitespaces))
+        return run {
+            try app.updateTripSettlement(
+                id, personID: personID, direction, MoneyInput.parse(amountText), method: method, atRate: rate,
+                fullSettlement: fullSettlement, on: date
+            )
+        }
+    }
+
     func recordTripSettlement(
         _ tripID: Int64, personID: Int64, _ direction: SettlementDirection, amountText: String, method: SettlementMethod,
         rateText: String, fullSettlement: Bool, on date: CalendarDate
@@ -255,11 +264,24 @@ final class BudgetViewModel {
         }
     }
 
+    func updateHolding(_ id: Int64, name: String, amountText: String, currency: String?, rateText: String) -> String? {
+        run {
+            try app.updateHolding(id, NewHolding(
+                name: name, amount: MoneyInput.parse(amountText), currency: currency,
+                rate: Decimal(string: rateText.trimmingCharacters(in: .whitespaces))
+            ))
+        }
+    }
+
     func deleteHolding(_ id: Int64) -> String? { run { try app.deleteHolding(id) } }
+    func updateAllocatedFund(_ id: Int64, name: String, amountText: String) -> String? {
+        run { try app.updateAllocatedFund(id, name: name, amount: MoneyInput.parse(amountText)) }
+    }
     func addAllocatedFund(name: String, amountText: String) -> String? { run { try app.addAllocatedFund(name: name, amount: MoneyInput.parse(amountText)) } }
     func deleteAllocatedFund(_ id: Int64) -> String? { run { try app.deleteAllocatedFund(id) } }
     func setLedgerCountsTowardsNetWorth(_ id: Int64, _ counts: Bool) -> String? { run { try app.setLedgerCountsTowardsNetWorth(id, counts) } }
     func addScheme(_ scheme: NewPayoutScheme) -> String? { run { try app.addScheme(scheme) } }
+    func updateScheme(_ id: Int64, _ scheme: NewPayoutScheme) -> String? { run { try app.updateScheme(id, scheme) } }
     func payoutDraft(_ id: Int64) -> PayoutDraft? { try? app.payoutDraft(id) }
     func recordPayout(_ id: Int64, amountText: String, on date: CalendarDate) -> String? { run { try app.recordPayout(id, amount: MoneyInput.parse(amountText), on: date) } }
     func closeScheme(_ id: Int64) -> String? { run { try app.closeScheme(id) } }
@@ -284,8 +306,10 @@ final class BudgetViewModel {
         reload()
     }
 
-    func categoryBreakdown(_ category: String) -> Breakdown? {
-        try? app.categoryBreakdown(category, reportAllTime ? .allTime : .month(reportMonth))
+    /// Reads `report` first so an open row redraws after an expense in it is edited.
+    func groupBreakdown(_ grouping: BreakdownGrouping, _ name: String) -> Breakdown? {
+        _ = report
+        return try? app.groupBreakdown(grouping, name, reportAllTime ? .allTime : .month(reportMonth))
     }
 
     /// Each action returns the message to show when it is refused, or nil when it worked.

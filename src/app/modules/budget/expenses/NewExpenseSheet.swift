@@ -96,23 +96,12 @@ struct NewExpenseSheet: View {
                         .font(.title2.weight(.semibold))
                         .rowPadding()
                         .accessibilityIdentifier("amountField")
-                    if model.currencies.count > 1 {
-                        FieldRow("Currency") {
-                            Picker("Currency", selection: $currency) {
-                                Text(model.preferences.homeCurrency).tag("")
-                                ForEach(model.currencies.filter { $0.code != model.preferences.homeCurrency }, id: \.code) {
-                                    Text($0.code).tag($0.code)
-                                }
-                            }
-                            .labelsHidden()
-                            .accessibilityIdentifier("currencyPicker")
-                            .onChange(of: currency) {
-                                if !currency.isEmpty, rateText.isEmpty {
-                                    rateText = model.lastRate(for: currency).map { "\($0)" } ?? ""
-                                }
+                    CurrencyField(model: model, selection: $currency, identifier: "currencyPicker")
+                        .onChange(of: currency) {
+                            if !currency.isEmpty, rateText.isEmpty {
+                                rateText = model.lastRate(for: currency).map { "\($0)" } ?? ""
                             }
                         }
-                    }
                     if !currency.isEmpty {
                         TextField("Rate: \(model.preferences.homeCurrency) per 1 \(currency)", text: $rateText)
                             .keyboardType(.decimalPad)

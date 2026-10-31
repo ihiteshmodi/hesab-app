@@ -116,3 +116,14 @@ Feature: Payout schemes and maturity reminders
   Scenario: Nothing to remind
     Given no scheme matures within 90 days and no payout is expected
     Then she sees "Nothing coming up. Maturities and expected payouts appear here."
+
+  Scenario: Priya edits a scheme
+    Given the scheme "Bond A" matures on 2027-02-06
+    When Priya changes its maturity to 2027-03-10, its payout to 850 and its payout day to 26
+    Then "Bond A" matures on 2027-03-10, pays 850 on the 26th
+    And its recorded payouts are kept
+
+  Scenario: An edited scheme is checked like a new one
+    When Priya edits "Bond A" to have an invested amount of 0
+    Then she sees "Enter an amount above 0"
+    And "Bond A" is unchanged

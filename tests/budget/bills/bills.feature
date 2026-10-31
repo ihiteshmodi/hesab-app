@@ -59,6 +59,12 @@ Feature: Bills, one-off or repeating, added to the budget with a tap
     Then the expense is 21,000 dated 2026-11-03
     And "Rent" still says 20,000
 
+  Scenario: A bill whose amount changes starts from what was paid last time
+    Given "Rent" was added for November at 21,000
+    When she taps Add on "Rent" for December
+    Then the New Expense form starts at 21,000
+    And "Rent" still says 20,000
+
   Scenario: Priya cancels the form
     When she taps Add on "Rent" and cancels
     Then no expense is created

@@ -20,7 +20,8 @@ private enum AppTab: String, CaseIterable {
     }
 }
 
-/// iOS folds a sixth tab into "More", so the bar is drawn here and the system one is hidden.
+/// iOS folds a sixth tab into "More" (an extra navigation bar with its own back button), so there is no TabView:
+/// the bar is drawn here and only the chosen screen is shown.
 struct RootView: View {
     let model: BudgetViewModel
     @Environment(\.scenePhase) private var scenePhase
@@ -45,14 +46,16 @@ struct RootView: View {
     }
 
     private var content: some View {
-        TabView(selection: $tab) {
-            BudgetScreen(model: model, route: $drawerRoute) { withAnimation(.easeOut(duration: 0.25)) { drawerOpen = true } }
-                .tag(AppTab.activity).toolbar(.hidden, for: .tabBar)
-            BillsScreen(model: model).tag(AppTab.bills).toolbar(.hidden, for: .tabBar)
-            PortfolioScreen(model: model).tag(AppTab.portfolio).toolbar(.hidden, for: .tabBar)
-            ReportsScreen(model: model).tag(AppTab.reports).toolbar(.hidden, for: .tabBar)
-            TripsScreen(model: model).tag(AppTab.trips).toolbar(.hidden, for: .tabBar)
-            SearchScreen(model: model).tag(AppTab.search).toolbar(.hidden, for: .tabBar)
+        Group {
+            switch tab {
+            case .activity:
+                BudgetScreen(model: model, route: $drawerRoute) { withAnimation(.easeOut(duration: 0.25)) { drawerOpen = true } }
+            case .bills: BillsScreen(model: model)
+            case .portfolio: PortfolioScreen(model: model)
+            case .reports: ReportsScreen(model: model)
+            case .trips: TripsScreen(model: model)
+            case .search: SearchScreen(model: model)
+            }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) { bar }
         .overlay {

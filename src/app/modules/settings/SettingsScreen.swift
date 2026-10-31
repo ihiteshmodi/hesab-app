@@ -228,7 +228,7 @@ func tickRow(_ title: String, _ chosen: Bool, choose: @escaping () -> Void) -> s
     .accessibilityAddTraits(chosen ? .isSelected : [])
 }
 
-private struct NewCurrencySheet: View {
+struct NewCurrencySheet: View {
     let model: BudgetViewModel
     @Environment(\.dismiss) private var dismiss
     @State private var code = ""

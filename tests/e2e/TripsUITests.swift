@@ -163,12 +163,11 @@ final class TripsUITests: XCTestCase {
 
     @MainActor
     private func addPersonOnScreen(_ app: XCUIApplication, _ name: String) {
-        app.buttons["addPersonButton"].tap()
-        let field = app.alerts.textFields.firstMatch
+        let field = app.textFields["newPersonField"]
         XCTAssertTrue(field.waitForExistence(timeout: 20))
         field.tap()
         field.typeText(name)
-        app.alerts.buttons["Add"].firstMatch.tap()
+        app.buttons["confirmAddPersonButton"].tap()
         XCTAssertTrue(app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", name)).firstMatch.waitForExistence(timeout: 20))
     }
 

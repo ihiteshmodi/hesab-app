@@ -134,6 +134,16 @@ struct BillTests {
         #expect(try s.app.bills().first { $0.bill.id == s.rent.id }?.bill.amount == .rupees(20_000))
     }
 
+    @Test func aBillWhoseAmountChangesStartsFromWhatWasPaidLastTime() throws {
+        let s = try background()
+        var november = try s.app.billDraft(s.rent.id)
+        november.amount = .rupees(21_000)
+        try s.app.addBillOccurrence(s.rent.id, november)
+
+        #expect(try s.app.billDraft(s.rent.id).amount == .rupees(21_000))
+        #expect(try s.app.bills().first { $0.bill.id == s.rent.id }?.bill.amount == .rupees(20_000))
+    }
+
     @Test func notSavingTheFormChangesNothing() throws {
         let s = try background()
 
