@@ -5,10 +5,14 @@ import HisaabCore
 enum CompositionRoot {
     static func makeApp() -> BudgetApp {
         do {
-            let database = ProcessInfo.processInfo.arguments.contains("-ui-testing")
+            let arguments = ProcessInfo.processInfo.arguments
+            let database = arguments.contains("-ui-testing")
                 ? try AppDatabase.inMemory()
                 : try AppDatabase.file(at: try databaseFileURL())
-            return BudgetApp(database: database, clock: SystemDayClock())
+            let app = BudgetApp(database: database, clock: SystemDayClock())
+            // The in-memory test database starts empty, so a test asks for the lock to be on from the first screen.
+            if arguments.contains("-ui-testing"), arguments.contains("-ui-app-lock") { try app.updatePreferences { $0.appLock = true } }
+            return app
         } catch {
             // Without its database the app has nothing to show, so stop rather than run on empty data.
             fatalError("Could not open the Hisaab database: \(error)")

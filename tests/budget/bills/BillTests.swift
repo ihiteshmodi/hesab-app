@@ -80,9 +80,12 @@ struct BillTests {
 
     @Test func aWiderWindowListsMore() throws {
         let s = try background()
+        try s.app.addBill(newBill("Gym", 2_000, due: "2026-11-16"))
+        #expect(try !s.app.upcoming().items.map(\.bill.name).contains("Gym"))
+
         try s.app.updatePreferences { $0.upcomingWindowDays = 20 }
 
-        #expect(try s.app.upcoming().items.map(\.bill.name).contains("Internet"))
+        #expect(try s.app.upcoming().items.map(\.bill.name).contains("Gym"))
     }
 
     @Test func aBillThatWasNotAddedIsPastDueWhenTheSettingIsOn() throws {

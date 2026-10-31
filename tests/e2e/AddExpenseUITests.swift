@@ -287,8 +287,10 @@ final class AddExpenseUITests: XCTestCase {
 
         let row = app.descendants(matching: .any)["incomeRow"]
         XCTAssertTrue(row.waitForExistence(timeout: 20))
-        row.swipeLeft()
-        app.buttons["Delete"].tap()
+        row.press(forDuration: 1.2)
+        let delete = app.buttons["Delete"]
+        XCTAssertTrue(delete.waitForExistence(timeout: 20))
+        delete.tap()
 
         let gone = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: row)
         XCTAssertEqual(XCTWaiter().wait(for: [gone], timeout: 10), .completed, "income row is still there")
@@ -310,10 +312,16 @@ final class AddExpenseUITests: XCTestCase {
         amount.typeText("20000")
         app.buttons["billCategoryPicker"].tap()
         app.buttons["Home & Utilities"].tap()
+        let done = app.buttons["keyboardDoneButton"]
+        if done.waitForExistence(timeout: 3) { done.tap() }
+        let automatic = app.switches["billAutoToggle"]
+        XCTAssertTrue(automatic.waitForExistence(timeout: 20))
+        automatic.coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: 0.5)).tap()
         app.buttons["saveBillButton"].tap()
 
-        XCTAssertTrue(app.descendants(matching: .any)["upcomingRow"].waitForExistence(timeout: 20))
-        app.buttons["addUpcomingBillButton"].tap()
+        let add = app.buttons["addCalendarBillButton"]
+        XCTAssertTrue(add.waitForExistence(timeout: 20))
+        add.tap()
         let save = app.buttons["saveExpenseButton"]
         XCTAssertTrue(save.waitForExistence(timeout: 20))
         save.tap()
@@ -326,7 +334,7 @@ final class AddExpenseUITests: XCTestCase {
 
     @MainActor
     private func selectTab(_ app: XCUIApplication, _ name: String) {
-        let tab = app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH %@", name)).firstMatch
+        let tab = app.buttons["tab-\(name)"]
         XCTAssertTrue(tab.waitForExistence(timeout: 20), "no tab called \(name)")
         tab.tap()
     }

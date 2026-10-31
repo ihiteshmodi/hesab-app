@@ -28,7 +28,9 @@ final class TripsUITests: XCTestCase {
 
         app.buttons["Balances"].tap()
         app.buttons["settleUpButton"].tap()
-        app.switches["settleInFullToggle"].tap()
+        let full = app.switches["settleInFullToggle"]
+        XCTAssertTrue(full.waitForExistence(timeout: 20))
+        full.coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: 0.5)).tap()
         type(app.textFields["transferAmountField"], "2810")
         XCTAssertTrue(app.descendants(matching: .any)["transferEffect"].exists)
         XCTAssertTrue(app.descendants(matching: .any)["transferDatePicker"].exists)
@@ -120,8 +122,10 @@ final class TripsUITests: XCTestCase {
 
     @MainActor
     private func saveTransfer(_ app: XCUIApplication) {
-        let save = app.buttons["saveTransferButton"]
-        if !save.waitForExistence(timeout: 5) { print("SAVE-MISSING-HIERARCHY", app.debugDescription) }
+        // With the decimal keyboard up the sheet's toolbar is hidden from XCUITest, so put the keyboard away first.
+        let done = app.descendants(matching: .any)["keyboardDoneButton"]
+        if done.waitForExistence(timeout: 5) { done.tap() }
+        let save = app.descendants(matching: .any)["saveTransferButton"]
         XCTAssertTrue(save.waitForExistence(timeout: 20), "the Save button never appeared")
         save.tap()
     }
@@ -145,13 +149,9 @@ final class TripsUITests: XCTestCase {
 
     @MainActor
     private func goBack(_ app: XCUIApplication) {
-        let back = app.navigationBars.buttons.firstMatch
-        if back.waitForExistence(timeout: 3) {
-            back.tap()
-            return
-        }
-        let edge = app.coordinate(withNormalizedOffset: CGVector(dx: 0.01, dy: 0.5))
-        edge.press(forDuration: 0.1, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.5)))
+        let back = app.buttons["BackButton"]
+        XCTAssertTrue(back.waitForExistence(timeout: 20), "no back button")
+        back.tap()
     }
 
     @MainActor

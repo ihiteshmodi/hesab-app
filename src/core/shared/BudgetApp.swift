@@ -69,6 +69,7 @@ public final class BudgetApp: Sendable {
     public let markAutoAddedSeen: MarkAutoAddedSeen
     public let undoAutoAdded: UndoAutoAdded
     public let billsAttention: GetBillsAttention
+    public let billsCalendar: GetBillsCalendar
     public let searchExpenses: SearchExpenses
     public let spendingBreakdown: GetSpendingBreakdown
     public let categoryBreakdown: GetCategoryBreakdown
@@ -199,6 +200,7 @@ public final class BudgetApp: Sendable {
         markAutoAddedSeen = MarkAutoAddedSeen(bills: billBook)
         undoAutoAdded = UndoAutoAdded(store: billStore, expenses: expenses)
         billsAttention = GetBillsAttention(store: billStore, schemes: schemeStore)
+        billsCalendar = GetBillsCalendar(store: billStore, schemes: schemeStore, income: income)
         searchExpenses = SearchExpenses(expenses: expenses)
         spendingBreakdown = GetSpendingBreakdown(expenses: expenses)
         categoryBreakdown = GetCategoryBreakdown(expenses: expenses)

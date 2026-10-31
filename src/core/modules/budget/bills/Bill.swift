@@ -165,11 +165,17 @@ public struct BillsAttention: Equatable, Sendable {
     public let autoAddedUnseen: Int
     /// Bills due today or earlier that are not added.
     public let menuCount: Int
+    /// The menu's "Bills" count: bills due today or earlier that are not added.
+    public let dueBills: Int
+    /// The menu's "Upcoming Income" count: payouts inside their alert window.
+    public let dueIncome: Int
 
-    public init(badge: Int, autoAddedUnseen: Int, menuCount: Int) {
+    public init(badge: Int, autoAddedUnseen: Int, menuCount: Int, dueBills: Int = 0, dueIncome: Int = 0) {
         self.badge = badge
         self.autoAddedUnseen = autoAddedUnseen
         self.menuCount = menuCount
+        self.dueBills = dueBills
+        self.dueIncome = dueIncome
     }
 }
 

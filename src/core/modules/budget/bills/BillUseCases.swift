@@ -21,9 +21,10 @@ struct BillBook {
         }
     }
 
+    /// Only bills she adds herself wait here; an automatic bill waits only for a due date whose add was undone.
     func upcoming() -> Upcoming {
         let items = bills.compactMap { bill -> UpcomingBill? in
-            guard let due = nextDue(bill) else { return nil }
+            guard let due = nextDue(bill), !bill.addAutomatically || due == bill.autoSkipDue else { return nil }
             let delta = today.days(until: due)
             guard delta <= preferences.upcomingWindowDays, delta >= 0 || preferences.includePastDue else { return nil }
             return UpcomingBill(bill: bill, dueDate: due, label: label(for: delta, due: due))
@@ -65,7 +66,7 @@ struct BillBook {
             }
         }.count
         let dueNow = bills.filter { bill in nextDue(bill).map { $0 <= today } ?? false }.count
-        return BillsAttention(badge: alerts + unseen, autoAddedUnseen: unseen, menuCount: dueNow)
+        return BillsAttention(badge: alerts + unseen, autoAddedUnseen: unseen, menuCount: dueNow, dueBills: dueNow)
     }
 }
 
@@ -293,7 +294,7 @@ public struct GetBillsAttention: Sendable {
         let matured = items.filter { $0.kind == .matured }.count
         return BillsAttention(
             badge: bills.badge + payouts + matured, autoAddedUnseen: bills.autoAddedUnseen,
-            menuCount: bills.menuCount + payouts
+            menuCount: bills.menuCount + payouts, dueBills: bills.dueBills, dueIncome: payouts
         )
     }
 }

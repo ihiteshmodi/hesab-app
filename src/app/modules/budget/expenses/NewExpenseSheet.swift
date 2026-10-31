@@ -89,98 +89,129 @@ struct NewExpenseSheet: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                Section {
+            CardScreen {
+                CardGroup {
                     TextField("Amount", text: $amountText)
                         .keyboardType(.decimalPad)
                         .font(.title2.weight(.semibold))
+                        .rowPadding()
                         .accessibilityIdentifier("amountField")
                     if model.currencies.count > 1 {
-                        Picker("Currency", selection: $currency) {
-                            Text(model.preferences.homeCurrency).tag("")
-                            ForEach(model.currencies.filter { $0.code != model.preferences.homeCurrency }, id: \.code) {
-                                Text($0.code).tag($0.code)
+                        FieldRow("Currency") {
+                            Picker("Currency", selection: $currency) {
+                                Text(model.preferences.homeCurrency).tag("")
+                                ForEach(model.currencies.filter { $0.code != model.preferences.homeCurrency }, id: \.code) {
+                                    Text($0.code).tag($0.code)
+                                }
                             }
-                        }
-                        .accessibilityIdentifier("currencyPicker")
-                        .onChange(of: currency) {
-                            if !currency.isEmpty, rateText.isEmpty {
-                                rateText = model.lastRate(for: currency).map { "\($0)" } ?? ""
+                            .labelsHidden()
+                            .accessibilityIdentifier("currencyPicker")
+                            .onChange(of: currency) {
+                                if !currency.isEmpty, rateText.isEmpty {
+                                    rateText = model.lastRate(for: currency).map { "\($0)" } ?? ""
+                                }
                             }
                         }
                     }
                     if !currency.isEmpty {
                         TextField("Rate: \(model.preferences.homeCurrency) per 1 \(currency)", text: $rateText)
                             .keyboardType(.decimalPad)
+                            .rowPadding()
                             .accessibilityIdentifier("rateField")
                         TextField("Or what you actually paid in \(model.preferences.homeCurrency)", text: $paidText)
                             .keyboardType(.decimalPad)
+                            .rowPadding()
                             .accessibilityIdentifier("paidField")
                     }
                     TextField("Description", text: $description)
+                        .rowPadding()
                         .accessibilityIdentifier("descriptionField")
                     TextField("Shop or person (optional)", text: $entity)
+                        .rowPadding()
                         .accessibilityIdentifier("entityField")
                     ForEach(entitySuggestions, id: \.self) { name in
-                        Button(name) { entity = name; applyLastUse(of: name) }
-                            .accessibilityIdentifier("entitySuggestion")
+                        Button { entity = name; applyLastUse(of: name) } label: {
+                            Text(name).foregroundStyle(Theme.blue).rowPadding()
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("entitySuggestion")
                     }
                     if dateStillToPick {
-                        Button("Pick a date") { dateStillToPick = false }
-                            .accessibilityIdentifier("pickDateButton")
+                        Button { dateStillToPick = false } label: {
+                            Text("Pick a date").foregroundStyle(Theme.blue).rowPadding()
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("pickDateButton")
                     } else {
-                        DatePicker("Date", selection: $date, displayedComponents: .date)
+                        FieldRow("Date") {
+                            DatePicker("Date", selection: $date, displayedComponents: .date).labelsHidden()
+                        }
                     }
                 }
-                Section {
+                CardGroup {
                     if let suggestion = categorySuggestion {
-                        Button("Used before: \(suggestion.category)\(suggestion.subCategory.isEmpty ? "" : " > \(suggestion.subCategory)")") {
-                            apply(suggestion)
+                        Button { apply(suggestion) } label: {
+                            Text("Used before: \(suggestion.category)\(suggestion.subCategory.isEmpty ? "" : " > \(suggestion.subCategory)")")
+                                .foregroundStyle(Theme.blue).rowPadding()
                         }
+                        .buttonStyle(.plain)
                         .accessibilityIdentifier("usedBeforeButton")
                     }
                     if category.isEmpty, !model.recentCategories.isEmpty {
                         ForEach(model.recentCategories, id: \.self) { choice in
-                            Button("\(choice.subCategory) (\(choice.category))") { apply(choice) }
+                            Button { apply(choice) } label: {
+                                Text("\(choice.subCategory) (\(choice.category))").foregroundStyle(Theme.blue).rowPadding()
+                            }
+                            .buttonStyle(.plain)
                         }
                     }
-                    Picker("Category", selection: $category) {
-                        Text("Choose").tag("")
-                        ForEach(model.categories, id: \.name) { Text($0.name).tag($0.name) }
+                    FieldRow("Category") {
+                        Picker("Category", selection: $category) {
+                            Text("Choose").tag("")
+                            ForEach(model.categories, id: \.name) { Text($0.name).tag($0.name) }
+                        }
+                        .labelsHidden()
+                        .accessibilityIdentifier("categoryPicker")
                     }
-                    .accessibilityIdentifier("categoryPicker")
                     if !subCategories.isEmpty {
-                        Picker("Sub-category", selection: $subCategory) {
-                            Text("None").tag("")
-                            ForEach(subCategories, id: \.self) { Text($0).tag($0) }
+                        FieldRow("Sub-category") {
+                            Picker("Sub-category", selection: $subCategory) {
+                                Text("None").tag("")
+                                ForEach(subCategories, id: \.self) { Text($0).tag($0) }
+                            }
+                            .labelsHidden()
+                            .accessibilityIdentifier("subCategoryPicker")
                         }
-                        .accessibilityIdentifier("subCategoryPicker")
                     }
-                    Picker("Paid with", selection: $payment) {
-                        ForEach(paymentChoices, id: \.title) { Text($0.title).tag($0) }
+                    FieldRow("Paid with") {
+                        Picker("Paid with", selection: $payment) {
+                            ForEach(paymentChoices, id: \.title) { Text($0.title).tag($0) }
+                        }
+                        .labelsHidden()
+                        .accessibilityIdentifier("paymentPicker")
                     }
-                    .accessibilityIdentifier("paymentPicker")
                     if payment.method == .cashWithdrawal {
                         Toggle("Keep as cash in hand", isOn: $keepAsCash)
+                            .rowPadding()
                             .accessibilityIdentifier("keepAsCashToggle")
                     }
                 }
-                Section {
+                CardGroup {
                     TextField("Spent for (leave empty for you)", text: $spentFor)
+                        .rowPadding()
                         .accessibilityIdentifier("spentForField")
                     TextField("Tags, separated by commas", text: $tagsText)
+                        .rowPadding()
                         .accessibilityIdentifier("tagsField")
                 }
                 if let errorMessage {
-                    Section {
-                        Text(errorMessage)
-                            .foregroundStyle(.red)
-                            .accessibilityIdentifier("errorMessage")
-                    }
+                    Text(errorMessage)
+                        .foregroundStyle(Theme.red)
+                        .padding(.horizontal, 18)
+                        .accessibilityIdentifier("errorMessage")
                 }
             }
-            .navigationTitle(editing != nil ? "Edit Expense" : submit != nil ? "Add to Budget" : "New Expense")
-            .navigationBarTitleDisplayMode(.inline)
+            .cardNavigation(editing != nil ? "Edit Expense" : submit != nil ? "Add to Budget" : "New Expense")
             .onChange(of: category) {
                 subCategory = pendingSubCategory ?? ""
                 pendingSubCategory = nil

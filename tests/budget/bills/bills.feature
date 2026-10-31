@@ -205,6 +205,64 @@ Feature: Bills, one-off or repeating, added to the budget with a tap
     Then it no longer appears in Upcoming or on the calendar
     And expenses already created from it stay
 
+  # Mockup 2: Activity > Upcoming lists only the bills she adds herself.
+  Scenario: A bill that adds itself does not wait in Upcoming
+    Given the setting "Upcoming window" is "Due within 30 days"
+    When she opens Upcoming
+    Then "Internet" is not listed because it adds itself
+    And Rent, Insurance premium and Society maintenance are listed
+
+  Scenario: An automatic add that was undone waits in Upcoming
+    Given today is 2026-11-16 and "Internet" was added automatically
+    When she undoes that add
+    Then "Internet" is listed in Upcoming with the label "Due today"
+
+  # Mockups 6 and 7: the Bills calendar and its filter menu.
+  Scenario: The Bills calendar puts every bill on its day
+    When she opens the Bills calendar for November 2026
+    Then she sees
+      | day | name                | detail                    | shows |
+      | 1   | Rent                | Every Month               | Add   |
+      | 10  | Insurance premium   | Every Month               | Add   |
+      | 12  | Society maintenance | Every 3 Months            | Add   |
+      | 16  | Internet            | Every Month · adds itself | Auto  |
+
+  Scenario: Later repeats appear in later months, but only the next one can be added
+    When she opens the Bills calendar for December 2026
+    Then Rent is on 1 Dec, Insurance premium on 10 Dec and Internet on 16 Dec
+    And none of them has an Add button because November comes first
+    And Society maintenance is not there because it is next due in February
+
+  Scenario: Added and automatic bills stay on their day
+    Given today is 2026-11-16 and "Internet" was added automatically
+    And Rent was added for 2026-11-01
+    When she opens the Bills calendar for November 2026
+    Then Rent shows "Added" on 1 Nov and Internet shows "Auto-added" on 16 Nov
+
+  Scenario: A bill that has ended leaves the calendar
+    Given "Rent" ends on 2026-11-30
+    When she opens the Bills calendar for December 2026
+    Then Rent is not there
+
+  Scenario Outline: The filter menu narrows the calendar
+    Given today is 2026-11-16 and "Internet" was added automatically
+    And Rent was added for 2026-11-01
+    And the scheme "RBI bond" pays 2,000 on the 20th
+    And a salary of 1,50,000 was received on 2026-11-01
+    When she chooses "<filter>" for November 2026
+    Then she sees <shown>
+
+    Examples:
+      | filter           | shown                                                                     |
+      | All Transactions | every bill, the RBI bond payout and the salary                            |
+      | Bills            | Rent, Insurance premium, Society maintenance and Internet                 |
+      | Not Added        | Insurance premium and Society maintenance                                 |
+      | Added            | Rent                                                                      |
+      | Auto-added       | Internet                                                                  |
+      | Income           | the RBI bond payout and the salary                                        |
+      | Upcoming Income  | the RBI bond payout on 20 Nov, with a Record button                       |
+      | Received Income  | the salary on 1 Nov                                                       |
+
   Scenario Outline: A bill needs the essentials
     When she saves a bill with name "<name>" and amount <amount>
     Then she sees "<message>"

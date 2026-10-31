@@ -23,11 +23,31 @@ private enum AppTab: String, CaseIterable {
 /// iOS folds a sixth tab into "More", so the bar is drawn here and the system one is hidden.
 struct RootView: View {
     let model: BudgetViewModel
+    @Environment(\.scenePhase) private var scenePhase
     @State private var tab = AppTab.activity
+    @State private var locked: Bool
+    @State private var lockMessage: String?
+    @State private var drawerOpen = false
+    @State private var drawerRoute: DrawerItem?
+
+    init(model: BudgetViewModel) {
+        self.model = model
+        _locked = State(initialValue: model.preferences.appLock)
+    }
 
     var body: some View {
+        Group { if locked { lockScreen } else { content } }
+            .onChange(of: scenePhase) {
+                if scenePhase == .background, model.preferences.appLock { locked = true }
+                if scenePhase == .active, locked, !PrivacyGate.isUITesting { Task { await unlock() } }
+            }
+            .task { if locked, !PrivacyGate.isUITesting { await unlock() } }
+    }
+
+    private var content: some View {
         TabView(selection: $tab) {
-            BudgetScreen(model: model).tag(AppTab.activity).toolbar(.hidden, for: .tabBar)
+            BudgetScreen(model: model, route: $drawerRoute) { withAnimation(.easeOut(duration: 0.25)) { drawerOpen = true } }
+                .tag(AppTab.activity).toolbar(.hidden, for: .tabBar)
             BillsScreen(model: model).tag(AppTab.bills).toolbar(.hidden, for: .tabBar)
             PortfolioScreen(model: model).tag(AppTab.portfolio).toolbar(.hidden, for: .tabBar)
             ReportsScreen(model: model).tag(AppTab.reports).toolbar(.hidden, for: .tabBar)
@@ -35,6 +55,42 @@ struct RootView: View {
             SearchScreen(model: model).tag(AppTab.search).toolbar(.hidden, for: .tabBar)
         }
         .safeAreaInset(edge: .bottom, spacing: 0) { bar }
+        .overlay {
+            if drawerOpen {
+                MenuDrawer { item in
+                    drawerOpen = false
+                    drawerRoute = item
+                } close: {
+                    withAnimation(.easeOut(duration: 0.2)) { drawerOpen = false }
+                }
+                .transition(.move(edge: .leading))
+            }
+        }
+    }
+
+    private func unlock() async {
+        if await PrivacyGate.authenticate(reason: "Unlock Hisaab") {
+            locked = false
+            lockMessage = nil
+        } else {
+            lockMessage = "Try Again"
+        }
+    }
+
+    private var lockScreen: some View {
+        ZStack {
+            Rectangle().fill(Color(.systemBackground)).ignoresSafeArea()
+            VStack(spacing: 16) {
+                Image(systemName: "lock.fill").font(.system(size: 44))
+                Text("Hisaab is locked").font(.title2.weight(.semibold))
+                if let lockMessage { Text(lockMessage).foregroundStyle(.red).accessibilityIdentifier("lockMessage") }
+                Button("Unlock") { Task { await unlock() } }
+                    .buttonStyle(.borderedProminent)
+                    .accessibilityIdentifier("unlockButton")
+            }
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("lockScreen")
     }
 
     private var bar: some View {

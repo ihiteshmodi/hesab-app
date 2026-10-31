@@ -29,21 +29,19 @@ struct TripDetailScreen: View {
     var body: some View {
         Group {
             if let summary = model.tripSummary(tripID) {
-                List {
-                    Section {
-                        Picker("View", selection: $pane) {
-                            ForEach(TripPane.allCases, id: \.self) { Text($0.rawValue).tag($0) }
-                        }
-                        .pickerStyle(.segmented)
-                        .accessibilityIdentifier("tripPanePicker")
+                CardScreen {
+                    Picker("View", selection: $pane) {
+                        ForEach(TripPane.allCases, id: \.self) { Text($0.rawValue).tag($0) }
                     }
-                    if let errorMessage { Text(errorMessage).foregroundStyle(.red) }
+                    .pickerStyle(.segmented)
+                    .accessibilityIdentifier("tripPanePicker")
+                    if let errorMessage { Text(errorMessage).foregroundStyle(Theme.red) }
                     switch pane {
                     case .expenses: expenses(summary)
                     case .balances: balances(summary)
                     }
                 }
-                .navigationTitle(summary.trip.name)
+                .cardNavigation(summary.trip.name)
                 .toolbar {
                     ToolbarItemGroup(placement: .primaryAction) {
                         NavigationLink {
@@ -75,7 +73,7 @@ struct TripDetailScreen: View {
                     if pane == .expenses {
                         Button { entry = .expense(nil) } label: {
                             Image(systemName: "plus").font(.title2.bold()).foregroundStyle(.white)
-                                .frame(width: 56, height: 56).background(Circle().fill(.blue))
+                                .frame(width: 56, height: 56).background(Circle().fill(Theme.blue))
                         }
                         .padding(20)
                         .accessibilityLabel("Add")
@@ -83,7 +81,7 @@ struct TripDetailScreen: View {
                     }
                 }
             } else {
-                Text("That trip no longer exists.").foregroundStyle(.secondary)
+                Text("That trip no longer exists.").foregroundStyle(Theme.secondary)
             }
         }
     }
@@ -92,36 +90,34 @@ struct TripDetailScreen: View {
 
     @ViewBuilder private func expenses(_ summary: TripSummary) -> some View {
         let trip = summary.trip
-        Section {
-            HStack {
-                VStack(alignment: .leading) {
-                    Text("MY EXPENSES").font(.caption).foregroundStyle(.secondary)
-                    Text(model.tripText(summary.myShare, trip)).font(.headline).monospacedDigit()
+        CardPanel {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 4) {
+                    CardCaption("My expenses")
+                    Text(model.tripText(summary.myShare, trip)).font(.title2.bold()).monospacedDigit()
                         .accessibilityIdentifier("tripMyExpenses")
-                    if trip.currency != nil { Text("≈ \(IndianMoneyFormat.string(summary.myShareHome))").font(.footnote).foregroundStyle(.secondary) }
+                    if trip.currency != nil { Text("≈ \(IndianMoneyFormat.string(summary.myShareHome))").font(.footnote).foregroundStyle(Theme.secondary) }
                 }
                 Spacer()
-                VStack(alignment: .trailing) {
-                    Text("TOTAL").font(.caption).foregroundStyle(.secondary)
-                    Text(model.tripText(summary.totalSpent, trip)).font(.headline).monospacedDigit()
-                    if trip.currency != nil { Text("≈ \(IndianMoneyFormat.string(summary.totalSpentHome))").font(.footnote).foregroundStyle(.secondary) }
+                VStack(alignment: .trailing, spacing: 4) {
+                    CardCaption("Total")
+                    Text(model.tripText(summary.totalSpent, trip)).font(.title2.bold()).monospacedDigit()
+                    if trip.currency != nil { Text("≈ \(IndianMoneyFormat.string(summary.totalSpentHome))").font(.footnote).foregroundStyle(Theme.secondary) }
                 }
             }
-            HStack {
-                Text("Net cost so far")
-                Spacer()
+        }
+        CardGroup {
+            CardRow(title: "Net cost so far") {
                 Text(IndianMoneyFormat.string(summary.netCost)).monospacedDigit().accessibilityIdentifier("tripNetCost")
             }
-            HStack {
-                Text("In the main ledger")
-                Spacer()
-                Text(IndianMoneyFormat.string(summary.ledgerAmount)).monospacedDigit().foregroundStyle(.secondary)
+            CardRow(title: "In the main ledger") {
+                Text(IndianMoneyFormat.string(summary.ledgerAmount)).monospacedDigit().foregroundStyle(Theme.secondary)
                     .accessibilityIdentifier("tripLedgerAmount")
             }
         }
-        Section {
+        CardGroup(footer: summary.expenses.isEmpty ? nil : "Touch and hold an expense to delete it.") {
             if summary.expenses.isEmpty {
-                Text("No expenses yet. Add one with the + button.").foregroundStyle(.secondary)
+                Text("No expenses yet. Add one with the + button.").foregroundStyle(Theme.secondary).rowPadding()
             }
             ForEach(summary.expenses, id: \.id) { expense in
                 NavigationLink {
@@ -131,19 +127,21 @@ struct TripDetailScreen: View {
                         VStack(alignment: .leading, spacing: 2) {
                             HStack(spacing: 4) {
                                 Text(expense.description)
-                                if expense.hasReceipt { Image(systemName: "paperclip").font(.footnote).foregroundStyle(.secondary) }
+                                if expense.hasReceipt { Image(systemName: "paperclip").font(.footnote).foregroundStyle(Theme.secondary) }
                             }
-                            Text(subtitle(expense, summary)).font(.footnote).foregroundStyle(.secondary)
+                            Text(subtitle(expense, summary)).font(.footnote).foregroundStyle(Theme.secondary)
                         }
                         Spacer()
                         VStack(alignment: .trailing) {
                             Text(model.tripText(expense.amount, trip)).monospacedDigit()
-                            Text("my share \(model.tripText(expense.shares[.me] ?? .zero, trip))").font(.footnote).foregroundStyle(.secondary)
+                            Text("my share \(model.tripText(expense.shares[.me] ?? .zero, trip))").font(.footnote).foregroundStyle(Theme.secondary)
                         }
                     }
+                    .rowPadding()
                 }
-                .swipeActions {
-                    Button("Delete", role: .destructive) { errorMessage = model.deleteTripExpense(expense.id) }
+                .buttonStyle(.plain)
+                .contextMenu {
+                    Button("Delete", systemImage: "trash", role: .destructive) { errorMessage = model.deleteTripExpense(expense.id) }
                 }
                 .accessibilityIdentifier("tripExpenseRow")
             }
@@ -166,25 +164,23 @@ struct TripDetailScreen: View {
     @ViewBuilder private func balances(_ summary: TripSummary) -> some View {
         let trip = summary.trip
         if trip.currency != nil {
-            Section {
+            CardGroup {
                 NavigationLink {
                     TripCashScreen(model: model, tripID: tripID)
                 } label: {
-                    HStack {
-                        VStack(alignment: .leading) {
-                            Text("Trip cash")
-                            Text("\(trip.currency ?? "") held in hand").font(.footnote).foregroundStyle(.secondary)
-                        }
-                        Spacer()
+                    CardRow(title: "Trip cash", subtitle: "\(trip.currency ?? "") held in hand") {
                         Text(model.tripText(summary.cash.balance, trip)).monospacedDigit().accessibilityIdentifier("tripCashBalance")
+                        Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
                     }
                 }
+                .buttonStyle(.plain)
+                .accessibilityElement(children: .contain)
                 .accessibilityIdentifier("tripCashLink")
             }
         }
-        Section {
+        CardGroup {
             if summary.balances.isEmpty {
-                Text("Add the people in this trip first (the people button above).").foregroundStyle(.secondary)
+                Text("Add the people in this trip first (the people button above).").foregroundStyle(Theme.secondary).rowPadding()
             }
             ForEach(summary.balances, id: \.person.id) { balance in
                 NavigationLink {
@@ -196,43 +192,43 @@ struct TripDetailScreen: View {
                         VStack(alignment: .leading) {
                             Text(balance.person.name).font(.headline)
                             Text(balance.owesMe == .zero ? "Square" : balance.owesMe > .zero ? "owes me" : "I owe")
-                                .font(.footnote).foregroundStyle(.secondary)
+                                .font(.footnote).foregroundStyle(Theme.secondary)
                         }
                         Spacer()
                         VStack(alignment: .trailing) {
                             Text(model.tripText(balance.owesMe < .zero ? .zero - balance.owesMe : balance.owesMe, trip)).monospacedDigit()
-                                .foregroundStyle(balance.owesMe > .zero ? Color.green : balance.owesMe < .zero ? Color.red : Color.secondary)
+                                .foregroundStyle(balance.owesMe > .zero ? Theme.green : balance.owesMe < .zero ? Theme.red : Theme.secondary)
                             if trip.currency != nil && balance.owesMe != .zero {
                                 Text("≈ \(IndianMoneyFormat.string(balance.owesMeHome < .zero ? .zero - balance.owesMeHome : balance.owesMeHome))")
-                                    .font(.footnote).foregroundStyle(.secondary)
+                                    .font(.footnote).foregroundStyle(Theme.secondary)
                             }
                         }
                     }
+                    .rowPadding()
                 }
+                .buttonStyle(.plain)
                 .accessibilityIdentifier("tripBalanceRow")
             }
-            Button("Settle Up") { entry = .transfer(personID: nil) }.accessibilityIdentifier("settleUpButton")
+            Button { entry = .transfer(personID: nil) } label: { Text("Settle Up").rowPadding() }
+                .accessibilityIdentifier("settleUpButton")
         }
-        Section("Money received") {
+        CardGroup(header: "Money received") {
             line("By bank or UPI", IndianMoneyFormat.string(summary.receivedBankHome))
             line("In rupee notes", IndianMoneyFormat.string(summary.receivedCashHome))
             if trip.currency != nil { line("In \(trip.currency ?? "") cash", model.tripText(summary.receivedCashTrip, trip)) }
             line("Written off (a cost)", IndianMoneyFormat.string(summary.writtenOffHome), id: "tripWrittenOff")
             line("Paid extra (a gain)", IndianMoneyFormat.string(summary.extraReceivedHome), id: "tripExtraReceived")
         }
-        Section {
-            Button(trip.isSettled ? "Mark Trip as Open Again" : "Mark Trip as Settled") {
-                errorMessage = model.setTripSettled(tripID, !trip.isSettled)
-            }
-            .accessibilityIdentifier("markSettledButton")
+        Button(trip.isSettled ? "Mark Trip as Open Again" : "Mark Trip as Settled") {
+            errorMessage = model.setTripSettled(tripID, !trip.isSettled)
         }
+        .buttonStyle(GreyButtonStyle())
+        .accessibilityIdentifier("markSettledButton")
     }
 
     private func line(_ title: String, _ value: String, id: String? = nil) -> some View {
-        HStack {
-            Text(title)
-            Spacer()
-            Text(value).monospacedDigit().foregroundStyle(.secondary).accessibilityIdentifier(id ?? title)
+        CardRow(title: title) {
+            Text(value).monospacedDigit().foregroundStyle(Theme.secondary).accessibilityIdentifier(id ?? title)
         }
     }
 }

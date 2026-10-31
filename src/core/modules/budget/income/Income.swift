@@ -7,6 +7,16 @@ public enum IncomeKind: String, CaseIterable, Sendable {
 
     /// Money that goes up "left to spend"; savings is the one kind that takes it down.
     var addsToLeftToSpend: Bool { self != .savings }
+
+    public var title: String {
+        switch self {
+        case .salary: "Salary"
+        case .savings: "Savings"
+        case .investmentIncome: "Investment Income"
+        case .moneyReceived: "Money Received"
+        case .borrowed: "Borrowed"
+        }
+    }
 }
 
 public struct IncomeEntry: Equatable, Sendable {

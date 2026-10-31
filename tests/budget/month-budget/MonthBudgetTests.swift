@@ -41,6 +41,24 @@ struct MonthBudgetTests {
         #expect(try app.monthBudget().expenses.map(\.description) == ["Late", "Middle", "Early"])
     }
 
+    @Test func theMonthCalendarShowsWhatWasSpentEachDay() throws {
+        let app = try makeApp(today: "2026-10-30")
+        for (date, rupees, method) in [
+            ("2026-10-01", 9_000, PaymentMethod.upi), ("2026-10-01", 200, .upi), ("2026-10-02", 261, .upi),
+            ("2026-10-03", 300, .cash), ("2026-09-30", 50, .upi),
+        ] {
+            try app.addExpense(NewExpense(
+                date: day(date), description: "Spend", amount: .rupees(rupees), category: "Home & Utilities",
+                paymentMethod: method
+            ))
+        }
+
+        let october = try app.monthBudget()
+
+        #expect(october.spentByDay == [1: .rupees(9_200), 2: .rupees(261)])
+        #expect(october.spentByDay.values.reduce(.zero, +) == october.spentThisMonth)
+    }
+
     @Test func nothingRecordedShowsZero() throws {
         let app = try makeApp()
 

@@ -13,17 +13,16 @@ struct TripExpenseDetailScreen: View {
     var body: some View {
         if let summary = model.tripSummary(tripID), let expense = summary.expenses.first(where: { $0.id == expenseID }) {
             let trip = summary.trip
-            List {
-                Section {
+            CardScreen {
+                CardPanel {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(expense.paidBy == .me ? "PAID BY ME" : "PAID BY \(name(expense.paidBy, summary).uppercased())")
-                            .font(.caption).foregroundStyle(.secondary)
+                        CardCaption(expense.paidBy == .me ? "Paid by me" : "Paid by \(name(expense.paidBy, summary))")
                         Text(model.tripText(expense.amount, trip)).font(.title.bold()).monospacedDigit()
                         if let charge = expense.paidInHome {
-                            Text("card charged \(IndianMoneyFormat.string(charge))").foregroundStyle(.secondary)
+                            Text("card charged \(IndianMoneyFormat.string(charge))").foregroundStyle(Theme.secondary)
                         } else if trip.currency != nil {
                             Text(expense.paidWith == .cash ? "paid in cash" : "≈ \(IndianMoneyFormat.string(TripValue.home(expense.amount, trip)))")
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(Theme.secondary)
                         }
                     }
                     Chart(shares(expense), id: \.who) { item in
@@ -32,41 +31,41 @@ struct TripExpenseDetailScreen: View {
                     .chartXAxis(.hidden)
                     .frame(height: 36)
                 }
-                Section("Who owes what") {
+                CardGroup(header: "Who owes what") {
                     ForEach(shares(expense), id: \.who) { item in
-                        HStack {
-                            Text(item.name)
-                            Spacer()
+                        CardRow(title: item.name) {
                             VStack(alignment: .trailing) {
                                 Text(model.tripText(Money(paise: item.paise), trip)).monospacedDigit()
                                 if trip.currency != nil {
                                     Text("≈ \(IndianMoneyFormat.string(TripValue.home(Money(paise: item.paise), trip, charge: expense)))")
-                                        .font(.footnote).foregroundStyle(.secondary)
+                                        .font(.footnote).foregroundStyle(Theme.secondary)
                                 }
                             }
                         }
                     }
                 }
                 if !expense.tag.isEmpty || !expense.note.isEmpty {
-                    Section("Details") {
-                        if !expense.tag.isEmpty { LabeledContent("Tag", value: expense.tag) }
-                        if !expense.note.isEmpty { Text(expense.note) }
+                    CardGroup(header: "Details") {
+                        if !expense.tag.isEmpty {
+                            CardRow(title: "Tag") { Text(expense.tag).foregroundStyle(Theme.secondary) }
+                        }
+                        if !expense.note.isEmpty { Text(expense.note).rowPadding() }
                     }
                 }
                 if expense.hasReceipt, let data = model.tripReceipt(expense.id), let image = UIImage(data: data) {
-                    Section("Receipt") {
+                    CardGroup(header: "Receipt") {
                         Image(uiImage: image).resizable().scaledToFit().accessibilityIdentifier("receiptImage")
                     }
                 }
             }
-            .navigationTitle(expense.description)
+            .cardNavigation(expense.description)
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     Button("Edit") { onEdit(expense); dismiss() }.accessibilityIdentifier("editTripExpenseButton")
                 }
             }
         } else {
-            Text("That expense no longer exists.").foregroundStyle(.secondary)
+            Text("That expense no longer exists.").foregroundStyle(Theme.secondary)
         }
     }
 
@@ -114,54 +113,51 @@ struct PersonStatementScreen: View {
     var body: some View {
         if let summary = model.tripSummary(tripID), let page = model.tripStatement(tripID, personID) {
             let trip = summary.trip
-            List {
-                Section {
+            CardScreen {
+                CardPanel {
                     HStack {
                         Text(page.owesMe >= .zero ? "Still owes me" : "I still owe").font(.headline)
                         Spacer()
                         VStack(alignment: .trailing) {
                             Text(model.tripText(page.owesMe < .zero ? .zero - page.owesMe : page.owesMe, trip)).font(.headline).monospacedDigit()
-                                .foregroundStyle(page.owesMe > .zero ? Color.green : page.owesMe < .zero ? Color.red : Color.secondary)
+                                .foregroundStyle(page.owesMe > .zero ? Theme.green : page.owesMe < .zero ? Theme.red : Theme.secondary)
                                 .accessibilityIdentifier("statementBalance")
                             if trip.currency != nil {
                                 Text("≈ \(IndianMoneyFormat.string(page.owesMeHome < .zero ? .zero - page.owesMeHome : page.owesMeHome))")
-                                    .font(.footnote).foregroundStyle(.secondary)
+                                    .font(.footnote).foregroundStyle(Theme.secondary)
                             }
                         }
                     }
                 }
-                if let errorMessage { Text(errorMessage).foregroundStyle(.red) }
+                if let errorMessage { Text(errorMessage).foregroundStyle(Theme.red) }
                 section("Entries they owe me for", page.lines.filter { $0.kind == .iPaid }, trip)
                 section("What I owe them for", page.lines.filter { $0.kind == .theyPaid }, trip)
                 section("Payments", page.lines.filter { $0.kind == .payment }, trip, deletable: true)
             }
-            .navigationTitle(page.person.name)
+            .cardNavigation(page.person.name)
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     Button("Settle") { onSettle(personID); dismiss() }.accessibilityIdentifier("statementSettleButton")
                 }
             }
         } else {
-            Text("That person is no longer in this trip.").foregroundStyle(.secondary)
+            Text("That person is no longer in this trip.").foregroundStyle(Theme.secondary)
         }
     }
 
     @ViewBuilder private func section(_ title: String, _ lines: [StatementLine], _ trip: Trip, deletable: Bool = false) -> some View {
         if !lines.isEmpty {
-            Section(title) {
+            CardGroup(header: title, footer: deletable ? "Touch and hold a payment to undo it." : nil) {
                 ForEach(Array(lines.enumerated()), id: \.offset) { _, line in
-                    HStack {
-                        VStack(alignment: .leading) {
-                            Text(line.title)
-                            Text(line.date.shortTitle).font(.footnote).foregroundStyle(.secondary)
-                        }
-                        Spacer()
+                    CardRow(title: line.title, subtitle: line.date.shortTitle) {
                         Text((line.amount > .zero ? "+ " : "− ") + model.tripText(line.amount < .zero ? .zero - line.amount : line.amount, trip))
                             .monospacedDigit()
                     }
-                    .swipeActions {
+                    .contextMenu {
                         if deletable, let id = line.settlementID {
-                            Button("Undo", role: .destructive) { errorMessage = model.deleteTripSettlement(id) }
+                            Button("Undo", systemImage: "arrow.uturn.backward", role: .destructive) {
+                                errorMessage = model.deleteTripSettlement(id)
+                            }
                         }
                     }
                     .accessibilityIdentifier("statementLine")
@@ -179,36 +175,33 @@ struct TripCashScreen: View {
     var body: some View {
         if let summary = model.tripSummary(tripID) {
             let trip = summary.trip
-            List {
-                Section {
+            CardScreen {
+                CardPanel {
                     VStack(alignment: .center, spacing: 4) {
-                        Text("CASH IN HAND (\(trip.currency ?? ""))").font(.caption).foregroundStyle(.secondary)
+                        CardCaption("Cash in hand (\(trip.currency ?? ""))")
                         Text(model.tripText(summary.cash.balance, trip)).font(.largeTitle.bold()).monospacedDigit()
                             .accessibilityIdentifier("tripCashScreenBalance")
-                        Text("≈ \(IndianMoneyFormat.string(TripValue.home(summary.cash.balance, trip))) at the trip rate").foregroundStyle(.secondary)
+                        Text("≈ \(IndianMoneyFormat.string(TripValue.home(summary.cash.balance, trip))) at the trip rate").foregroundStyle(Theme.secondary)
                     }
                     .frame(maxWidth: .infinity)
-                    if let warning = summary.cash.warning { Text(warning).foregroundStyle(.orange) }
+                    if let warning = summary.cash.warning { Text(warning).foregroundStyle(Theme.orange) }
                 }
-                Section("Where it went") {
-                    if summary.cash.lines.isEmpty { Text("Nothing yet. Set what you are holding, or take cash from a friend.").foregroundStyle(.secondary) }
+                CardGroup(header: "Where it went") {
+                    if summary.cash.lines.isEmpty {
+                        Text("Nothing yet. Set what you are holding, or take cash from a friend.").foregroundStyle(Theme.secondary).rowPadding()
+                    }
                     ForEach(Array(summary.cash.lines.enumerated()), id: \.offset) { _, line in
-                        HStack {
-                            VStack(alignment: .leading) {
-                                Text(line.description)
-                                Text(line.date.shortTitle).font(.footnote).foregroundStyle(.secondary)
-                            }
-                            Spacer()
+                        CardRow(title: line.description, subtitle: line.date.shortTitle) {
                             VStack(alignment: .trailing) {
                                 Text((line.amount >= .zero ? "+ " : "− ") + model.tripText(line.amount < .zero ? .zero - line.amount : line.amount, trip))
                                     .monospacedDigit()
-                                Text(model.tripText(line.runningBalance, trip)).font(.footnote).foregroundStyle(.secondary).monospacedDigit()
+                                Text(model.tripText(line.runningBalance, trip)).font(.footnote).foregroundStyle(Theme.secondary).monospacedDigit()
                             }
                         }
                     }
                 }
             }
-            .navigationTitle("Trip Cash")
+            .cardNavigation("Trip Cash")
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     Button("Set Cash", systemImage: "pencil") { setting = true }.accessibilityIdentifier("setTripCashButton")
@@ -228,12 +221,14 @@ private struct SetTripCashSheet: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                TextField("Cash you are holding", text: $text).keyboardType(.decimalPad).accessibilityIdentifier("setTripCashField")
-                if let errorMessage { Text(errorMessage).foregroundStyle(.red) }
+            CardScreen {
+                CardGroup {
+                    TextField("Cash you are holding", text: $text).keyboardType(.decimalPad).accessibilityIdentifier("setTripCashField")
+                        .rowPadding()
+                }
+                if let errorMessage { Text(errorMessage).foregroundStyle(Theme.red) }
             }
-            .navigationTitle("Set Trip Cash")
-            .navigationBarTitleDisplayMode(.inline)
+            .cardNavigation("Set Trip Cash")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
@@ -257,45 +252,44 @@ struct TripInsightsScreen: View {
     var body: some View {
         if let summary = model.tripSummary(tripID) {
             let trip = summary.trip
-            List {
-                Section("Who owes me") {
+            CardScreen {
+                CardGroup(header: "Who owes me") {
                     let owed = summary.balances.filter { $0.owesMe > .zero }.map { Owed(id: $0.person.id, name: $0.person.name, paise: $0.owesMe.paise) }
-                    if owed.isEmpty { Text("Nobody owes you anything.").foregroundStyle(.secondary) }
+                    if owed.isEmpty { Text("Nobody owes you anything.").foregroundStyle(Theme.secondary).rowPadding() }
                     Chart(owed) { item in
-                        BarMark(x: .value("Owes", item.paise), y: .value("Person", item.name)).foregroundStyle(.green)
+                        BarMark(x: .value("Owes", item.paise), y: .value("Person", item.name)).foregroundStyle(Theme.green)
                     }
                     .chartXAxis(.hidden)
                     .frame(height: CGFloat(max(owed.count, 1)) * 36)
+                    .padding(18)
                     ForEach(owed) { item in
-                        HStack { Text(item.name); Spacer(); Text(model.tripText(Money(paise: item.paise), trip)).monospacedDigit() }
+                        CardRow(title: item.name) { Text(model.tripText(Money(paise: item.paise), trip)).monospacedDigit() }
                     }
                 }
-                Section("Spend by tag") {
-                    if summary.spendByTag.isEmpty { Text("No expenses yet.").foregroundStyle(.secondary) }
+                CardGroup(header: "Spend by tag") {
+                    if summary.spendByTag.isEmpty { Text("No expenses yet.").foregroundStyle(Theme.secondary).rowPadding() }
                     Chart(summary.spendByTag, id: \.tag) { item in
                         SectorMark(angle: .value("Spend", item.amount.paise), innerRadius: .ratio(0.55))
                             .foregroundStyle(by: .value("Tag", item.tag.isEmpty ? "Untagged" : item.tag))
                     }
                     .frame(height: 180)
+                    .padding(18)
                     ForEach(summary.spendByTag, id: \.tag) { item in
-                        HStack {
-                            Text(item.tag.isEmpty ? "Untagged" : item.tag)
-                            Spacer()
+                        CardRow(title: item.tag.isEmpty ? "Untagged" : item.tag) {
                             Text(model.tripText(item.amount, trip)).monospacedDigit()
                         }
                     }
                 }
-                Section("Paid vs share") {
+                CardGroup(header: "Paid vs share") {
                     ForEach(summary.totals, id: \.participant) { total in
-                        VStack(alignment: .leading) {
-                            Text(name(total.participant, summary))
-                            Text("paid \(model.tripText(total.paid, trip)) · share \(model.tripText(total.share, trip))")
-                                .font(.footnote).foregroundStyle(.secondary)
-                        }
+                        CardRow(
+                            title: name(total.participant, summary),
+                            subtitle: "paid \(model.tripText(total.paid, trip)) · share \(model.tripText(total.share, trip))"
+                        )
                     }
                 }
             }
-            .navigationTitle("Insights")
+            .cardNavigation("Insights")
         }
     }
 
@@ -317,39 +311,40 @@ struct TripPeopleScreen: View {
 
     var body: some View {
         if let summary = model.tripSummary(tripID) {
-            List {
-                if let errorMessage { Text(errorMessage).foregroundStyle(.red).accessibilityIdentifier("peopleError") }
-                Section("In this trip") {
+            CardScreen {
+                if let errorMessage { Text(errorMessage).foregroundStyle(Theme.red).accessibilityIdentifier("peopleError") }
+                CardGroup(header: "In this trip", footer: summary.members.isEmpty ? nil : "Touch and hold a person to remove them.") {
                     ForEach(summary.members, id: \.id) { person in
                         Text(person.name)
-                            .swipeActions {
-                                Button("Remove", role: .destructive) { errorMessage = model.deletePerson(tripID, person.id) }
+                            .rowPadding()
+                            .contextMenu {
+                                Button("Remove", systemImage: "person.badge.minus", role: .destructive) {
+                                    errorMessage = model.deletePerson(tripID, person.id)
+                                }
                             }
                             .accessibilityIdentifier("personRow")
                     }
-                    Button("Add Person") { adding = true }.accessibilityIdentifier("addPersonButton")
+                    Button { adding = true } label: { Text("Add Person").rowPadding() }.accessibilityIdentifier("addPersonButton")
                 }
-                Section {
+                CardGroup(
+                    header: "Groups",
+                    footer: "A group only saves taps in the split. It never changes who owes what."
+                        + (summary.groups.isEmpty ? "" : " Touch and hold a group to delete it.")
+                ) {
                     ForEach(summary.groups, id: \.id) { group in
                         Button { editingGroup = GroupDraft(group) } label: {
-                            VStack(alignment: .leading) {
-                                Text(group.name).foregroundStyle(.primary)
-                                Text(names(group.members, summary)).font(.footnote).foregroundStyle(.secondary)
-                            }
+                            CardRow(title: group.name, subtitle: names(group.members, summary))
                         }
-                        .swipeActions {
-                            Button("Delete", role: .destructive) { errorMessage = model.deleteTripGroup(group.id) }
+                        .buttonStyle(.plain)
+                        .contextMenu {
+                            Button("Delete", systemImage: "trash", role: .destructive) { errorMessage = model.deleteTripGroup(group.id) }
                         }
                         .accessibilityIdentifier("groupRow")
                     }
-                    Button("New Group") { editingGroup = GroupDraft(nil) }.accessibilityIdentifier("newGroupButton")
-                } header: {
-                    Text("Groups")
-                } footer: {
-                    Text("A group only saves taps in the split. It never changes who owes what.")
+                    Button { editingGroup = GroupDraft(nil) } label: { Text("New Group").rowPadding() }.accessibilityIdentifier("newGroupButton")
                 }
             }
-            .navigationTitle("People")
+            .cardNavigation("People")
             .alert("Add Person", isPresented: $adding) {
                 TextField("Name", text: $newName).accessibilityIdentifier("newPersonField")
                 Button("Add") {
@@ -399,9 +394,11 @@ private struct GroupSheet: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                TextField("Group name", text: $name).accessibilityIdentifier("groupNameField")
-                Section("Who is in it") {
+            CardScreen {
+                CardGroup {
+                    TextField("Group name", text: $name).accessibilityIdentifier("groupNameField").rowPadding()
+                }
+                CardGroup(header: "Who is in it") {
                     ForEach(participants, id: \.self) { who in
                         let title: String = {
                             switch who {
@@ -412,19 +409,17 @@ private struct GroupSheet: View {
                         Button {
                             if members.contains(who) { members.remove(who) } else { members.insert(who) }
                         } label: {
-                            HStack {
-                                Text(title).foregroundStyle(.primary)
-                                Spacer()
-                                if members.contains(who) { Image(systemName: "checkmark").foregroundStyle(.blue) }
+                            CardRow(title: title) {
+                                if members.contains(who) { Image(systemName: "checkmark").foregroundStyle(Theme.blue) }
                             }
                         }
+                        .buttonStyle(.plain)
                         .accessibilityIdentifier("groupMember-\(title)")
                     }
                 }
-                if let errorMessage { Text(errorMessage).foregroundStyle(.red).accessibilityIdentifier("groupError") }
+                if let errorMessage { Text(errorMessage).foregroundStyle(Theme.red).accessibilityIdentifier("groupError") }
             }
-            .navigationTitle(draft.id == 0 ? "New Group" : "Edit Group")
-            .navigationBarTitleDisplayMode(.inline)
+            .cardNavigation(draft.id == 0 ? "New Group" : "Edit Group")
             .onAppear {
                 name = draft.name
                 members = draft.members

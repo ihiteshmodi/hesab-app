@@ -12,31 +12,36 @@ struct NewIncomeSheet: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                Section {
+            CardScreen {
+                CardGroup {
                     TextField("Amount", text: $amountText)
                         .keyboardType(.decimalPad)
                         .font(.title2.weight(.semibold))
+                        .rowPadding()
                         .accessibilityIdentifier("incomeAmountField")
-                    Picker("Type", selection: $kind) {
-                        Text("Choose").tag(IncomeKind?.none)
-                        ForEach(IncomeKind.allCases, id: \.self) { Text($0.title).tag(IncomeKind?.some($0)) }
+                    FieldRow("Type") {
+                        Picker("Type", selection: $kind) {
+                            Text("Choose").tag(IncomeKind?.none)
+                            ForEach(IncomeKind.allCases, id: \.self) { Text($0.title).tag(IncomeKind?.some($0)) }
+                        }
+                        .labelsHidden()
+                        .accessibilityIdentifier("incomeTypePicker")
                     }
-                    .accessibilityIdentifier("incomeTypePicker")
                     TextField(kind == .borrowed ? "Borrowed from" : "Note (optional)", text: $note)
+                        .rowPadding()
                         .accessibilityIdentifier("incomeNoteField")
-                    DatePicker("Date", selection: $date, displayedComponents: .date)
+                    FieldRow("Date") {
+                        DatePicker("Date", selection: $date, displayedComponents: .date).labelsHidden()
+                    }
                 }
                 if let errorMessage {
-                    Section {
-                        Text(errorMessage)
-                            .foregroundStyle(.red)
-                            .accessibilityIdentifier("incomeErrorMessage")
-                    }
+                    Text(errorMessage)
+                        .foregroundStyle(Theme.red)
+                        .padding(.horizontal, 18)
+                        .accessibilityIdentifier("incomeErrorMessage")
                 }
             }
-            .navigationTitle("New Income")
-            .navigationBarTitleDisplayMode(.inline)
+            .cardNavigation("New Income")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
@@ -57,14 +62,4 @@ struct NewIncomeSheet: View {
     }
 }
 
-extension IncomeKind {
-    var title: String {
-        switch self {
-        case .salary: "Salary"
-        case .savings: "Savings"
-        case .investmentIncome: "Investment Income"
-        case .moneyReceived: "Money Received"
-        case .borrowed: "Borrowed"
-        }
-    }
-}
+

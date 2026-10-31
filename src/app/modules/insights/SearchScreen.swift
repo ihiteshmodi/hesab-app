@@ -8,33 +8,30 @@ struct SearchScreen: View {
 
     var body: some View {
         NavigationStack {
-            List {
+            CardScreen {
                 if text.trimmingCharacters(in: .whitespaces).isEmpty {
-                    Text("Search by description, shop or person, category, note or amount.").foregroundStyle(.secondary)
+                    CardPanel {
+                        Text("Search by description, shop or person, category, note or amount.").foregroundStyle(Theme.secondary)
+                    }
                 } else if model.searchResults.groups.isEmpty {
-                    Text("No expenses match \"\(text)\".").foregroundStyle(.secondary)
-                        .accessibilityIdentifier("noResults")
+                    CardPanel {
+                        Text("No expenses match \"\(text)\".").foregroundStyle(Theme.secondary)
+                            .accessibilityIdentifier("noResults")
+                    }
                 } else {
-                    Section {
-                        HStack {
-                            Text("Total")
-                            Spacer()
-                            Text(IndianMoneyFormat.string(model.searchResults.total)).monospacedDigit()
+                    CardGroup {
+                        CardRow(title: "Total") {
+                            Text(IndianMoneyFormat.string(model.searchResults.total)).monospacedDigit().fontWeight(.semibold)
                                 .accessibilityIdentifier("searchTotal")
                         }
                     }
                     ForEach(model.searchResults.groups, id: \.month) { group in
-                        Section(group.month.title) {
+                        CardGroup(header: group.month.title) {
                             ForEach(group.expenses, id: \.id) { expense in
                                 Button { openedExpense = expense.id } label: {
-                                    HStack {
-                                        VStack(alignment: .leading) {
-                                            Text(expense.description)
-                                            Text([expense.entity, expense.category, expense.date.shortTitle]
-                                                .compactMap { $0 }.joined(separator: " · "))
-                                                .font(.footnote).foregroundStyle(.secondary)
-                                        }
-                                        Spacer()
+                                    CardRow(title: expense.description,
+                                            subtitle: [expense.entity, expense.category, expense.date.shortTitle]
+                                                .compactMap { $0 }.joined(separator: " · ")) {
                                         Text(IndianMoneyFormat.string(expense.amount)).monospacedDigit()
                                     }
                                 }
@@ -45,7 +42,7 @@ struct SearchScreen: View {
                     }
                 }
             }
-            .navigationTitle("Search")
+            .cardNavigation("Search")
             .searchable(text: $text, prompt: "Search expenses")
             .onChange(of: text) { model.search(text) }
             .sheet(item: $openedExpense) { id in ExpenseDetailSheet(model: model, expenseID: id) }

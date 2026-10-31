@@ -6,28 +6,23 @@ struct PendingRefundsScreen: View {
     @State private var openedExpense: Int64?
 
     var body: some View {
-        List {
+        CardScreen {
             if let pending = model.pendingRefunds {
                 if pending.expenses.isEmpty {
-                    Text("Nothing pending. Refunds you are waiting for appear here.")
-                        .foregroundStyle(.secondary)
+                    CardPanel {
+                        Text("Nothing pending. Refunds you are waiting for appear here.")
+                            .foregroundStyle(Theme.secondary)
+                    }
                 } else {
-                    Section {
-                        HStack {
-                            Text("Still to come back")
-                            Spacer()
+                    CardGroup {
+                        CardRow(title: "Still to come back") {
                             Text(IndianMoneyFormat.string(pending.stillToCome)).monospacedDigit()
                         }
                     }
-                    Section {
+                    CardGroup {
                         ForEach(pending.expenses, id: \.id) { expense in
                             Button { openedExpense = expense.id } label: {
-                                HStack {
-                                    VStack(alignment: .leading) {
-                                        Text(expense.description)
-                                        Text(expense.date.shortTitle).font(.footnote).foregroundStyle(.secondary)
-                                    }
-                                    Spacer()
+                                CardRow(title: expense.description, subtitle: expense.date.shortTitle) {
                                     Text(IndianMoneyFormat.string(expense.amount)).monospacedDigit()
                                 }
                             }
@@ -37,7 +32,7 @@ struct PendingRefundsScreen: View {
                 }
             }
         }
-        .navigationTitle("Pending Refunds")
+        .cardNavigation("Pending Refunds")
         .sheet(item: $openedExpense) { id in
             ExpenseDetailSheet(model: model, expenseID: id)
         }

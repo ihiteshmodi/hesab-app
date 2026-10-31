@@ -28,4 +28,18 @@ struct IndianMoneyFormatTests {
     func plainFormatDropsTheSymbolAndWholeRupeeDecimals(paise: Int, expected: String) {
         #expect(IndianMoneyFormat.plain(Money(paise: paise)) == expected)
     }
+
+    @Test(arguments: [
+        (26_150, "₹261"),
+        (99_999, "₹999"),
+        (100_000, "₹1k"),
+        (920_000, "₹9.2k"),
+        (1_115_000, "₹11.1k"),
+        (9_999_900, "₹99.9k"),
+        (10_000_000, "₹1L"),
+        (15_000_000, "₹1.5L"),
+    ])
+    func compactFormatFitsACalendarDay(paise: Int, expected: String) {
+        #expect(IndianMoneyFormat.compact(Money(paise: paise)) == expected)
+    }
 }

@@ -146,12 +146,21 @@ final class BudgetViewModel {
     func deletePlanned(_ id: Int64) -> String? { run { try app.deletePlannedItem(id) } }
     func addPlannedAsExpense(_ id: Int64, _ expense: NewExpense) -> String? { run { try app.addPlannedAsExpense(id, expense) } }
 
-    func addBill(_ bill: NewBill) -> String? { run { try app.addBill(bill) } }
-    func updateBill(_ id: Int64, _ bill: NewBill) -> String? { run { try app.updateBill(id, bill) } }
+    /// A bill that adds itself and is already due goes in at once, so it never waits for the next launch.
+    func addBill(_ bill: NewBill) -> String? { run { try app.addBill(bill); notices += try app.runAutomaticBills() } }
+    func updateBill(_ id: Int64, _ bill: NewBill) -> String? {
+        run { try app.updateBill(id, bill); notices += try app.runAutomaticBills() }
+    }
     func deleteBill(_ id: Int64) -> String? { run { try app.deleteBill(id) } }
 
     func changeBillPlan(_ id: Int64, endsOn: CalendarDate, startingWith bill: NewBill) -> String? {
         run { try app.changeBillPlan(id, endsOn: endsOn, startingWith: bill) }
+    }
+
+    /// Reads the loaded lists first so the calendar redraws whenever they reload.
+    func billsCalendar(for month: CalendarDate.YearMonth) -> BillsCalendar? {
+        _ = (bills, upcomingIncome, budget)
+        return try? app.billsCalendar(for: month)
     }
 
     func billDraft(_ id: Int64) -> NewExpense? { try? app.billDraft(id) }

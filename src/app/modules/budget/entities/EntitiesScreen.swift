@@ -8,30 +8,30 @@ struct EntitiesScreen: View {
     @State private var errorMessage: String?
 
     var body: some View {
-        List {
+        CardScreen {
             if let errorMessage {
-                Text(errorMessage).foregroundStyle(.red).accessibilityIdentifier("entityError")
+                Text(errorMessage).foregroundStyle(Theme.red).padding(.horizontal, 18).accessibilityIdentifier("entityError")
             }
             if model.entities.isEmpty {
-                Text("No shops or people yet. They are saved when you add an expense.").foregroundStyle(.secondary)
-            }
-            ForEach(model.entities, id: \.id) { entity in
-                NavigationLink {
-                    EntityDetailScreen(model: model, entityID: entity.id)
-                } label: {
-                    HStack {
-                        Text(entity.name)
-                        Spacer()
-                        Text("\(entity.expenseCount)").foregroundStyle(.secondary)
-                    }
+                CardPanel {
+                    Text("No shops or people yet. They are saved when you add an expense.").foregroundStyle(Theme.secondary)
                 }
-                .accessibilityIdentifier("entityRow")
-                .swipeActions {
-                    Button("Delete", role: .destructive) { errorMessage = model.deleteEntity(entity.id) }
+            } else {
+                CardGroup(footer: "Touch and hold an entry to delete it.") {
+                    ForEach(model.entities, id: \.id) { entity in
+                        LinkRow(title: entity.name, value: "\(entity.expenseCount)", identifier: "entityRow") {
+                            EntityDetailScreen(model: model, entityID: entity.id)
+                        }
+                        .contextMenu {
+                            Button("Delete", systemImage: "trash", role: .destructive) {
+                                errorMessage = model.deleteEntity(entity.id)
+                            }
+                        }
+                    }
                 }
             }
         }
-        .navigationTitle("Entities")
+        .cardNavigation("Entities")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button("Add Entity", systemImage: "plus") { newName = ""; adding = true }
@@ -59,40 +59,39 @@ struct EntityDetailScreen: View {
     private var entity: EntitySummary? { model.entities.first { $0.id == entityID } }
 
     var body: some View {
-        List {
-            if let errorMessage { Text(errorMessage).foregroundStyle(.red) }
+        CardScreen {
+            if let errorMessage { Text(errorMessage).foregroundStyle(Theme.red).padding(.horizontal, 18) }
             if let history = model.entityHistory(entityID) {
-                Section {
-                    HStack {
-                        Text("Total")
-                        Spacer()
+                CardGroup {
+                    CardRow(title: "Total") {
                         Text(IndianMoneyFormat.string(history.total)).monospacedDigit()
                     }
                 }
                 ForEach(history.months, id: \.month) { month in
-                    Section {
-                        ForEach(month.expenses, id: \.id) { expense in
-                            HStack {
-                                Text(expense.description)
-                                Spacer()
-                                Text(IndianMoneyFormat.string(expense.netAmount)).monospacedDigit()
-                            }
-                        }
-                    } header: {
+                    VStack(alignment: .leading, spacing: 7) {
                         HStack {
                             Text(month.month.title)
                             Spacer()
                             Text(IndianMoneyFormat.string(month.total)).monospacedDigit()
                         }
+                        .font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.secondary)
+                        .padding(.horizontal, 18).padding(.top, 2)
+                        CardGroup {
+                            ForEach(month.expenses, id: \.id) { expense in
+                                CardRow(title: expense.description) {
+                                    Text(IndianMoneyFormat.string(expense.netAmount)).monospacedDigit()
+                                }
+                            }
+                        }
                     }
                 }
             }
-            Section {
-                Button("Rename") { newName = entity?.name ?? ""; renaming = true }
-                Button("Merge Into Another Entity") { merging = true }
+            CardGroup {
+                ButtonRow(title: "Rename") { newName = entity?.name ?? ""; renaming = true }
+                ButtonRow(title: "Merge Into Another Entity") { merging = true }
             }
         }
-        .navigationTitle(entity?.name ?? "Entity")
+        .cardNavigation(entity?.name ?? "Entity")
         .alert("Rename Entity", isPresented: $renaming) {
             TextField("Name", text: $newName)
             Button("Save") { errorMessage = model.renameEntity(entityID, to: newName) }

@@ -12,9 +12,9 @@ struct ExpenseDetailSheet: View {
 
     var body: some View {
         NavigationStack {
-            Form {
+            CardScreen {
                 if let expense = model.expense(id: expenseID) {
-                    Section {
+                    CardGroup {
                         row("Description", expense.description)
                         row("Amount", IndianMoneyFormat.string(expense.amount))
                         row("Costs you", IndianMoneyFormat.string(expense.netAmount))
@@ -29,18 +29,15 @@ struct ExpenseDetailSheet: View {
                     }
                     refundSection(expense)
                     if let errorMessage {
-                        Section {
-                            Text(errorMessage).foregroundStyle(.red).accessibilityIdentifier("detailError")
-                        }
+                        Text(errorMessage).foregroundStyle(Theme.red).padding(.horizontal, 18)
+                            .accessibilityIdentifier("detailError")
                     }
-                    Section {
-                        Button("Delete Expense", role: .destructive) { confirmingDelete = true }
-                            .accessibilityIdentifier("deleteExpenseButton")
-                    }
+                    Button("Delete Expense", role: .destructive) { confirmingDelete = true }
+                        .buttonStyle(GreyButtonStyle(tint: Theme.red))
+                        .accessibilityIdentifier("deleteExpenseButton")
                 }
             }
-            .navigationTitle("Expense")
-            .navigationBarTitleDisplayMode(.inline)
+            .cardNavigation("Expense")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Edit") { editingID = expenseID }
@@ -66,21 +63,21 @@ struct ExpenseDetailSheet: View {
 
     @ViewBuilder
     private func refundSection(_ expense: Expense) -> some View {
-        Section("Refund") {
+        CardGroup(header: "Refund") {
             switch expense.refund {
             case .notRefundable:
-                Button("Mark as Refundable") { errorMessage = model.markRefundable(expenseID) }
+                action("Mark as Refundable") { errorMessage = model.markRefundable(expenseID) }
                     .accessibilityIdentifier("markRefundableButton")
             case .pending:
                 receivedField
-                Button("Record Received") { record() }
+                action("Record Received") { record() }
                     .accessibilityIdentifier("recordReceivedButton")
-                Button("Unmark as Refundable") { errorMessage = model.unmarkRefundable(expenseID) }
+                action("Unmark as Refundable") { errorMessage = model.unmarkRefundable(expenseID) }
             case .settled(let received):
                 row("Received", IndianMoneyFormat.string(received))
                 receivedField
-                Button("Change Received Amount") { record() }
-                Button("Undo Settlement") { errorMessage = model.undoSettlement(expenseID) }
+                action("Change Received Amount") { record() }
+                action("Undo Settlement") { errorMessage = model.undoSettlement(expenseID) }
                     .accessibilityIdentifier("undoSettlementButton")
             }
         }
@@ -89,6 +86,7 @@ struct ExpenseDetailSheet: View {
     private var receivedField: some View {
         TextField("Amount received", text: $receivedText)
             .keyboardType(.decimalPad)
+            .rowPadding()
             .accessibilityIdentifier("receivedField")
     }
 
@@ -97,11 +95,14 @@ struct ExpenseDetailSheet: View {
         if errorMessage == nil { receivedText = "" }
     }
 
+    private func action(_ title: String, perform: @escaping () -> Void) -> some View {
+        Button(action: perform) { Text(title).foregroundStyle(Theme.blue).rowPadding() }
+            .buttonStyle(.plain)
+    }
+
     private func row(_ title: String, _ value: String) -> some View {
-        HStack {
-            Text(title).foregroundStyle(.secondary)
-            Spacer()
-            Text(value)
+        CardRow(title: title, titleColor: Theme.secondary) {
+            Text(value).multilineTextAlignment(.trailing)
         }
     }
 }

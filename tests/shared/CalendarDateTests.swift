@@ -82,4 +82,18 @@ struct CalendarDateTests {
         #expect(CalendarDate(justAfterMidnightInIndia, calendar: india).isoString == "2026-10-30")
         #expect(CalendarDate(justAfterMidnightInIndia, calendar: utc).isoString == "2026-10-29")
     }
+
+    @Test(arguments: [
+        (2026, 11, 30, 0),
+        (2026, 10, 31, 4),
+        (2026, 2, 28, 0),
+        (2028, 2, 29, 2),
+        (2000, 1, 31, 6),
+    ])
+    func aMonthKnowsItsLengthAndTheWeekdayItStartsOn(year: Int, month: Int, days: Int, firstWeekday: Int) {
+        let yearMonth = CalendarDate.YearMonth(year: year, month: month)
+
+        #expect(yearMonth.dayCount == days)
+        #expect(yearMonth.firstWeekday == firstWeekday)
+    }
 }

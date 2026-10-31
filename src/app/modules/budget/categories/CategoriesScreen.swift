@@ -45,26 +45,12 @@ struct CategoriesScreen: View {
     @State private var errorMessage: String?
 
     var body: some View {
-        List {
+        CardScreen {
             if let errorMessage {
-                Text(errorMessage).foregroundStyle(.red).accessibilityIdentifier("categoryError")
+                Text(errorMessage).foregroundStyle(Theme.red).padding(.horizontal, 18).accessibilityIdentifier("categoryError")
             }
             ForEach(visible, id: \.id) { parent in
-                Section {
-                    ForEach(parent.subCategories, id: \.id) { sub in
-                        Text(sub.name)
-                            .accessibilityIdentifier("subCategoryRow")
-                            .swipeActions {
-                                Button("Delete", role: .destructive) { errorMessage = model.deleteSubCategory(sub.id) }
-                                Button("Rename") { open(.renameSub(sub)) }.tint(.blue)
-                                Button("Merge") {
-                                    mergeSource = sub
-                                    mergeChoices = parent.subCategories.filter { $0.id != sub.id }
-                                }
-                                .tint(.orange)
-                            }
-                    }
-                } header: {
+                VStack(alignment: .leading, spacing: 7) {
                     HStack {
                         Text(parent.name).accessibilityIdentifier("categoryHeader")
                         Spacer()
@@ -73,14 +59,39 @@ struct CategoriesScreen: View {
                             Button("Rename") { open(.renameCategory(parent)) }
                             Button("Delete", role: .destructive) { errorMessage = model.deleteCategory(parent.id) }
                         } label: {
-                            Image(systemName: "ellipsis.circle")
+                            Image(systemName: "ellipsis.circle").font(.body).foregroundStyle(Theme.blue)
+                        }
+                    }
+                    .font(.system(size: 13, weight: .semibold)).foregroundStyle(Theme.secondary)
+                    .padding(.horizontal, 18).padding(.top, 2)
+                    if !parent.subCategories.isEmpty {
+                        CardGroup {
+                            ForEach(parent.subCategories, id: \.id) { sub in
+                                Text(sub.name)
+                                    .rowPadding()
+                                    .accessibilityIdentifier("subCategoryRow")
+                                    .contextMenu {
+                                        Button("Delete", systemImage: "trash", role: .destructive) {
+                                            errorMessage = model.deleteSubCategory(sub.id)
+                                        }
+                                        Button("Rename", systemImage: "pencil") { open(.renameSub(sub)) }
+                                        Button("Merge", systemImage: "arrow.triangle.merge") {
+                                            mergeSource = sub
+                                            mergeChoices = parent.subCategories.filter { $0.id != sub.id }
+                                        }
+                                    }
+                            }
                         }
                     }
                 }
             }
+            if !visible.isEmpty {
+                Text("Touch and hold a sub-category to rename, merge or delete it.")
+                    .font(.footnote).foregroundStyle(Theme.secondary).padding(.horizontal, 18)
+            }
         }
         .searchable(text: $search, prompt: "Search categories")
-        .navigationTitle("Categories")
+        .cardNavigation("Categories")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button("Add Category", systemImage: "plus") { open(.addCategory) }

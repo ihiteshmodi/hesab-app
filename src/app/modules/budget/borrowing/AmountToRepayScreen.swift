@@ -6,53 +6,47 @@ struct AmountToRepayScreen: View {
     @State private var repaying: Int64?
 
     var body: some View {
-        List {
+        CardScreen {
             if let owed = model.amountToRepay {
-                Section {
-                    HStack {
-                        Text("Amount to repay")
-                        Spacer()
-                        Text(IndianMoneyFormat.string(owed.total)).monospacedDigit()
-                            .accessibilityIdentifier("repayTotal")
-                    }
+                CardPanel {
+                    CardCaption("Amount to repay")
+                    Text(IndianMoneyFormat.string(owed.total)).font(.system(size: 34, weight: .bold)).monospacedDigit()
+                        .accessibilityIdentifier("repayTotal")
                 }
                 if owed.borrowings.isEmpty {
                     Text("Nothing borrowed. Add Income with the type Borrowed to track it here.")
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Theme.secondary).padding(.horizontal, 18)
                 }
                 if !owed.lenders.isEmpty {
-                    Section("Owed to") {
+                    CardGroup(header: "Owed to") {
                         ForEach(owed.lenders, id: \.lender) { debt in
-                            HStack {
-                                Text(debt.lender)
-                                Spacer()
+                            CardRow(title: debt.lender) {
                                 Text(IndianMoneyFormat.string(debt.owed)).monospacedDigit()
                             }
                         }
                     }
                 }
-                Section("Borrowings") {
-                    ForEach(owed.borrowings, id: \.borrowing.id) { line in
-                        Button { repaying = line.borrowing.id } label: {
-                            HStack {
-                                VStack(alignment: .leading) {
-                                    Text(line.lender)
-                                    Text("\(line.borrowing.date.shortTitle) · borrowed \(IndianMoneyFormat.string(line.borrowing.amount))")
-                                        .font(.footnote).foregroundStyle(.secondary)
+                if !owed.borrowings.isEmpty {
+                    CardGroup(header: "Borrowings") {
+                        ForEach(owed.borrowings, id: \.borrowing.id) { line in
+                            Button { repaying = line.borrowing.id } label: {
+                                CardRow(
+                                    title: line.lender,
+                                    subtitle: "\(line.borrowing.date.shortTitle) · borrowed \(IndianMoneyFormat.string(line.borrowing.amount))"
+                                ) {
+                                    Text(line.isRepaid ? "Repaid" : IndianMoneyFormat.string(line.owed))
+                                        .foregroundStyle(line.isRepaid ? Theme.green : .primary)
+                                        .monospacedDigit()
                                 }
-                                Spacer()
-                                Text(line.isRepaid ? "Repaid" : IndianMoneyFormat.string(line.owed))
-                                    .foregroundStyle(line.isRepaid ? .green : .primary)
-                                    .monospacedDigit()
                             }
+                            .buttonStyle(.plain)
+                            .accessibilityIdentifier("borrowingRow")
                         }
-                        .buttonStyle(.plain)
-                        .accessibilityIdentifier("borrowingRow")
                     }
                 }
             }
         }
-        .navigationTitle("Amount to Repay")
+        .cardNavigation("Amount to Repay")
         .sheet(item: $repaying) { id in RepaymentSheet(model: model, borrowingID: id) }
     }
 }
@@ -66,32 +60,35 @@ private struct RepaymentSheet: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                TextField("Amount repaid", text: $amountText)
-                    .keyboardType(.decimalPad)
-                    .accessibilityIdentifier("repaymentAmountField")
+            CardScreen {
+                CardGroup {
+                    TextField("Amount repaid", text: $amountText)
+                        .keyboardType(.decimalPad)
+                        .rowPadding()
+                        .accessibilityIdentifier("repaymentAmountField")
+                }
                 if let errorMessage {
-                    Text(errorMessage).foregroundStyle(.red).accessibilityIdentifier("repaymentError")
+                    Text(errorMessage).foregroundStyle(Theme.red).padding(.horizontal, 18)
+                        .accessibilityIdentifier("repaymentError")
                 }
                 if let repayments = model.amountToRepay?.borrowings.first(where: { $0.borrowing.id == borrowingID })?.repayments,
                    !repayments.isEmpty {
-                    Section("Repaid so far") {
+                    CardGroup(header: "Repaid so far", footer: "Touch and hold an entry to delete it.") {
                         ForEach(repayments, id: \.id) { repayment in
-                            HStack {
-                                Text(repayment.date.shortTitle)
-                                Spacer()
+                            CardRow(title: repayment.date.shortTitle) {
                                 Text(IndianMoneyFormat.string(repayment.amount)).monospacedDigit()
                             }
                             .accessibilityIdentifier("repaymentRow")
-                            .swipeActions {
-                                Button("Delete", role: .destructive) { errorMessage = model.deleteRepayment(repayment.id) }
+                            .contextMenu {
+                                Button("Delete", systemImage: "trash", role: .destructive) {
+                                    errorMessage = model.deleteRepayment(repayment.id)
+                                }
                             }
                         }
                     }
                 }
             }
-            .navigationTitle("Record Repayment")
-            .navigationBarTitleDisplayMode(.inline)
+            .cardNavigation("Record Repayment")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {

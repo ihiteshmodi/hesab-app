@@ -1,10 +1,11 @@
 import HisaabCore
-import LocalAuthentication
 import SwiftUI
 
 struct PortfolioScreen: View {
     let model: BudgetViewModel
+    @Environment(\.scenePhase) private var scenePhase
     @State private var hidden = true
+    @State private var authMessage: String?
     @State private var settingBank = false
     @State private var addingHolding = false
     @State private var addingFund = false
@@ -14,99 +15,86 @@ struct PortfolioScreen: View {
 
     var body: some View {
         NavigationStack {
-            List {
-                if let errorMessage { Text(errorMessage).foregroundStyle(.red) }
+            CardScreen {
+                if let errorMessage { Text(errorMessage).foregroundStyle(Theme.red).padding(.horizontal, 18) }
+                if let authMessage {
+                    Text(authMessage).foregroundStyle(Theme.red).padding(.horizontal, 18).accessibilityIdentifier("portfolioAuthMessage")
+                }
                 if let portfolio = model.portfolio {
-                    Section {
-                        VStack(spacing: 4) {
-                            Text("NET WORTH").font(.caption).foregroundStyle(.secondary)
-                            Text(money(portfolio.netWorth)).font(.largeTitle.bold()).monospacedDigit()
-                                .accessibilityIdentifier("netWorth")
-                        }
-                        .frame(maxWidth: .infinity)
+                    CardPanel {
+                        CardCaption("Net worth")
+                        Text(money(portfolio.netWorth)).font(.system(size: 42, weight: .bold)).monospacedDigit()
+                            .lineLimit(1).minimumScaleFactor(0.6)
+                            .accessibilityIdentifier("netWorth")
                         if let warning = portfolio.warning, !hidden {
-                            Text(warning).foregroundStyle(.orange).accessibilityIdentifier("portfolioWarning")
+                            Text(warning).font(.footnote).foregroundStyle(Theme.orange).accessibilityIdentifier("portfolioWarning")
                         }
                     }
-                    Section {
+                    CardGroup {
                         Button { settingBank = true } label: {
-                            HStack {
-                                VStack(alignment: .leading) {
-                                    Text("Bank balance").foregroundStyle(.primary)
-                                    Text(portfolio.bankBalanceAsOf.map { "as of \($0.shortTitle) · tap to update" } ?? "tap to set")
-                                        .font(.footnote).foregroundStyle(.secondary)
-                                }
-                                Spacer()
-                                Text(money(portfolio.bankBalance)).foregroundStyle(.primary).monospacedDigit()
-                                    .accessibilityIdentifier("bankBalance")
+                            CardRow(title: "Bank balance",
+                                    subtitle: portfolio.bankBalanceAsOf.map { "as of \($0.shortTitle) · tap to update" } ?? "tap to set") {
+                                Text(money(portfolio.bankBalance)).monospacedDigit().accessibilityIdentifier("bankBalance")
                             }
                         }
+                        .buttonStyle(.plain)
                         .accessibilityIdentifier("setBankBalanceButton")
                         ForEach(model.ledgers?.ledgers ?? [], id: \.ledger.id) { summary in
                             Toggle(isOn: Binding(
                                 get: { summary.ledger.countsTowardsNetWorth },
                                 set: { errorMessage = model.setLedgerCountsTowardsNetWorth(summary.ledger.id, $0) }
                             )) {
-                                VStack(alignment: .leading) {
+                                VStack(alignment: .leading, spacing: 1) {
                                     Text("\(summary.ledger.name) (counted)")
-                                    Text(money(summary.balance)).font(.footnote).foregroundStyle(.secondary)
+                                    Text(money(summary.balance)).font(.footnote).foregroundStyle(Theme.secondary).monospacedDigit()
                                 }
                             }
+                            .rowPadding()
                             .accessibilityIdentifier("countLedger-\(summary.ledger.name)")
                         }
-                        HStack {
-                            Text("Free to allocate").fontWeight(.semibold)
-                            Spacer()
-                            Text(money(portfolio.availableForAllocation)).monospacedDigit().accessibilityIdentifier("freeToAllocate")
+                        CardRow(title: "Free to allocate") {
+                            Text(money(portfolio.availableForAllocation)).monospacedDigit().fontWeight(.semibold)
+                                .accessibilityIdentifier("freeToAllocate")
                         }
                     }
-                    Section("Allocated") {
+                    CardGroup(header: "Allocated", footer: portfolio.allocatedFunds.isEmpty ? nil : "Touch and hold an allocation to delete it.") {
                         ForEach(portfolio.allocatedFunds, id: \.id) { fund in
-                            HStack { Text(fund.name); Spacer(); Text(money(fund.amount)).monospacedDigit() }
-                                .swipeActions { Button("Delete", role: .destructive) { errorMessage = model.deleteAllocatedFund(fund.id) } }
-                        }
-                        Button("Add Allocation") { addingFund = true }.accessibilityIdentifier("addFundButton")
-                    }
-                    Section("Investments") {
-                        ForEach(portfolio.holdings, id: \.holding.id) { line in
-                            HStack {
-                                VStack(alignment: .leading) {
-                                    Text(line.holding.name)
-                                    if let code = line.holding.currency {
-                                        Text("\(code) \(IndianMoneyFormat.plain(line.holding.amount))").font(.footnote).foregroundStyle(.secondary)
-                                    }
+                            CardRow(title: fund.name) { Text(money(fund.amount)).monospacedDigit() }
+                                .contextMenu {
+                                    Button("Delete", systemImage: "trash", role: .destructive) { errorMessage = model.deleteAllocatedFund(fund.id) }
                                 }
-                                Spacer()
+                        }
+                        addButton("Add Allocation", identifier: "addFundButton") { addingFund = true }
+                    }
+                    CardGroup(header: "Investments", footer: portfolio.holdings.isEmpty ? nil : "Touch and hold an investment to delete it.") {
+                        ForEach(portfolio.holdings, id: \.holding.id) { line in
+                            CardRow(title: line.holding.name,
+                                    subtitle: line.holding.currency.map { "\($0) \(IndianMoneyFormat.plain(line.holding.amount))" }) {
                                 Text(money(line.valueInHome)).monospacedDigit()
                             }
-                            .swipeActions { Button("Delete", role: .destructive) { errorMessage = model.deleteHolding(line.holding.id) } }
-                        }
-                        NavigationLink {
-                            PayoutSchemesScreen(model: model, hidden: hidden)
-                        } label: {
-                            HStack {
-                                Text("Payout schemes")
-                                Spacer()
-                                Text(money(model.payouts.investedTotal)).foregroundStyle(.secondary).monospacedDigit()
+                            .contextMenu {
+                                Button("Delete", systemImage: "trash", role: .destructive) { errorMessage = model.deleteHolding(line.holding.id) }
                             }
                         }
-                        .accessibilityIdentifier("payoutSchemesLink")
-                        Button("Add Investment") { addingHolding = true }.accessibilityIdentifier("addHoldingButton")
+                        LinkRow(title: "Payout schemes", value: money(model.payouts.investedTotal), identifier: "payoutSchemesLink") {
+                            PayoutSchemesScreen(model: model, hidden: hidden)
+                        }
+                        addButton("Add Investment", identifier: "addHoldingButton") { addingHolding = true }
                     }
                     if !portfolio.rates.isEmpty {
-                        Section("Exchange rates") {
+                        CardGroup(header: "Exchange rates") {
                             ForEach(portfolio.rates, id: \.currency) { rate in
-                                HStack {
-                                    Text("1 \(rate.currency)")
-                                    Spacer()
-                                    Text("\(rate.rate) (set \(rate.setOn.shortTitle))").foregroundStyle(.secondary)
+                                CardRow(title: "1 \(rate.currency)") {
+                                    Text("\(rate.rate) (set \(rate.setOn.shortTitle))").foregroundStyle(Theme.secondary)
                                 }
                             }
                         }
                     }
                 }
             }
-            .navigationTitle("Portfolio")
+            .cardNavigation("Portfolio", large: true)
+            .onDisappear { hidden = true }
+            .onChange(of: scenePhase) { if scenePhase != .active { hidden = true } }
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     Button(hidden ? "Show" : "Hide", systemImage: hidden ? "eye" : "eye.slash") { toggle() }
@@ -119,20 +107,21 @@ struct PortfolioScreen: View {
         }
     }
 
+    private func addButton(_ title: String, identifier: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) { Text(title).foregroundStyle(Theme.blue).rowPadding() }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier(identifier)
+    }
+
     private func toggle() {
         guard hidden else { hidden = true; return }
-        if CommandLine.arguments.contains("-ui-testing") {
-            hidden = false
-            return
-        }
-        let context = LAContext()
-        var failure: NSError?
-        guard context.canEvaluatePolicy(.deviceOwnerAuthentication, error: &failure) else {
-            hidden = false
-            return
-        }
-        context.evaluatePolicy(.deviceOwnerAuthentication, localizedReason: "Show your amounts") { ok, _ in
-            Task { @MainActor in if ok { hidden = false } }
+        Task {
+            if await PrivacyGate.authenticate(reason: "Show your amounts") {
+                hidden = false
+                authMessage = nil
+            } else {
+                authMessage = "Try Again"
+            }
         }
     }
 }
@@ -145,12 +134,13 @@ private struct BankBalanceSheet: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                TextField("Bank balance", text: $text).keyboardType(.decimalPad).accessibilityIdentifier("bankBalanceField")
-                if let errorMessage { Text(errorMessage).foregroundStyle(.red) }
+            CardScreen {
+                CardGroup {
+                    TextField("Bank balance", text: $text).keyboardType(.decimalPad).rowPadding().accessibilityIdentifier("bankBalanceField")
+                    if let errorMessage { Text(errorMessage).foregroundStyle(Theme.red).rowPadding() }
+                }
             }
-            .navigationTitle("Bank Balance")
-            .navigationBarTitleDisplayMode(.inline)
+            .cardNavigation("Bank Balance")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
@@ -174,13 +164,14 @@ private struct FundSheet: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                TextField("Name", text: $name).accessibilityIdentifier("fundNameField")
-                TextField("Amount", text: $amountText).keyboardType(.decimalPad).accessibilityIdentifier("fundAmountField")
-                if let errorMessage { Text(errorMessage).foregroundStyle(.red) }
+            CardScreen {
+                CardGroup {
+                    TextField("Name", text: $name).rowPadding().accessibilityIdentifier("fundNameField")
+                    TextField("Amount", text: $amountText).keyboardType(.decimalPad).rowPadding().accessibilityIdentifier("fundAmountField")
+                    if let errorMessage { Text(errorMessage).foregroundStyle(Theme.red).rowPadding() }
+                }
             }
-            .navigationTitle("Add Allocation")
-            .navigationBarTitleDisplayMode(.inline)
+            .cardNavigation("Add Allocation")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
@@ -206,21 +197,26 @@ private struct HoldingSheet: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                TextField("Name", text: $name).accessibilityIdentifier("holdingNameField")
-                TextField("Amount", text: $amountText).keyboardType(.decimalPad).accessibilityIdentifier("holdingAmountField")
-                Picker("Currency", selection: $currency) {
-                    Text("Home currency").tag("")
-                    ForEach(model.currencies.filter { $0.code != model.preferences.homeCurrency }, id: \.code) { Text($0.code).tag($0.code) }
+            CardScreen {
+                CardGroup {
+                    TextField("Name", text: $name).rowPadding().accessibilityIdentifier("holdingNameField")
+                    TextField("Amount", text: $amountText).keyboardType(.decimalPad).rowPadding().accessibilityIdentifier("holdingAmountField")
+                    FieldRow("Currency") {
+                        Picker("Currency", selection: $currency) {
+                            Text("Home currency").tag("")
+                            ForEach(model.currencies.filter { $0.code != model.preferences.homeCurrency }, id: \.code) { Text($0.code).tag($0.code) }
+                        }
+                        .labelsHidden()
+                    }
+                    if !currency.isEmpty {
+                        TextField("Rate (\(model.preferences.homeCurrency) per 1 \(currency))", text: $rateText).keyboardType(.decimalPad)
+                            .rowPadding()
+                            .accessibilityIdentifier("holdingRateField")
+                    }
+                    if let errorMessage { Text(errorMessage).foregroundStyle(Theme.red).rowPadding() }
                 }
-                if !currency.isEmpty {
-                    TextField("Rate (\(model.preferences.homeCurrency) per 1 \(currency))", text: $rateText).keyboardType(.decimalPad)
-                        .accessibilityIdentifier("holdingRateField")
-                }
-                if let errorMessage { Text(errorMessage).foregroundStyle(.red) }
             }
-            .navigationTitle("Add Investment")
-            .navigationBarTitleDisplayMode(.inline)
+            .cardNavigation("Add Investment")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {

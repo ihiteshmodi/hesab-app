@@ -15,36 +15,37 @@ struct PayoutSchemesScreen: View {
     private func money(_ value: Money) -> String { hidden ? "••••••" : IndianMoneyFormat.string(value) }
 
     var body: some View {
-        List {
-            if let errorMessage { Text(errorMessage).foregroundStyle(.red) }
-            if let reminder { Text(reminder).foregroundStyle(.orange).accessibilityIdentifier("schemeReminder") }
-            Section {
-                HStack { Text("Invested"); Spacer(); Text(money(model.payouts.investedTotal)).monospacedDigit() }
-                HStack { Text("Monthly payout"); Spacer(); Text(money(model.payouts.monthlyPayoutTotal)).monospacedDigit() }
+        CardScreen {
+            if let errorMessage { Text(errorMessage).foregroundStyle(Theme.red).padding(.horizontal, 18) }
+            if let reminder { Text(reminder).foregroundStyle(Theme.orange).padding(.horizontal, 18).accessibilityIdentifier("schemeReminder") }
+            CardGroup {
+                CardRow(title: "Invested") { Text(money(model.payouts.investedTotal)).monospacedDigit() }
+                CardRow(title: "Monthly payout") { Text(money(model.payouts.monthlyPayoutTotal)).monospacedDigit() }
             }
-            Section("Schemes") {
-                if model.payouts.schemes.isEmpty { Text("No schemes yet.").foregroundStyle(.secondary) }
+            CardGroup(header: "Schemes", footer: model.payouts.schemes.isEmpty ? nil : "Touch and hold a scheme to record a payout or close it.") {
+                if model.payouts.schemes.isEmpty { Text("No schemes yet.").foregroundStyle(Theme.secondary).rowPadding() }
                 ForEach(model.payouts.schemes, id: \.scheme.id) { line in
                     let scheme = line.scheme
                     HStack {
-                        VStack(alignment: .leading) {
+                        VStack(alignment: .leading, spacing: 1) {
                             HStack {
                                 Text(scheme.name).font(.headline)
-                                if scheme.isClosed { Text("closed").font(.caption).foregroundStyle(.secondary) }
+                                if scheme.isClosed { StatusPill(text: "closed") }
                             }
                             Text("Pays on the \(scheme.payoutDay)th" + (scheme.maturity.map { " · matures \($0.shortTitle)" } ?? ""))
-                                .font(.footnote).foregroundStyle(.secondary)
+                                .font(.footnote).foregroundStyle(Theme.secondary)
                         }
-                        Spacer()
-                        VStack(alignment: .trailing) {
+                        Spacer(minLength: 8)
+                        VStack(alignment: .trailing, spacing: 1) {
                             Text(money(scheme.invested)).monospacedDigit()
-                            Text("\(money(scheme.monthlyPayout)) / month").font(.footnote).foregroundStyle(.green)
+                            Text("\(money(scheme.monthlyPayout)) / month").font(.footnote).foregroundStyle(Theme.green).monospacedDigit()
                         }
                     }
-                    .swipeActions {
+                    .rowPadding()
+                    .contextMenu {
                         if !scheme.isClosed {
-                            Button("Record Payout") { recording = scheme }.tint(.blue)
-                            Button("Close") { closing = scheme }.tint(.red)
+                            Button("Record Payout", systemImage: "indianrupeesign.circle") { recording = scheme }
+                            Button("Close", systemImage: "xmark.circle") { closing = scheme }
                         }
                     }
                     .accessibilityElement(children: .combine)
@@ -52,7 +53,7 @@ struct PayoutSchemesScreen: View {
                 }
             }
         }
-        .navigationTitle("Payout Schemes")
+        .cardNavigation("Payout Schemes")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button("Add Scheme", systemImage: "plus") { adding = true }.accessibilityIdentifier("addSchemeButton")
@@ -82,17 +83,20 @@ private struct NewSchemeSheet: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                TextField("Name", text: $name).accessibilityIdentifier("schemeNameField")
-                TextField("Amount invested", text: $investedText).keyboardType(.decimalPad).accessibilityIdentifier("schemeInvestedField")
-                TextField("Monthly payout", text: $payoutText).keyboardType(.decimalPad).accessibilityIdentifier("schemePayoutField")
-                Stepper("Pays on day \(payoutDay)", value: $payoutDay, in: 1...31)
-                Toggle("Has a maturity date", isOn: $hasMaturity)
-                if hasMaturity { DatePicker("Matures on", selection: $maturity, displayedComponents: .date) }
-                if let errorMessage { Text(errorMessage).foregroundStyle(.red).accessibilityIdentifier("schemeError") }
+            CardScreen {
+                CardGroup {
+                    TextField("Name", text: $name).rowPadding().accessibilityIdentifier("schemeNameField")
+                    TextField("Amount invested", text: $investedText).keyboardType(.decimalPad).rowPadding().accessibilityIdentifier("schemeInvestedField")
+                    TextField("Monthly payout", text: $payoutText).keyboardType(.decimalPad).rowPadding().accessibilityIdentifier("schemePayoutField")
+                    Stepper("Pays on day \(payoutDay)", value: $payoutDay, in: 1...31).rowPadding()
+                    Toggle("Has a maturity date", isOn: $hasMaturity).rowPadding()
+                    if hasMaturity {
+                        FieldRow("Matures on") { DatePicker("Matures on", selection: $maturity, displayedComponents: .date).labelsHidden() }
+                    }
+                    if let errorMessage { Text(errorMessage).foregroundStyle(Theme.red).rowPadding().accessibilityIdentifier("schemeError") }
+                }
             }
-            .navigationTitle("New Scheme")
-            .navigationBarTitleDisplayMode(.inline)
+            .cardNavigation("New Scheme")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
@@ -121,18 +125,15 @@ struct RecordPayoutSheet: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                Section {
-                    LabeledContent("Scheme", value: scheme.name)
-                    TextField("Amount", text: $amountText).keyboardType(.decimalPad).accessibilityIdentifier("payoutAmountField")
-                    DatePicker("Date received", selection: $date, displayedComponents: .date)
-                } footer: {
-                    if !note.isEmpty { Text(note) }
+            CardScreen {
+                CardGroup(footer: note.isEmpty ? nil : note) {
+                    CardRow(title: "Scheme") { Text(scheme.name).foregroundStyle(Theme.secondary) }
+                    TextField("Amount", text: $amountText).keyboardType(.decimalPad).rowPadding().accessibilityIdentifier("payoutAmountField")
+                    FieldRow("Date received") { DatePicker("Date received", selection: $date, displayedComponents: .date).labelsHidden() }
                 }
-                if let errorMessage { Text(errorMessage).foregroundStyle(.red) }
+                if let errorMessage { Text(errorMessage).foregroundStyle(Theme.red).padding(.horizontal, 18) }
             }
-            .navigationTitle("Record Payout")
-            .navigationBarTitleDisplayMode(.inline)
+            .cardNavigation("Record Payout")
             .onAppear {
                 guard let draft = model.payoutDraft(scheme.id) else { return }
                 amountText = IndianMoneyFormat.plain(draft.amount)

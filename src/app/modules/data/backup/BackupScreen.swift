@@ -13,24 +13,28 @@ struct BackupScreen: View {
     @State private var messageIsError = false
 
     var body: some View {
-        List {
-            Section {
-                Button("Export Data", systemImage: "square.and.arrow.up") { export() }
-                    .accessibilityIdentifier("exportDataButton")
-                Button("Import Data", systemImage: "square.and.arrow.down") { choosingFile = true }
-                    .accessibilityIdentifier("importDataButton")
-            } footer: {
-                Text("Your data lives only on this phone. Export it to keep your own copy; nothing leaves the phone unless you share the file.")
+        CardScreen {
+            CardGroup(footer: "Your data lives only on this phone. Export it to keep your own copy; nothing leaves the phone unless you share the file.") {
+                Button { export() } label: {
+                    Label("Export Data", systemImage: "square.and.arrow.up").foregroundStyle(Theme.blue).rowPadding()
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("exportDataButton")
+                Button { choosingFile = true } label: {
+                    Label("Import Data", systemImage: "square.and.arrow.down").foregroundStyle(Theme.blue).rowPadding()
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("importDataButton")
             }
             if let message {
-                Section {
+                CardPanel {
                     Text(message)
-                        .foregroundStyle(messageIsError ? .red : .green)
+                        .foregroundStyle(messageIsError ? Theme.red : Theme.green)
                         .accessibilityIdentifier("backupMessage")
                 }
             }
         }
-        .navigationTitle("Backup")
+        .cardNavigation("Backup")
         .fileExporter(
             isPresented: $exporting, document: exportedFile, contentType: SQLiteDocument.sqlite,
             defaultFilename: exportFileName
