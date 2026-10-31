@@ -73,3 +73,60 @@ Feature: One-time import of a reviewed expense list (Mac tool)
   Scenario: The personal files never reach the repository
     Then the CSV, the aliases and the card list live in an ignored folder
     And the tool's tests use made-up data only
+
+  # Everything the spreadsheet holds, not only expenses. Each extra file is optional.
+  # income.csv: date, amount, kind (salary, savings, investment_income, money_received, borrowed), note
+  # bills.csv: name, amount, category, sub_category, entity, payment, next_due, repeat, ends, automatic, alert, notes
+  # planned.csv: description, amount
+  # ledgers.csv: name, counts_towards_net_worth; ledger_entries.csv: ledger, date, description, amount
+  # portfolio.csv: kind (bank_balance, holding, allocation, scheme), name, amount, currency, rate, date, payout, payout_day, maturity, closed
+  # expenses.csv gains refundable and reimbursed (Yes or No).
+
+  Scenario: Refund flags become refund states
+    Given an expense "Train ticket" of 1,200 that is refundable and reimbursed
+    And an expense "Online order" of 600 that is refundable and not reimbursed
+    And an expense "Milk" of 50 that is neither
+    When Priya runs the tool
+    Then "Train ticket" is settled with 1,200 received
+    And "Online order" is pending with nothing received
+    And "Milk" is not refundable
+
+  Scenario: Income rows keep their kind
+    Given income rows for salary, investment income and savings
+    When Priya runs the tool
+    Then each is saved with its kind and note
+    And "Left to spend" counts salary and investment income and subtracts savings
+
+  Scenario: Zero-amount income rows are skipped and reported
+    Given a savings row of 0 with the note "no investment this month"
+    When Priya runs the tool
+    Then it is not imported
+    And the report lists it with its note
+
+  Scenario: Bills start on the date given and an automatic bill adds nothing on the first launch
+    Given an automatic monthly bill whose next due date is in the future
+    When Priya runs the tool
+    Then the bill exists with that due date
+    And running the automatic bills on the import day adds no expense
+
+  Scenario: Planned items keep their total
+    Given two planned items of 600 and 2,000
+    When Priya runs the tool
+    Then the planned total is 2,600
+
+  Scenario: Ledgers come with their entries and net-worth flag
+    Given a ledger "Aunty" that counts towards net worth with entries 5,000 and -1,200
+    And a ledger "Friend" that does not count
+    When Priya runs the tool
+    Then "Aunty" holds 3,800 and counts towards net worth
+    And "Friend" does not count
+
+  Scenario: The portfolio is rebuilt
+    Given a bank balance, a rupee holding, a 10 USD holding at 80 rupees, an allocation and a scheme with a maturity date
+    When Priya runs the tool
+    Then the bank balance, holdings, allocation and scheme are in the app
+    And net worth equals bank balance minus ledgers and allocations plus investments plus counted ledgers
+
+  Scenario: The report shows every figure to check against the spreadsheet
+    When Priya runs the tool
+    Then it shows refunds settled and pending, the planned total, each ledger balance, investments and net worth
