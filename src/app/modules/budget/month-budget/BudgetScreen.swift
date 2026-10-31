@@ -1,7 +1,7 @@
 import HisaabCore
 import SwiftUI
 
-/// The Activity tab: one card with Spending, Upcoming and Savings, the month's entries and its calendar.
+/// The Activity tab: one card with Spending, Upcoming and Savings, then a switch between the month's expenses, income and calendar.
 struct BudgetScreen: View {
     let model: BudgetViewModel
     @Binding var route: DrawerItem?
@@ -17,6 +17,7 @@ struct BudgetScreen: View {
     @State private var reviewingAutoAdded = false
     @State private var errorMessage: String?
     @State private var pane = ActivityPane.spending
+    @State private var view = ActivityView.expenses
     @State private var revealed = false
     @State private var savingsShown = false
     @State private var authMessage: String?
@@ -24,6 +25,9 @@ struct BudgetScreen: View {
     private var hidden: Bool { model.preferences.hideBalances && !revealed }
 
     private func shown(_ money: Money) -> String { hidden ? "₹ ••••" : IndianMoneyFormat.string(money) }
+
+    /// Income stays masked on every visit, whatever Hide Balances says; the eye is the only way to see it.
+    private func shownIncome(_ money: Money) -> String { revealed ? IndianMoneyFormat.string(money) : "₹ ••••" }
 
     var body: some View {
         NavigationStack {
@@ -133,11 +137,9 @@ struct BudgetScreen: View {
         HStack {
             CardCaption("Left to spend")
             Spacer()
-            if model.preferences.hideBalances {
-                Button(hidden ? "Show" : "Hide", systemImage: hidden ? "eye" : "eye.slash") { revealed.toggle() }
-                    .labelStyle(.iconOnly).buttonStyle(.plain).foregroundStyle(Theme.secondary)
-                    .accessibilityIdentifier("activityEyeButton")
-            }
+            Button(revealed ? "Hide" : "Show", systemImage: revealed ? "eye.slash" : "eye") { revealed.toggle() }
+                .labelStyle(.iconOnly).buttonStyle(.plain).foregroundStyle(Theme.secondary)
+                .accessibilityIdentifier("activityEyeButton")
         }
         Text(shown(budget.leftToSpend))
             .font(.system(size: 42, weight: .bold)).monospacedDigit()
@@ -146,7 +148,7 @@ struct BudgetScreen: View {
             .accessibilityIdentifier("leftToSpend")
         HStack(spacing: 10) {
             tile(shown(budget.spentThisMonth), "Spent in \(monthName(budget.month))", id: "spentThisMonth")
-            tile(shown(budget.incomeThisMonth), "Income in \(monthName(budget.month))", id: "incomeThisMonth")
+            tile(shownIncome(budget.incomeThisMonth), "Income in \(monthName(budget.month))", id: "incomeThisMonth")
         }
         let pending = budget.pendingRefundsEverywhere
         if pending.count > 0 {
@@ -181,34 +183,45 @@ struct BudgetScreen: View {
     }
 
     @ViewBuilder private func entries(_ budget: MonthBudget) -> some View {
+        CardPanel {
+            PillSegments(selection: $view, options: ActivityView.allCases.map { ($0, $0.rawValue) })
+                .accessibilityIdentifier("activityViewPicker")
+        }
         if let errorMessage { Text(errorMessage).foregroundStyle(Theme.red) }
-        if budget.hasNoEntriesAtAll {
+        if budget.hasNoEntriesAtAll, view == .expenses {
             Text("No entries yet. Add your first expense or income.").foregroundStyle(Theme.secondary).padding(.horizontal, 4)
         }
-        if !budget.expenses.isEmpty {
-            CardGroup {
-                ForEach(budget.expenses, id: \.id) { expense in
-                    Button { openedExpense = expense.id } label: {
-                        ExpenseRow(expense: expense, foreignText: expense.foreign.map(model.text))
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityIdentifier("expenseRow")
-                }
-            }
-        }
-        if !budget.incomeEntries.isEmpty {
-            CardGroup(header: "Income", footer: "Touch and hold an entry to delete it.") {
-                ForEach(budget.incomeEntries, id: \.id) { entry in
-                    IncomeRow(entry: entry)
-                        .accessibilityElement(children: .combine)
-                        .accessibilityIdentifier("incomeRow")
-                        .contextMenu {
-                            Button("Delete", systemImage: "trash", role: .destructive) { errorMessage = model.deleteIncome(entry.id) }
+        switch view {
+        case .expenses:
+            if !budget.expenses.isEmpty {
+                CardGroup {
+                    ForEach(budget.expenses, id: \.id) { expense in
+                        Button { openedExpense = expense.id } label: {
+                            ExpenseRow(expense: expense, foreignText: expense.foreign.map(model.text))
                         }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("expenseRow")
+                    }
                 }
             }
+        case .income:
+            if budget.incomeEntries.isEmpty {
+                Text("No income this month.").foregroundStyle(Theme.secondary).padding(.horizontal, 4)
+            } else {
+                CardGroup(footer: "Touch and hold an entry to delete it.") {
+                    ForEach(budget.incomeEntries, id: \.id) { entry in
+                        IncomeRow(entry: entry)
+                            .accessibilityElement(children: .combine)
+                            .accessibilityIdentifier("incomeRow")
+                            .contextMenu {
+                                Button("Delete", systemImage: "trash", role: .destructive) { errorMessage = model.deleteIncome(entry.id) }
+                            }
+                    }
+                }
+            }
+        case .calendar:
+            MonthCalendarCard(budget: budget)
         }
-        MonthCalendarCard(budget: budget)
     }
 
     // MARK: Upcoming
@@ -329,6 +342,13 @@ enum ActivityPane: String, CaseIterable {
     case spending = "Spending"
     case upcoming = "Upcoming"
     case savings = "Savings"
+}
+
+/// What the Spending pane lists below its summary card.
+enum ActivityView: String, CaseIterable {
+    case expenses = "Expenses"
+    case income = "Income"
+    case calendar = "Calendar"
 }
 
 /// How the Upcoming window reads, from its number of days.

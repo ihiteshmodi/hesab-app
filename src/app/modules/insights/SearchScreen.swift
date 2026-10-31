@@ -43,7 +43,8 @@ struct SearchScreen: View {
                 }
             }
             .cardNavigation("Search")
-            .searchable(text: $text, prompt: "Search expenses")
+            // iOS 26 anchors the default field at the bottom, behind the custom tab bar in RootView.
+            .searchable(text: $text, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search expenses")
             .onChange(of: text) { model.search(text) }
             .sheet(item: $openedExpense) { id in ExpenseDetailSheet(model: model, expenseID: id) }
         }

@@ -60,6 +60,8 @@ final class AddExpenseUITests: XCTestCase {
 
         XCTAssertTrue(app.staticTexts["leftToSpend"].waitForExistence(timeout: 20))
         XCTAssertEqual(app.staticTexts["leftToSpend"].label, "₹1,50,000.00")
+        XCTAssertEqual(app.staticTexts["incomeThisMonth"].label, "₹ ••••")
+        app.buttons["activityEyeButton"].tap()
         XCTAssertEqual(app.staticTexts["incomeThisMonth"].label, "₹1,50,000.00")
     }
 
@@ -285,6 +287,7 @@ final class AddExpenseUITests: XCTestCase {
         app.buttons["Salary"].tap()
         app.buttons["saveIncomeButton"].tap()
 
+        app.buttons["Income"].tap()
         let row = app.descendants(matching: .any)["incomeRow"]
         XCTAssertTrue(row.waitForExistence(timeout: 20))
         row.press(forDuration: 1.2)

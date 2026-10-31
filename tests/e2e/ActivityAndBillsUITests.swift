@@ -33,6 +33,7 @@ final class ActivityAndBillsUITests: XCTestCase {
     func testTheMonthCalendarShowsWhatWasSpentToday() {
         let app = launchApp()
         addExpense(app, "1250", "Groceries")
+        app.buttons["Calendar"].tap()
 
         let day = app.descendants(matching: .any)["spentDay-\(today)"]
         XCTAssertTrue(day.waitForExistence(timeout: 20))
@@ -124,6 +125,7 @@ final class ActivityAndBillsUITests: XCTestCase {
         XCTAssertTrue(waitForAbsence(save))
 
         selectTab(app, "Activity")
+        app.buttons["Income"].tap()
         let income = app.descendants(matching: .any)["incomeRow"]
         XCTAssertTrue(income.waitForExistence(timeout: 20))
         XCTAssertTrue(income.label.contains("Investment Income"))
