@@ -24,6 +24,7 @@ Feature: Preferences
     Then those figures show "₹ ••••"
     When she taps the eye on the Activity screen
     Then the figures show until she leaves the screen
+    # Income in the summary card is hidden even with Hide Balances off; see month-budget.feature.
 
   Scenario: The savings bank balance is hidden until she asks
     Given she opens Activity and chooses the Savings tab

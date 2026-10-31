@@ -66,7 +66,28 @@ Feature: What is left to spend, and what was spent this month
     Then "Left to spend" shows 0
     And she sees "No entries yet. Add your first expense or income."
 
-  # Mockup 1: below the list, the month calendar shows what was spent each day.
+  # Below the summary card a switch chooses what the Spending pane lists, so nobody scrolls past one list to reach the other.
+  Scenario: A switch under the summary card chooses between expenses, income and the calendar
+    Given Priya recorded an expense "Weekly groceries" and a salary this month
+    When she opens Activity
+    Then she sees the switch "Expenses", "Income" and "Calendar" with "Expenses" chosen
+    And she sees "Weekly groceries" but not the salary
+    When she chooses "Income"
+    Then she sees the salary but not "Weekly groceries"
+    When she chooses "Calendar"
+    Then she sees the month calendar but neither list
+
+  # The income figure stays out of sight on every visit; Left to spend and Spent stay visible.
+  Scenario: Income in the summary card stays hidden until she taps the eye
+    Given Priya recorded a salary of 1,50,000 this month
+    When she opens Activity
+    Then "Income in October" shows "₹ ••••" while "Left to spend" and "Spent in October" show their amounts
+    When she taps the eye on the Activity screen
+    Then "Income in October" shows "₹1,50,000.00"
+    When she leaves the screen and comes back
+    Then "Income in October" shows "₹ ••••" again
+
+  # Mockup 1: the month calendar shows what was spent each day.
   Scenario: The month calendar shows what was spent each day
     Given Priya spent in October
       | date       | amount | paid with |
