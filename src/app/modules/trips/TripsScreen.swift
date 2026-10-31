@@ -10,18 +10,18 @@ struct TripsScreen: View {
 
     var body: some View {
         NavigationStack {
-            List {
+            CardScreen {
                 if model.trips.isEmpty {
-                    Text("No trips yet. Add one to split what you pay with friends.").foregroundStyle(.secondary)
+                    CardPanel { Text("No trips yet. Add one to split what you pay with friends.").foregroundStyle(Theme.secondary) }
                 }
-                ForEach(open, id: \.trip.id) { row($0) }
+                if !open.isEmpty {
+                    CardGroup { ForEach(open, id: \.trip.id) { row($0) } }
+                }
                 if !settled.isEmpty {
-                    Section("Settled") {
-                        ForEach(settled, id: \.trip.id) { row($0) }
-                    }
+                    CardGroup(header: "Settled") { ForEach(settled, id: \.trip.id) { row($0) } }
                 }
             }
-            .navigationTitle("Trips")
+            .cardNavigation("Trips", large: true)
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     Button("New Trip", systemImage: "plus") { creating = true }
@@ -39,27 +39,29 @@ struct TripsScreen: View {
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
                     Text(summary.trip.name).font(.headline)
-                    if summary.trip.isSettled { Text("Settled").font(.caption).foregroundStyle(.green) }
+                    if summary.trip.isSettled { StatusPill(text: "Settled", tone: .green) }
                     Spacer()
                     VStack(alignment: .trailing) {
                         Text(IndianMoneyFormat.string(summary.netCost)).monospacedDigit()
-                        Text("net cost so far").font(.caption).foregroundStyle(.secondary)
+                        Text("net cost so far").font(.caption).foregroundStyle(Theme.secondary)
                     }
                 }
                 Text((summary.trip.currency ?? "₹") + " · " + (summary.members.isEmpty ? "no people yet" : summary.members.map(\.name).joined(separator: ", ")))
-                    .font(.footnote).foregroundStyle(.secondary)
+                    .font(.footnote).foregroundStyle(Theme.secondary)
                 ForEach(summary.balances.filter { $0.owesMe != .zero }, id: \.person.id) { balance in
                     HStack {
                         Text(balance.owesMe > .zero ? "\(balance.person.name) owes" : "I owe \(balance.person.name)")
-                            .font(.footnote).foregroundStyle(.secondary)
+                            .font(.footnote).foregroundStyle(Theme.secondary)
                         Spacer()
                         Text(amountText(model.tripText(abs(balance.owesMe), summary.trip), approx: summary, balance))
                             .font(.footnote).monospacedDigit()
-                            .foregroundStyle(balance.owesMe > .zero ? Color.green : Color.red)
+                            .foregroundStyle(balance.owesMe > .zero ? Theme.green : Theme.red)
                     }
                 }
             }
+            .rowPadding()
         }
+        .buttonStyle(.plain)
         .accessibilityIdentifier("tripRow")
     }
 
@@ -113,64 +115,66 @@ struct NewTripSheet: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                Section {
-                    TextField("Trip name", text: $name).accessibilityIdentifier("tripNameField")
-                    Picker("Currency", selection: $currency) {
-                        Text("Home currency").tag("")
-                        ForEach(model.currencies.filter { $0.code != model.preferences.homeCurrency }, id: \.code) {
-                            Text($0.code).tag($0.code)
+            CardScreen {
+                CardGroup(footer: currency.isEmpty ? nil : "Used for expenses without a card charge, and for the amounts shown beside balances.") {
+                    TextField("Trip name", text: $name).accessibilityIdentifier("tripNameField").rowPadding()
+                    FieldRow("Currency") {
+                        Picker("Currency", selection: $currency) {
+                            Text("Home currency").tag("")
+                            ForEach(model.currencies.filter { $0.code != model.preferences.homeCurrency }, id: \.code) {
+                                Text($0.code).tag($0.code)
+                            }
+                        }
+                        .labelsHidden()
+                        .accessibilityIdentifier("tripCurrencyPicker")
+                        .onChange(of: currency) {
+                            if !currency.isEmpty, rateText.isEmpty, let last = model.lastRate(for: currency) { rateText = "\(last)" }
                         }
                     }
-                    .accessibilityIdentifier("tripCurrencyPicker")
-                    .onChange(of: currency) {
-                        if !currency.isEmpty, rateText.isEmpty, let last = model.lastRate(for: currency) { rateText = "\(last)" }
-                    }
                     if !currency.isEmpty {
-                        HStack {
-                            Text("Rate (\(model.preferences.homeCurrency) per 1 \(currency))")
-                            Spacer()
+                        FieldRow("Rate (\(model.preferences.homeCurrency) per 1 \(currency))") {
                             TextField("0.0053", text: $rateText).keyboardType(.decimalPad).multilineTextAlignment(.trailing)
                                 .accessibilityIdentifier("tripRateField")
                         }
                     }
-                } footer: {
-                    if !currency.isEmpty {
-                        Text("Used for expenses without a card charge, and for the amounts shown beside balances.")
-                    }
                 }
-                Section {
+                CardGroup(header: "Main ledger entry", footer: "Only the bank and card money of this trip goes to the main ledger, as one entry.") {
                     TextField("\(name.isEmpty ? "Trip" : name) expenses", text: $ledgerName).accessibilityIdentifier("tripLedgerNameField")
-                    Picker("Category", selection: $category) {
-                        Text("Choose").tag("")
-                        ForEach(model.categories, id: \.name) { Text($0.name).tag($0.name) }
+                        .rowPadding()
+                    FieldRow("Category") {
+                        Picker("Category", selection: $category) {
+                            Text("Choose").tag("")
+                            ForEach(model.categories, id: \.name) { Text($0.name).tag($0.name) }
+                        }
+                        .labelsHidden()
+                        .accessibilityIdentifier("tripCategoryPicker")
                     }
-                    .accessibilityIdentifier("tripCategoryPicker")
                     if !subCategories.isEmpty {
-                        Picker("Sub-category", selection: $subCategory) {
-                            Text("None").tag("")
-                            ForEach(subCategories, id: \.self) { Text($0).tag($0) }
+                        FieldRow("Sub-category") {
+                            Picker("Sub-category", selection: $subCategory) {
+                                Text("None").tag("")
+                                ForEach(subCategories, id: \.self) { Text($0).tag($0) }
+                            }
+                            .labelsHidden()
                         }
                     }
-                    Picker("Paid with", selection: $payment) {
-                        ForEach(paymentChoices, id: \.title) { Text($0.title).tag($0) }
+                    FieldRow("Paid with") {
+                        Picker("Paid with", selection: $payment) {
+                            ForEach(paymentChoices, id: \.title) { Text($0.title).tag($0) }
+                        }
+                        .labelsHidden()
                     }
-                    Toggle("Ends on", isOn: $hasEnd)
-                    if hasEnd { DatePicker("End date", selection: $endDate, displayedComponents: .date) }
-                } header: {
-                    Text("Main ledger entry")
-                } footer: {
-                    Text("Only the bank and card money of this trip goes to the main ledger, as one entry.")
+                    Toggle("Ends on", isOn: $hasEnd).rowPadding()
+                    if hasEnd {
+                        FieldRow("End date") { DatePicker("End date", selection: $endDate, displayedComponents: .date).labelsHidden() }
+                    }
                 }
-                if let errorMessage {
-                    Section { Text(errorMessage).foregroundStyle(.red).accessibilityIdentifier("tripError") }
-                }
+                if let errorMessage { Text(errorMessage).foregroundStyle(Theme.red).accessibilityIdentifier("tripError") }
                 if editing != nil {
-                    Section { Button("Delete Trip", role: .destructive) { confirmingDelete = true } }
+                    Button("Delete Trip", role: .destructive) { confirmingDelete = true }.buttonStyle(GreyButtonStyle(tint: Theme.red))
                 }
             }
-            .navigationTitle(editing == nil ? "New Trip" : "Edit Trip")
-            .navigationBarTitleDisplayMode(.inline)
+            .cardNavigation(editing == nil ? "New Trip" : "Edit Trip")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) { Button("Save") { save() }.accessibilityIdentifier("saveTripButton") }

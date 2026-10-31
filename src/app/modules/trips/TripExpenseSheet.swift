@@ -78,36 +78,45 @@ struct TripExpenseSheet: View {
         }
     }
 
+    private var detailsFooter: String? {
+        if trip.currency != nil && paidBy == .me && paidWith == .bank {
+            return "Optional. Gives this expense its real rupee cost; otherwise the trip rate is used."
+        }
+        return paidWith == .cash && paidBy == .me ? "Counts for the split, but takes from cash instead of the main ledger." : nil
+    }
+
     var body: some View {
         NavigationStack {
-            Form {
+            CardScreen {
                 if editing == nil {
-                    HStack {
-                        Text("Expense").fontWeight(.semibold)
-                        Spacer()
-                        Button("Transfer instead") { switchToTransfer() }.accessibilityIdentifier("switchToTransferButton")
+                    CardGroup {
+                        HStack {
+                            Text("Expense").fontWeight(.semibold)
+                            Spacer()
+                            Button("Transfer instead") { switchToTransfer() }.accessibilityIdentifier("switchToTransferButton")
+                        }
+                        .rowPadding()
                     }
                 }
-                Section {
-                    TextField("Title", text: $title).accessibilityIdentifier("tripExpenseTitleField")
-                    HStack {
-                        Text("Amount (\(trip.currency ?? "₹"))")
-                        Spacer()
+                CardGroup(footer: detailsFooter) {
+                    TextField("Title", text: $title).accessibilityIdentifier("tripExpenseTitleField").rowPadding()
+                    FieldRow("Amount (\(trip.currency ?? "₹"))") {
                         TextField("0", text: $amountText).keyboardType(.decimalPad).multilineTextAlignment(.trailing)
                             .accessibilityIdentifier("tripExpenseAmountField")
                     }
                     if trip.currency != nil && paidBy == .me && paidWith == .bank {
-                        HStack {
-                            Text("Card charged me (₹)")
-                            Spacer()
+                        FieldRow("Card charged me (₹)") {
                             TextField("optional", text: $cardText).keyboardType(.decimalPad).multilineTextAlignment(.trailing)
                                 .accessibilityIdentifier("tripExpenseCardField")
                         }
                     }
-                    Picker("Paid by", selection: $paidBy) {
-                        ForEach(participants, id: \.self) { Text(name($0)).tag($0) }
+                    FieldRow("Paid by") {
+                        Picker("Paid by", selection: $paidBy) {
+                            ForEach(participants, id: \.self) { Text(name($0)).tag($0) }
+                        }
+                        .labelsHidden()
+                        .accessibilityIdentifier("tripPaidByPicker")
                     }
-                    .accessibilityIdentifier("tripPaidByPicker")
                     if paidBy == .me {
                         Picker("Paid with", selection: $paidWith) {
                             Text("Card / bank").tag(ExpensePayment.bank)
@@ -115,29 +124,28 @@ struct TripExpenseSheet: View {
                         }
                         .pickerStyle(.segmented)
                         .accessibilityIdentifier("tripPaidWithPicker")
+                        .rowPadding()
                     }
-                    DatePicker("Date", selection: $date, displayedComponents: .date)
+                    FieldRow("Date") { DatePicker("Date", selection: $date, displayedComponents: .date).labelsHidden() }
                     Button { choosingTag = true } label: {
-                        HStack {
-                            Text("Tag").foregroundStyle(.primary)
-                            Spacer()
-                            Text(tag.isEmpty ? "None" : tag).foregroundStyle(.secondary)
-                        }
+                        CardRow(title: "Tag") { Text(tag.isEmpty ? "None" : tag).foregroundStyle(Theme.secondary) }
                     }
+                    .buttonStyle(.plain)
                     .accessibilityIdentifier("tripTagButton")
-                } footer: {
-                    if trip.currency != nil && paidBy == .me && paidWith == .bank {
-                        Text("Optional. Gives this expense its real rupee cost; otherwise the trip rate is used.")
-                    } else if paidWith == .cash && paidBy == .me {
-                        Text("Counts for the split, but takes from cash instead of the main ledger.")
-                    }
                 }
-                Section("Split between") {
+                CardGroup(
+                    header: "Split between",
+                    footer: kind == .items
+                        ? "Tax and service are shared in proportion to what each person ordered."
+                            + (items.isEmpty ? "" : " Touch and hold an item to delete it.")
+                        : nil
+                ) {
                     Picker("Split", selection: $kind) {
                         ForEach(SplitKind.allCases, id: \.self) { Text($0.rawValue).tag($0) }
                     }
                     .pickerStyle(.segmented)
                     .accessibilityIdentifier("tripSplitKindPicker")
+                    .rowPadding()
                     if kind != .items {
                         groupChips
                         ForEach(participants, id: \.self) { who in personRow(who) }
@@ -145,28 +153,26 @@ struct TripExpenseSheet: View {
                         itemsEditor
                     }
                 }
-                Section("Notes and receipt") {
-                    TextField("Notes", text: $note).accessibilityIdentifier("tripNoteField")
+                CardGroup(header: "Notes and receipt") {
+                    TextField("Notes", text: $note).accessibilityIdentifier("tripNoteField").rowPadding()
                     PhotosPicker(selection: $photo, matching: .images) {
                         Label(receipt != nil || (hadReceipt && !receiptTouched) ? "Replace receipt photo" : "Add receipt photo", systemImage: "photo")
                     }
+                    .rowPadding()
                     if CameraPicker.isAvailable {
-                        Button { takingPhoto = true } label: { Label("Take receipt photo", systemImage: "camera") }
+                        Button { takingPhoto = true } label: { Label("Take receipt photo", systemImage: "camera").rowPadding() }
                             .accessibilityIdentifier("takeReceiptPhotoButton")
                     }
                     if receipt != nil || (hadReceipt && !receiptTouched) {
-                        Button("Remove receipt photo", role: .destructive) {
+                        Button(role: .destructive) {
                             receipt = nil
                             receiptTouched = true
-                        }
+                        } label: { Text("Remove receipt photo").rowPadding() }
                     }
                 }
-                if let errorMessage {
-                    Section { Text(errorMessage).foregroundStyle(.red).accessibilityIdentifier("tripExpenseError") }
-                }
+                if let errorMessage { Text(errorMessage).foregroundStyle(Theme.red).accessibilityIdentifier("tripExpenseError") }
             }
-            .navigationTitle(editing == nil ? "Add" : "Edit Expense")
-            .navigationBarTitleDisplayMode(.inline)
+            .cardNavigation(editing == nil ? "Add" : "Edit Expense")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) { Button("Save") { save() }.accessibilityIdentifier("saveTripExpenseButton") }
@@ -204,14 +210,15 @@ struct TripExpenseSheet: View {
                 }
                 chip("Everyone", on: selected == Set(participants)) { selected = Set(participants) }
             }
+            .padding(.horizontal, 18).padding(.vertical, 10)
         }
     }
 
     private func chip(_ title: String, on: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(title).font(.subheadline.weight(.semibold)).padding(.horizontal, 12).padding(.vertical, 6)
-                .background(Capsule().fill(on ? Color.blue : Color.blue.opacity(0.1)))
-                .foregroundStyle(on ? Color.white : Color.blue)
+                .background(Capsule().fill(on ? Theme.blue : Theme.blue.opacity(0.1)))
+                .foregroundStyle(on ? Color.white : Theme.blue)
         }
         .buttonStyle(.plain)
     }
@@ -222,14 +229,14 @@ struct TripExpenseSheet: View {
                 if selected.contains(who) { selected.remove(who) } else { selected.insert(who) }
             } label: {
                 Image(systemName: selected.contains(who) ? "checkmark.circle.fill" : "circle")
-                    .foregroundStyle(selected.contains(who) ? Color.green : Color.secondary)
+                    .foregroundStyle(selected.contains(who) ? Theme.green : Theme.secondary)
             }
             .buttonStyle(.borderless)
             Text(name(who))
             Spacer()
             if selected.contains(who) {
                 switch kind {
-                case .equally: Text(equalShareText).foregroundStyle(.secondary).monospacedDigit()
+                case .equally: Text(equalShareText).foregroundStyle(Theme.secondary).monospacedDigit()
                 case .shares: weightField(who, placeholder: "1", suffix: "shares")
                 case .amounts: weightField(who, placeholder: "0", suffix: "")
                 case .percent: weightField(who, placeholder: "0", suffix: "%")
@@ -237,6 +244,7 @@ struct TripExpenseSheet: View {
                 }
             }
         }
+        .rowPadding()
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("splitRow-\(name(who))")
     }
@@ -251,7 +259,7 @@ struct TripExpenseSheet: View {
             TextField(placeholder, text: Binding(get: { weights[who] ?? "" }, set: { weights[who] = $0 }))
                 .keyboardType(.decimalPad).multilineTextAlignment(.trailing).frame(width: 90)
                 .accessibilityIdentifier("weightField-\(name(who))")
-            if !suffix.isEmpty { Text(suffix).foregroundStyle(.secondary) }
+            if !suffix.isEmpty { Text(suffix).foregroundStyle(Theme.secondary) }
         }
     }
 
@@ -272,15 +280,16 @@ struct TripExpenseSheet: View {
                     }
                 }
             }
+            .rowPadding()
+            .contextMenu {
+                Button("Delete", systemImage: "trash", role: .destructive) { items.removeAll { $0.id == item.id } }
+            }
         }
-        .onDelete { items.remove(atOffsets: $0) }
-        Button("Add Item") { items.append(ItemDraft(people: Set(participants))) }.accessibilityIdentifier("addItemButton")
-        HStack {
-            Text("Tax and service")
-            Spacer()
+        Button { items.append(ItemDraft(people: Set(participants))) } label: { Text("Add Item").rowPadding() }
+            .accessibilityIdentifier("addItemButton")
+        FieldRow("Tax and service") {
             TextField("0", text: $extraText).keyboardType(.decimalPad).multilineTextAlignment(.trailing).frame(width: 110)
         }
-        Text("Tax and service are shared in proportion to what each person ordered.").font(.footnote).foregroundStyle(.secondary)
     }
 
     // MARK: saving
@@ -326,41 +335,39 @@ struct TagPickerSheet: View {
 
     var body: some View {
         NavigationStack {
-            List {
-                Section {
-                    TextField("Type a new tag", text: $typed).accessibilityIdentifier("newTagField")
-                    Button("Use \"\(typed.trimmingCharacters(in: .whitespaces))\"") {
+            CardScreen {
+                CardGroup {
+                    TextField("Type a new tag", text: $typed).accessibilityIdentifier("newTagField").rowPadding()
+                    Button {
                         selection = typed.trimmingCharacters(in: .whitespaces)
                         dismiss()
-                    }
+                    } label: { Text("Use \"\(typed.trimmingCharacters(in: .whitespaces))\"").rowPadding() }
                     .disabled(typed.trimmingCharacters(in: .whitespaces).isEmpty)
                     .accessibilityIdentifier("useNewTagButton")
                 }
-                Section("Pick one") {
-                    Button("None") { selection = ""; dismiss() }
+                CardGroup(header: "Pick one", footer: "Touch and hold a tag you added to delete it.") {
+                    Button { selection = ""; dismiss() } label: { CardRow(title: "None") }.buttonStyle(.plain)
                     ForEach(model.tripTags(), id: \.name) { tag in
                         Button {
                             selection = tag.name
                             dismiss()
                         } label: {
-                            HStack {
-                                Text(tag.name).foregroundStyle(.primary)
-                                Spacer()
-                                if selection == tag.name { Image(systemName: "checkmark") }
+                            CardRow(title: tag.name) {
+                                if selection == tag.name { Image(systemName: "checkmark").foregroundStyle(Theme.blue) }
                             }
                         }
-                        .swipeActions {
+                        .buttonStyle(.plain)
+                        .contextMenu {
                             if !tag.isDefault {
-                                Button("Delete", role: .destructive) { errorMessage = model.deleteTripTag(tag.name) }
+                                Button("Delete", systemImage: "trash", role: .destructive) { errorMessage = model.deleteTripTag(tag.name) }
                             }
                         }
                         .accessibilityIdentifier("tag-\(tag.name)")
                     }
                 }
-                if let errorMessage { Text(errorMessage).foregroundStyle(.red) }
+                if let errorMessage { Text(errorMessage).foregroundStyle(Theme.red) }
             }
-            .navigationTitle("Tag")
-            .navigationBarTitleDisplayMode(.inline)
+            .cardNavigation("Tag")
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } } }
         }
     }

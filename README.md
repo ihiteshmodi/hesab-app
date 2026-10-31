@@ -6,7 +6,7 @@
 
 > Track what is left to spend, where your money went and what you own, in one native app that never goes online. Your data lives in a single SQLite file on your phone.
 
-**Status: early.** Expenses (with category, sub-category, entity, who it was for and tags) and income entries work end to end, and the Budget screen shows what is left to spend and what was spent and earned this month. The rest is specified in [`tests/`](tests) as Gherkin scenarios and will be built feature by feature (see [Roadmap](#roadmap)).
+**Status: in daily use.** Every screen in the approved mockups is built: Activity (Spending, Upcoming, Savings and a month calendar of daily spending), Bills (a calendar of bills and expected payouts with a filter menu, or a list), Portfolio, Reports, Trips and Search, plus a menu drawer for everything else. New requirements are specified in [`tests/`](tests) as Gherkin scenarios first (see [Roadmap](#roadmap)).
 
 ## Why it exists
 
@@ -26,7 +26,7 @@ swift test                # runs the core tests, no simulator needed
 Expected output:
 
 ```text
-✔ Test run with 393 tests in 32 suites passed after 1.4 seconds.
+✔ Test run with 410 tests in 33 suites passed after 1.5 seconds.
 ...
 Built build/Hisaab.ipa
 ```
@@ -82,7 +82,7 @@ MoneyInput.parse("12.345")          // nil: more than two decimals
 
 ### Back up and restore
 
-In the app, open **Backup**: **Export Data** saves `budget-<date>.sqlite`, and **Import Data** replaces the current data with a file exported from the app (a copy of the previous data is kept first as `before-import-<date>.sqlite`). The same from code:
+In the app, open the menu (the round button on Activity) and choose **Export Data** or **Import Data**: Export saves `budget-<date>.sqlite`, and Import replaces the current data with a file exported from the app (a copy of the previous data is kept first as `before-import-<date>.sqlite`). The same from code:
 
 ```swift
 let file = try app.exportData(into: folderURL)                  // budget-2026-10-30.sqlite
@@ -106,6 +106,7 @@ Hisaab needs no environment variables, keys or accounts.
 |---|---|---|---|
 | Database file | `Application Support/Hisaab/hisaab.sqlite` inside the app's own storage | created on first launch | No |
 | Launch argument `-ui-testing` | Uses an empty in-memory database (used by the UI tests) | off | No |
+| Launch arguments `-ui-app-lock`, `-ui-auth-fail` | UI tests only: start with App Lock on, or make Face ID fail | off | No |
 | Bundle identifier | Set in `project.yml` (`app.hisaab.Hisaab`); change it if you sign the app yourself | `app.hisaab.Hisaab` | No |
 | Minimum iOS | Set in `project.yml` and `Package.swift` | 17.0 | No |
 
@@ -138,7 +139,9 @@ Defaults to the month containing today. Returns `leftToSpend` (everything ever r
 - No network code and no network permission.
 - No analytics, accounts or secrets.
 - The repository contains no personal data. A fresh install is empty.
-- Backup and restore is one file you control (planned: export and import in the app).
+- Backup and restore is one file you control (Export Data and Import Data in the menu).
+- **Hide Balances** (Settings) shows ₹ •••• until you tap the eye. The savings bank balance and the Portfolio tab always stay hidden until Face ID (or the passcode) confirms, and hide again when you leave.
+- **App Lock** (Settings) asks for Face ID when the app opens or comes back from the background. It can only be turned on after Face ID succeeds once.
 
 ## How it is built
 
@@ -148,7 +151,7 @@ Defaults to the month containing today. Returns `leftToSpend` (everything ever r
 
 ```text
 src/core/        domain rules, use cases, SQLite repositories (Swift package, no UI)
-src/app/         SwiftUI screens and the composition root
+src/app/         SwiftUI screens and the composition root; src/app/design has the card look from the mockups
 tests/           Gherkin specs (.feature) beside the Swift tests; tests/e2e has simulator UI tests
 docs/design/     impact map, architecture, test strategy
 scripts/         test and IPA build scripts
@@ -158,6 +161,6 @@ Design notes: [impact map](docs/design/budget-app/impact-map.md), [architecture]
 
 ## Roadmap
 
-Built: expenses, income, refunds, planned expenses and bills, categories and entities, search and reports, ledgers, cash in hand, card bills, amount to repay, foreign currencies, backup and restore, a one-time spreadsheet importer, portfolio and net worth, payout schemes with reminders, and trips (split expenses with friends, in any currency, with the main ledger following bank and card money only).
+Built: expenses, income, refunds, planned expenses and bills (with a calendar and filter menu), Activity's Upcoming list and month calendar, categories and entities, search and reports, ledgers, cash in hand, card bills, amount to repay, foreign currencies, backup and restore, a one-time spreadsheet importer, portfolio and net worth, payout schemes with reminders, Hide Balances and App Lock, and trips (split expenses with friends, in any currency, with the main ledger following bank and card money only).
 
 Specified next (see the `.feature` files): spending insights polish and anything you add as a new requirement.

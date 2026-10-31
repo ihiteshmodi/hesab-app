@@ -1,8 +1,14 @@
 import HisaabCore
 import SwiftUI
 
+/// The Bills tab: a month calendar of bills and income, narrowed by the filter menu, or the same as a list.
 struct BillsScreen: View {
     let model: BudgetViewModel
+    @State private var month = CalendarDate(Date()).yearMonth
+    @State private var selectedDay = CalendarDate(Date()).day
+    @State private var filter = BillsFilter.allTransactions
+    @State private var filterOpen = false
+    @State private var showingList = false
     @State private var addingBill = false
     @State private var addingPlanned = false
     @State private var addingSeveral = false
@@ -15,113 +21,37 @@ struct BillsScreen: View {
 
     var body: some View {
         NavigationStack {
-            List {
+            CardScreen {
+                HStack(spacing: 10) {
+                    Button { withAnimation(.easeOut(duration: 0.15)) { filterOpen.toggle() } } label: {
+                        CircleIcon(systemName: "line.3.horizontal", badge: model.attention.badge)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Filter, \(model.attention.badge)")
+                    .accessibilityIdentifier("billsFilterButton")
+                    Text(filter == .allTransactions ? "All Transactions" : filter.title)
+                        .font(.subheadline.weight(.semibold)).foregroundStyle(Theme.secondary)
+                    Spacer()
+                    Button { showingList.toggle() } label: {
+                        CircleIcon(systemName: showingList ? "calendar" : "list.bullet")
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(showingList ? "Calendar" : "List")
+                    .accessibilityIdentifier("billsViewSwitch")
+                }
                 if let errorMessage {
-                    Text(errorMessage).foregroundStyle(.red).accessibilityIdentifier("billsError")
+                    Text(errorMessage).foregroundStyle(Theme.red).accessibilityIdentifier("billsError")
                 }
-                if !model.upcomingIncome.isEmpty {
-                    Section("Upcoming income") {
-                        ForEach(Array(model.upcomingIncome.enumerated()), id: \.offset) { _, item in
-                            HStack {
-                                Text(item.label)
-                                    .font(.footnote)
-                                    .foregroundStyle(item.kind == .payout ? Color.primary : Color.red)
-                                Spacer()
-                                if item.kind == .payout {
-                                    Button("Record") { recordingPayout = item.scheme }
-                                        .buttonStyle(.bordered)
-                                        .accessibilityIdentifier("recordPayoutButton")
-                                }
-                            }
-                            .accessibilityElement(children: .contain)
-                            .accessibilityIdentifier("upcomingIncomeRow")
-                        }
-                    }
-                }
-                Section("Upcoming") {
-                    if model.upcoming.items.isEmpty {
-                        Text("Nothing due soon.").foregroundStyle(.secondary)
-                    }
-                    ForEach(model.upcoming.items, id: \.bill.id) { item in
-                        HStack {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(item.bill.name)
-                                Text(item.label).font(.footnote)
-                                    .foregroundStyle(item.label.hasPrefix("Past") ? Color.red : Color.secondary)
-                            }
-                            Spacer()
-                            Text(IndianMoneyFormat.string(item.bill.amount)).monospacedDigit()
-                            Button("Add") { billToAdd = item.bill.id }
-                                .buttonStyle(.bordered)
-                                .accessibilityIdentifier("addUpcomingBillButton")
-                        }
-                        .accessibilityElement(children: .contain)
-                        .accessibilityIdentifier("upcomingRow")
-                    }
-                    Button("Add Several at Once") { addingSeveral = true }
-                        .accessibilityIdentifier("addSeveralButton")
-                }
-                Section {
-                    if model.planned.items.isEmpty {
-                        Text("Nothing planned yet. Add an expense you know is coming.").foregroundStyle(.secondary)
-                    }
-                    ForEach(model.planned.items, id: \.id) { item in
-                        HStack {
-                            Text(item.description)
-                            Spacer()
-                            Text(IndianMoneyFormat.string(item.amount)).monospacedDigit()
-                            Button("Add") { plannedToAdd = item.id }
-                                .buttonStyle(.bordered)
-                                .accessibilityIdentifier("addPlannedButton")
-                        }
-                        .swipeActions {
-                            Button("Delete", role: .destructive) { errorMessage = model.deletePlanned(item.id) }
-                            Button("Give a Date") { plannedToSchedule = item }.tint(.blue)
-                        }
-                    }
-                    if !model.planned.items.isEmpty {
-                        HStack {
-                            Text("Planned total")
-                            Spacer()
-                            Text(IndianMoneyFormat.string(model.planned.total)).monospacedDigit()
-                                .accessibilityIdentifier("plannedTotal")
-                        }
-                    }
-                } header: {
-                    Text("Planned")
-                }
-                Section("All bills") {
-                    ForEach(model.bills, id: \.bill.id) { summary in
-                        Button { editingBill = summary.bill.id } label: {
-                            HStack {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(summary.bill.name)
-                                    Text(detail(summary)).font(.footnote).foregroundStyle(.secondary)
-                                }
-                                Spacer()
-                                Text(IndianMoneyFormat.string(summary.bill.amount)).monospacedDigit()
-                            }
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityIdentifier("billRow")
-                    }
-                }
-                Section {
-                    NavigationLink {
-                        AutoAddedScreen(model: model)
-                    } label: {
-                        HStack {
-                            Text("Auto-added")
-                            Spacer()
-                            if model.attention.autoAddedUnseen > 0 {
-                                Text("\(model.attention.autoAddedUnseen)").foregroundStyle(.red)
-                            }
-                        }
-                    }
-                    .accessibilityIdentifier("autoAddedLink")
+                if filter == .planned {
+                    planned
+                } else if let calendar = model.billsCalendar(for: month) {
+                    if showingList { list(calendar) } else { calendarView(calendar) }
+                    if [.allTransactions, .income, .upcomingIncome].contains(filter) { upcomingIncome }
+                    if filter != .income, filter != .upcomingIncome, filter != .receivedIncome { allBills }
                 }
             }
-            .navigationTitle("Bills")
+            .cardNavigation("Bills")
+            .overlay(alignment: .topLeading) { if filterOpen { filterMenu } }
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     Menu {
@@ -129,9 +59,12 @@ struct BillsScreen: View {
                             .accessibilityIdentifier("newBillButton")
                         Button("New Planned Item", systemImage: "list.bullet.clipboard") { addingPlanned = true }
                             .accessibilityIdentifier("newPlannedButton")
+                        Button("Add Several at Once", systemImage: "checklist") { addingSeveral = true }
+                            .accessibilityIdentifier("addSeveralMenuButton")
                     } label: {
                         Image(systemName: "plus")
                     }
+                    .accessibilityLabel("Add")
                     .accessibilityIdentifier("billsAddMenu")
                 }
             }
@@ -140,9 +73,7 @@ struct BillsScreen: View {
             .sheet(isPresented: $addingSeveral) { AddSeveralSheet(model: model) }
             .sheet(item: $editingBill) { id in NewBillSheet(model: model, editing: id) }
             .sheet(item: $recordingPayout) { RecordPayoutSheet(model: model, scheme: $0) }
-            .sheet(item: $plannedToSchedule) { item in
-                NewBillSheet(model: model, startingFrom: item)
-            }
+            .sheet(item: $plannedToSchedule) { item in NewBillSheet(model: model, startingFrom: item) }
             .sheet(item: $billToAdd) { id in
                 if let draft = model.billDraft(id) {
                     NewExpenseSheet(model: model, draft: draft) { model.addBillOccurrence(id, $0) }
@@ -159,11 +90,246 @@ struct BillsScreen: View {
         }
     }
 
+    // MARK: calendar
+
+    private func calendarView(_ calendar: BillsCalendar) -> some View {
+        let counts = calendar.counts(filter)
+        let day = min(selectedDay, month.dayCount)
+        return Group {
+            CardPanel(padding: 14) {
+                HStack {
+                    Text(month.title).font(.system(size: 22, weight: .bold)).accessibilityIdentifier("billsMonthTitle")
+                    Spacer()
+                    Button { move(-1) } label: { CircleIcon(systemName: "chevron.left") }
+                        .buttonStyle(.plain).accessibilityLabel("Previous Month").accessibilityIdentifier("billsPreviousMonth")
+                    Button { move(1) } label: { CircleIcon(systemName: "chevron.right") }
+                        .buttonStyle(.plain).accessibilityLabel("Next Month").accessibilityIdentifier("billsNextMonth")
+                }
+                .padding(.horizontal, 6).padding(.bottom, 4)
+                CalendarGrid(month: month) { date in
+                    Button { selectedDay = date } label: {
+                        VStack(spacing: 2) {
+                            Text("\(date)").font(.system(size: 16))
+                            HStack(spacing: 3) {
+                                ForEach(0..<min(counts[date] ?? 0, 3), id: \.self) { _ in
+                                    Circle().fill(date == day ? Color.white : Theme.blue).frame(width: 5, height: 5)
+                                }
+                            }
+                            .frame(height: 6)
+                        }
+                        .foregroundStyle(date == day ? Color.white : Color.primary)
+                        .frame(width: 42, height: 46)
+                        .background(date == day ? Theme.blue : .clear, in: Circle())
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("\(date) \(month.title), \(counts[date] ?? 0) due")
+                    .accessibilityAddTraits(date == day ? .isSelected : [])
+                    .accessibilityIdentifier("billDay-\(date)")
+                }
+            }
+            let items = calendar.items(filter, on: day)
+            if let date = month.date(day: day) {
+                CardGroup(header: date.dayTitle) {
+                    if items.isEmpty {
+                        Text("Nothing on this day.").foregroundStyle(Theme.secondary).rowPadding()
+                            .accessibilityIdentifier("billDayEmpty")
+                    }
+                    ForEach(Array(items.enumerated()), id: \.offset) { _, item in itemRow(item) }
+                }
+            }
+        }
+    }
+
+    private func list(_ calendar: BillsCalendar) -> some View {
+        let items = calendar.items(filter)
+        let days = Array(Set(items.map(\.date))).sorted()
+        return Group {
+            HStack {
+                Button { move(-1) } label: { CircleIcon(systemName: "chevron.left") }
+                    .buttonStyle(.plain).accessibilityLabel("Previous Month").accessibilityIdentifier("billsPreviousMonth")
+                Spacer()
+                Text(month.title).font(.system(size: 20, weight: .bold)).accessibilityIdentifier("billsMonthTitle")
+                Spacer()
+                Button { move(1) } label: { CircleIcon(systemName: "chevron.right") }
+                    .buttonStyle(.plain).accessibilityLabel("Next Month").accessibilityIdentifier("billsNextMonth")
+            }
+            if items.isEmpty {
+                CardPanel { Text("Nothing this month.").foregroundStyle(Theme.secondary) }
+            }
+            ForEach(days, id: \.self) { date in
+                CardGroup(header: date.dayTitle) {
+                    ForEach(Array(items.filter { $0.date == date }.enumerated()), id: \.offset) { _, item in itemRow(item) }
+                }
+            }
+        }
+    }
+
+    private func itemRow(_ item: CalendarItem) -> some View {
+        let row = CardRow(title: item.name, subtitle: item.detail) {
+            Text(IndianMoneyFormat.string(item.amount)).monospacedDigit().font(.system(size: 15.5))
+            if item.canAdd, let id = item.billID {
+                Button("Add") { billToAdd = id }.buttonStyle(AddPillStyle()).accessibilityIdentifier("addCalendarBillButton")
+            } else if item.canRecord, let id = item.schemeID {
+                Button("Record") { recordingPayout = model.payouts.schemes.first { $0.scheme.id == id }?.scheme }
+                    .buttonStyle(AddPillStyle()).accessibilityIdentifier("recordPayoutButton")
+            } else {
+                switch item.kind {
+                case .billNotAdded where item.isAutomatic: StatusPill(text: "Auto")
+                case .billAdded: StatusPill(text: "Added", tone: .green)
+                case .billAutoAdded: StatusPill(text: "Auto-added", tone: .green)
+                case .receivedIncome: StatusPill(text: "Received", tone: .green)
+                default: EmptyView()
+                }
+            }
+        }
+        return Group {
+            if let id = item.billID {
+                row.onTapGesture { editingBill = id }
+            } else {
+                row
+            }
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("billCalendarRow")
+    }
+
+    private func move(_ delta: Int) {
+        month = month.shifted(by: delta)
+        let today = CalendarDate(Date())
+        selectedDay = today.yearMonth == month ? today.day : 1
+    }
+
+    // MARK: lists under the calendar
+
+    @ViewBuilder private var upcomingIncome: some View {
+        if !model.upcomingIncome.isEmpty {
+            CardGroup(header: "Within your alert window") {
+                ForEach(Array(model.upcomingIncome.enumerated()), id: \.offset) { _, item in
+                    HStack(spacing: 8) {
+                        Text(item.label).font(.subheadline)
+                            .foregroundStyle(item.kind == .matured ? Theme.red : Color.primary)
+                        Spacer(minLength: 6)
+                        if item.kind == .payout {
+                            Button("Record") { recordingPayout = item.scheme }
+                                .buttonStyle(AddPillStyle())
+                                .accessibilityIdentifier("recordUpcomingPayoutButton")
+                        }
+                    }
+                    .rowPadding()
+                    .accessibilityElement(children: .contain)
+                    .accessibilityIdentifier("upcomingIncomeRow")
+                }
+            }
+        }
+    }
+
+    @ViewBuilder private var allBills: some View {
+        if !model.bills.isEmpty {
+            CardGroup(header: "All bills", footer: "Tap a bill to change it, change its plan or delete it.") {
+                ForEach(model.bills, id: \.bill.id) { summary in
+                    ButtonRow(title: summary.bill.name, subtitle: detail(summary), value: IndianMoneyFormat.string(summary.bill.amount)) {
+                        editingBill = summary.bill.id
+                    }
+                    .accessibilityIdentifier("billRow")
+                }
+            }
+        }
+        CardGroup {
+            LinkRow(title: "Auto-added", value: model.attention.autoAddedUnseen > 0 ? "\(model.attention.autoAddedUnseen) new" : "",
+                    identifier: "autoAddedLink") { AutoAddedScreen(model: model) }
+        }
+    }
+
+    @ViewBuilder private var planned: some View {
+        CardGroup(header: "Planned (no date)", footer: "Expenses you know are coming but cannot date yet. Touch and hold one to delete it or give it a date.") {
+            if model.planned.items.isEmpty {
+                Text("Nothing planned yet. Add an expense you know is coming.").foregroundStyle(Theme.secondary).rowPadding()
+            }
+            ForEach(model.planned.items, id: \.id) { item in
+                CardRow(title: item.description) {
+                    Text(IndianMoneyFormat.string(item.amount)).monospacedDigit()
+                    Button("Add") { plannedToAdd = item.id }.buttonStyle(AddPillStyle()).accessibilityIdentifier("addPlannedButton")
+                }
+                .contextMenu {
+                    Button("Give a Date", systemImage: "calendar") { plannedToSchedule = item }
+                    Button("Delete", systemImage: "trash", role: .destructive) { errorMessage = model.deletePlanned(item.id) }
+                }
+            }
+            if !model.planned.items.isEmpty {
+                CardRow(title: "Planned total") {
+                    Text(IndianMoneyFormat.string(model.planned.total)).monospacedDigit().fontWeight(.semibold)
+                        .accessibilityIdentifier("plannedTotal")
+                }
+            }
+        }
+        Button("New Planned Item") { addingPlanned = true }.buttonStyle(PrimaryButtonStyle())
+    }
+
     private func detail(_ summary: BillSummary) -> String {
-        var parts = [summary.bill.repeats.title]
+        var parts = [summary.bill.repeats == .never ? "One-off" : summary.bill.repeats.title]
         if let due = summary.nextDue { parts.append("Next due \(due.shortTitle)") } else { parts.append("Ended") }
         if let added = summary.addedLabel { parts.append(added) }
         return parts.joined(separator: " · ")
+    }
+
+    // MARK: the filter menu (mockup 7)
+
+    private var filterMenu: some View {
+        ZStack(alignment: .topLeading) {
+            Color.black.opacity(0.001).ignoresSafeArea().onTapGesture { filterOpen = false }
+            VStack(alignment: .leading, spacing: 0) {
+                ForEach(BillsFilter.allCases, id: \.self) { option in
+                    Button {
+                        filter = option
+                        filterOpen = false
+                    } label: {
+                        HStack(spacing: 10) {
+                            Image(systemName: "checkmark").font(.system(size: 15, weight: .bold))
+                                .opacity(filter == option ? 1 : 0)
+                            Text(option.title).font(.system(size: 17))
+                            Spacer()
+                            count(option)
+                        }
+                        .padding(.vertical, 10).padding(.horizontal, 14)
+                        .padding(.leading, [.notAdded, .added, .autoAdded, .upcomingIncome, .receivedIncome].contains(option) ? 18 : 0)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("filter-\(option.rawValue)")
+                }
+            }
+            .padding(.vertical, 8)
+            .frame(width: 290)
+            .background(Theme.card.opacity(0.98), in: RoundedRectangle(cornerRadius: 26, style: .continuous))
+            .shadow(color: .black.opacity(0.2), radius: 20, y: 14)
+            .padding(.leading, 18).padding(.top, 6)
+        }
+    }
+
+    @ViewBuilder private func count(_ option: BillsFilter) -> some View {
+        let hot: Int = switch option {
+        case .bills: model.attention.dueBills
+        case .autoAdded: model.attention.autoAddedUnseen
+        case .upcomingIncome: model.attention.dueIncome
+        default: 0
+        }
+        if hot > 0 {
+            Text("\(hot)").font(.system(size: 13, weight: .bold)).foregroundStyle(.white)
+                .padding(.horizontal, 8).padding(.vertical, 1).background(Theme.red, in: Capsule())
+                .accessibilityIdentifier("filterCount-\(option.rawValue)")
+        } else if option == .planned, !model.planned.items.isEmpty {
+            Text("\(model.planned.items.count)").font(.system(size: 15)).foregroundStyle(Theme.secondary)
+        }
+    }
+}
+
+private extension CalendarDate {
+    /// "Sun, 1 Nov".
+    var dayTitle: String {
+        let weekday = (yearMonth.firstWeekday + day - 1) % 7
+        let names = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+        return "\(names[weekday]), \(shortTitle)"
     }
 }
 
@@ -176,15 +342,17 @@ private struct NewPlannedSheet: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                TextField("What is coming", text: $description).accessibilityIdentifier("plannedDescriptionField")
-                TextField("Amount", text: $amountText).keyboardType(.decimalPad).accessibilityIdentifier("plannedAmountField")
+            CardScreen {
+                CardGroup {
+                    TextField("What is coming", text: $description).rowPadding().accessibilityIdentifier("plannedDescriptionField")
+                    TextField("Amount", text: $amountText).keyboardType(.decimalPad).rowPadding()
+                        .accessibilityIdentifier("plannedAmountField")
+                }
                 if let errorMessage {
-                    Text(errorMessage).foregroundStyle(.red).accessibilityIdentifier("plannedError")
+                    Text(errorMessage).foregroundStyle(Theme.red).padding(.horizontal, 18).accessibilityIdentifier("plannedError")
                 }
             }
-            .navigationTitle("New Planned Item")
-            .navigationBarTitleDisplayMode(.inline)
+            .cardNavigation("New Planned Item")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
@@ -199,7 +367,8 @@ private struct NewPlannedSheet: View {
     }
 }
 
-private struct AddSeveralSheet: View {
+/// Mockup 12: tick the bills to add for a month and add them together.
+struct AddSeveralSheet: View {
     let model: BudgetViewModel
     @Environment(\.dismiss) private var dismiss
     @State private var month: CalendarDate.YearMonth
@@ -216,44 +385,44 @@ private struct AddSeveralSheet: View {
     var body: some View {
         NavigationStack {
             let choices = model.billsToAdd(for: month)
-            List {
-                Section {
-                    HStack {
-                        Button("Previous Month", systemImage: "chevron.left") { move(-1) }.labelStyle(.iconOnly)
-                        Spacer()
-                        Text(month.title).font(.headline)
-                        Spacer()
-                        Button("Next Month", systemImage: "chevron.right") { move(1) }.labelStyle(.iconOnly)
-                    }
-                    .buttonStyle(.borderless)
+            CardScreen {
+                HStack {
+                    Button { move(-1) } label: { CircleIcon(systemName: "chevron.left") }.buttonStyle(.plain)
+                        .accessibilityLabel("Previous Month")
+                    Spacer()
+                    Text(month.title).font(.headline)
+                    Spacer()
+                    Button { move(1) } label: { CircleIcon(systemName: "chevron.right") }.buttonStyle(.plain)
+                        .accessibilityLabel("Next Month")
                 }
-                Section {
-                    if choices.isEmpty { Text("Nothing to add for this month.").foregroundStyle(.secondary) }
+                CardGroup {
+                    if choices.isEmpty { Text("Nothing to add for this month.").foregroundStyle(Theme.secondary).rowPadding() }
                     ForEach(choices, id: \.bill.id) { choice in
                         Button {
                             if ticked.contains(choice.bill.id) { ticked.remove(choice.bill.id) } else { ticked.insert(choice.bill.id) }
                         } label: {
-                            HStack {
+                            HStack(spacing: 12) {
                                 Image(systemName: choice.alreadyAdded ? "checkmark.circle.fill"
                                       : ticked.contains(choice.bill.id) ? "checkmark.square.fill" : "square")
-                                VStack(alignment: .leading) {
+                                    .foregroundStyle(choice.alreadyAdded ? Theme.green : Theme.blue).font(.title3)
+                                VStack(alignment: .leading, spacing: 1) {
                                     Text(choice.bill.name)
                                     Text(choice.alreadyAdded ? "Added" : choice.dueDate.shortTitle)
-                                        .font(.footnote).foregroundStyle(.secondary)
+                                        .font(.footnote).foregroundStyle(Theme.secondary)
                                 }
                                 Spacer()
                                 Text(IndianMoneyFormat.string(choice.bill.amount)).monospacedDigit()
                             }
+                            .rowPadding()
                         }
                         .buttonStyle(.plain)
                         .disabled(choice.alreadyAdded)
                         .accessibilityIdentifier("severalRow")
                     }
                 }
-                if let errorMessage { Text(errorMessage).foregroundStyle(.red) }
+                if let errorMessage { Text(errorMessage).foregroundStyle(Theme.red) }
             }
-            .navigationTitle("Add Several")
-            .navigationBarTitleDisplayMode(.inline)
+            .cardNavigation("Add Several")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
@@ -274,31 +443,29 @@ private struct AddSeveralSheet: View {
     }
 }
 
+/// Mockup 10: every expense the app added by itself, newest first, each with Undo.
 struct AutoAddedScreen: View {
     let model: BudgetViewModel
     @State private var errorMessage: String?
 
     var body: some View {
-        List {
-            if model.autoAdded.isEmpty {
-                Text("Nothing was added automatically yet.").foregroundStyle(.secondary)
-            }
-            ForEach(model.autoAdded, id: \.occurrenceID) { entry in
-                HStack {
-                    VStack(alignment: .leading) {
-                        Text(entry.billName)
-                        Text("Due \(entry.dueDate.shortTitle)").font(.footnote).foregroundStyle(.secondary)
+        CardScreen {
+            CardGroup {
+                if model.autoAdded.isEmpty {
+                    Text("Nothing was added automatically yet.").foregroundStyle(Theme.secondary).rowPadding()
+                }
+                ForEach(model.autoAdded, id: \.occurrenceID) { entry in
+                    CardRow(title: entry.billName, subtitle: "Due \(entry.dueDate.shortTitle)") {
+                        Text(IndianMoneyFormat.string(entry.amount)).monospacedDigit()
+                        Button("Undo") { errorMessage = model.undoAutoAdded(entry.occurrenceID) }
+                            .buttonStyle(AddPillStyle())
+                            .accessibilityIdentifier("undoAutoAddedButton")
                     }
-                    Spacer()
-                    Text(IndianMoneyFormat.string(entry.amount)).monospacedDigit()
-                    Button("Undo") { errorMessage = model.undoAutoAdded(entry.occurrenceID) }
-                        .buttonStyle(.bordered)
-                        .accessibilityIdentifier("undoAutoAddedButton")
                 }
             }
-            if let errorMessage { Text(errorMessage).foregroundStyle(.red) }
+            if let errorMessage { Text(errorMessage).foregroundStyle(Theme.red) }
         }
-        .navigationTitle("Auto-added")
+        .cardNavigation("Auto-added")
         .onAppear { model.markAutoAddedSeen() }
     }
 }

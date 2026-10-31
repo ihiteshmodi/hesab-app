@@ -65,3 +65,20 @@ Feature: What is left to spend, and what was spent this month
     When she opens the Budget tab
     Then "Left to spend" shows 0
     And she sees "No entries yet. Add your first expense or income."
+
+  # Mockup 1: below the list, the month calendar shows what was spent each day.
+  Scenario: The month calendar shows what was spent each day
+    Given Priya spent in October
+      | date       | amount | paid with |
+      | 2026-10-01 | 9,000  | UPI       |
+      | 2026-10-01 | 200    | UPI       |
+      | 2026-10-02 | 261    | UPI       |
+      | 2026-10-03 | 300    | Cash      |
+    When she views October
+    Then the calendar shows 9,200 on 1 Oct and 261 on 2 Oct
+    And 3 Oct shows nothing because cash does not count in "Spent this month"
+    And the days add up to "Spent this month"
+
+  Scenario: The calendar starts the month on its weekday
+    When she views November 2026
+    Then the calendar has 30 days and 1 Nov sits under Sunday

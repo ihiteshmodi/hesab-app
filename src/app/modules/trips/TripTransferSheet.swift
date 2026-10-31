@@ -14,6 +14,9 @@ struct TripTransferSheet: View {
     @State private var full = false
     @State private var date = Date()
     @State private var errorMessage: String?
+    @FocusState private var focused: Field?
+
+    private enum Field { case amount, rate }
 
     init(model: BudgetViewModel, summary: TripSummary, personID: Int64?, switchToExpense: @escaping () -> Void) {
         self.model = model
@@ -47,25 +50,32 @@ struct TripTransferSheet: View {
 
     var body: some View {
         NavigationStack {
-            Form {
+            CardScreen {
                 HStack {
-                    Button("Expense instead") { switchToExpense() }
+                    Button("Cancel") { dismiss() }.buttonStyle(.borderless).accessibilityIdentifier("cancelTransferButton")
                     Spacer()
                     Text("Transfer").fontWeight(.semibold)
+                    Spacer()
+                    Button("Expense") { switchToExpense() }.buttonStyle(.borderless).accessibilityIdentifier("switchToExpenseButton")
                 }
-                Section {
-                    Picker("Person", selection: $personID) {
-                        ForEach(summary.members, id: \.id) { Text($0.name).tag($0.id) }
+                .padding(.horizontal, 4).padding(.top, 8)
+                CardGroup {
+                    FieldRow("Person") {
+                        Picker("Person", selection: $personID) {
+                            ForEach(summary.members, id: \.id) { Text($0.name).tag($0.id) }
+                        }
+                        .labelsHidden()
+                        .accessibilityIdentifier("transferPersonPicker")
                     }
-                    .accessibilityIdentifier("transferPersonPicker")
                     Picker("Direction", selection: $direction) {
                         Text("They paid me").tag(SettlementDirection.theyPaidMe)
                         Text("I paid them").tag(SettlementDirection.iPaidThem)
                     }
                     .pickerStyle(.segmented)
                     .accessibilityIdentifier("transferDirectionPicker")
+                    .rowPadding()
                 }
-                Section("How") {
+                CardGroup(header: "How") {
                     Picker("How", selection: $method) {
                         Text("Bank / UPI").tag(SettlementMethod.bank)
                         Text("Cash \(home)").tag(SettlementMethod.cashHome)
@@ -73,42 +83,50 @@ struct TripTransferSheet: View {
                     }
                     .pickerStyle(.segmented)
                     .accessibilityIdentifier("transferMethodPicker")
-                    Toggle("Settle in full", isOn: $full).accessibilityIdentifier("settleInFullToggle")
-                    HStack {
-                        Text(direction == .theyPaidMe ? "I received (\(method == .cashTrip ? trip.currency ?? "" : home))"
-                             : "I paid (\(method == .cashTrip ? trip.currency ?? "" : home))")
-                        Spacer()
+                    .rowPadding()
+                    Toggle("Settle in full", isOn: $full).accessibilityIdentifier("settleInFullToggle").rowPadding()
+                    FieldRow(direction == .theyPaidMe ? "I received (\(method == .cashTrip ? trip.currency ?? "" : home))"
+                             : "I paid (\(method == .cashTrip ? trip.currency ?? "" : home))") {
                         TextField("0", text: $amountText).keyboardType(.decimalPad).multilineTextAlignment(.trailing)
+                            .focused($focused, equals: .amount)
                             .accessibilityIdentifier("transferAmountField")
                     }
                     if foreign && method != .cashTrip {
-                        HStack {
-                            Text("Rate (\(home) per 1 \(trip.currency ?? ""))")
-                            Spacer()
+                        FieldRow("Rate (\(home) per 1 \(trip.currency ?? ""))") {
                             TextField("rate", text: $rateText).keyboardType(.decimalPad).multilineTextAlignment(.trailing)
+                                .focused($focused, equals: .rate)
                                 .accessibilityIdentifier("transferRateField")
                         }
                     }
-                    DatePicker(direction == .theyPaidMe ? "Date received" : "Date paid", selection: $date, in: ...Date(), displayedComponents: .date)
-                        .accessibilityIdentifier("transferDatePicker")
+                    FieldRow(direction == .theyPaidMe ? "Date received" : "Date paid") {
+                        DatePicker(direction == .theyPaidMe ? "Date received" : "Date paid", selection: $date, in: ...Date(), displayedComponents: .date)
+                            .labelsHidden()
+                            .accessibilityIdentifier("transferDatePicker")
+                    }
                 }
                 if let amount, amount > .zero { effect(amount) }
-                if let errorMessage {
-                    Section { Text(errorMessage).foregroundStyle(.red).accessibilityIdentifier("transferError") }
-                }
+                if let errorMessage { Text(errorMessage).foregroundStyle(Theme.red).accessibilityIdentifier("transferError") }
             }
-            .navigationTitle("Transfer")
-            .navigationBarTitleDisplayMode(.inline)
+            .toolbar(.hidden, for: .navigationBar)
+            .safeAreaInset(edge: .bottom) {
+                Button("Save Transfer") { save() }
+                    .buttonStyle(PrimaryButtonStyle())
+                    .padding(.horizontal, 18).padding(.vertical, 10)
+                    .background(Theme.background)
+                    .accessibilityIdentifier("saveTransferButton")
+            }
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
-                ToolbarItem(placement: .confirmationAction) { Button("Save") { save() }.accessibilityIdentifier("saveTransferButton") }
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("Done") { focused = nil }.accessibilityIdentifier("keyboardDoneButton")
+                }
             }
         }
     }
 
     private func effect(_ amount: Money) -> some View {
         let name = summary.members.first { $0.id == personID }?.name ?? "They"
-        return Section("What this changes") {
+        return CardGroup(header: "What this changes") {
             if let clears {
                 let after = outstanding - clears
                 let text = full
@@ -132,15 +150,12 @@ struct TripTransferSheet: View {
                 effectRow("\(trip.currency ?? "") cash", (direction == .theyPaidMe ? "+ " : "− ") + model.tripText(amount, trip))
             }
         }
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("transferEffect")
     }
 
     private func effectRow(_ title: String, _ value: String) -> some View {
-        HStack {
-            Text(title).foregroundStyle(.secondary)
-            Spacer()
-            Text(value).monospacedDigit()
-        }
+        CardRow(title: title, titleColor: Theme.secondary) { Text(value).monospacedDigit() }
     }
 
     private func save() {

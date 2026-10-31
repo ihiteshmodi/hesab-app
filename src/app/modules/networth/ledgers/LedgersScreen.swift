@@ -6,38 +6,31 @@ struct LedgersScreen: View {
     @State private var adding = false
 
     var body: some View {
-        List {
+        CardScreen {
             if let overview = model.ledgers {
                 if overview.ledgers.isEmpty {
-                    Text("No ledgers yet. Add one for each person whose money you hold.")
-                        .foregroundStyle(.secondary)
+                    CardPanel {
+                        Text("No ledgers yet. Add one for each person whose money you hold.")
+                            .foregroundStyle(Theme.secondary)
+                    }
                 } else {
-                    Section {
-                        HStack {
-                            Text("Held for others")
-                            Spacer()
+                    CardGroup {
+                        CardRow(title: "Held for others") {
                             Text(IndianMoneyFormat.string(overview.total)).monospacedDigit()
                                 .accessibilityIdentifier("ledgersTotal")
                         }
                     }
-                    Section {
+                    CardGroup {
                         ForEach(overview.ledgers, id: \.ledger.id) { summary in
-                            NavigationLink {
+                            LinkRow(title: summary.ledger.name, value: IndianMoneyFormat.string(summary.balance), identifier: "ledgerRow") {
                                 LedgerDetailScreen(model: model, ledgerID: summary.ledger.id)
-                            } label: {
-                                HStack {
-                                    Text(summary.ledger.name)
-                                    Spacer()
-                                    Text(IndianMoneyFormat.string(summary.balance)).monospacedDigit()
-                                }
                             }
-                            .accessibilityIdentifier("ledgerRow")
                         }
                     }
                 }
             }
         }
-        .navigationTitle("Ledgers")
+        .cardNavigation("Ledgers")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button("Add Ledger", systemImage: "plus") { adding = true }
@@ -57,15 +50,16 @@ private struct NewLedgerSheet: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                TextField("Person", text: $name).accessibilityIdentifier("ledgerNameField")
-                Toggle("Counts towards my net worth", isOn: $countsTowardsNetWorth)
-                if let errorMessage {
-                    Text(errorMessage).foregroundStyle(.red).accessibilityIdentifier("ledgerError")
+            CardScreen {
+                CardGroup {
+                    TextField("Person", text: $name).rowPadding().accessibilityIdentifier("ledgerNameField")
+                    Toggle("Counts towards my net worth", isOn: $countsTowardsNetWorth).rowPadding()
+                    if let errorMessage {
+                        Text(errorMessage).foregroundStyle(Theme.red).rowPadding().accessibilityIdentifier("ledgerError")
+                    }
                 }
             }
-            .navigationTitle("New Ledger")
-            .navigationBarTitleDisplayMode(.inline)
+            .cardNavigation("New Ledger")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
@@ -93,42 +87,34 @@ struct LedgerDetailScreen: View {
     }
 
     var body: some View {
-        List {
+        CardScreen {
             if let summary {
-                Section {
-                    HStack {
-                        Text("Balance")
-                        Spacer()
+                CardGroup {
+                    CardRow(title: "Balance") {
                         Text(IndianMoneyFormat.string(summary.balance)).monospacedDigit()
                             .accessibilityIdentifier("ledgerBalance")
                     }
                 }
-                Section("Entries") {
+                CardGroup(header: "Entries", footer: summary.lines.isEmpty ? nil : "Touch and hold an entry to delete it.") {
                     ForEach(Array(summary.lines.enumerated()), id: \.offset) { _, line in
-                        HStack {
-                            VStack(alignment: .leading) {
-                                Text(line.description)
-                                Text(line.date.shortTitle).font(.footnote).foregroundStyle(.secondary)
-                            }
-                            Spacer()
+                        CardRow(title: line.description, subtitle: line.date.shortTitle) {
                             Text(IndianMoneyFormat.string(line.amount)).monospacedDigit()
                         }
-                        .swipeActions {
+                        .contextMenu {
                             if let entryID = line.entryID {
-                                Button("Delete", role: .destructive) { errorMessage = model.deleteLedgerEntry(entryID) }
+                                Button("Delete", systemImage: "trash", role: .destructive) { errorMessage = model.deleteLedgerEntry(entryID) }
                             }
                         }
                     }
                 }
                 if let errorMessage {
-                    Section { Text(errorMessage).foregroundStyle(.red) }
+                    CardPanel { Text(errorMessage).foregroundStyle(Theme.red) }
                 }
-                Section {
-                    Button("Delete Ledger", role: .destructive) { confirmingDelete = true }
-                }
+                Button("Delete Ledger", role: .destructive) { confirmingDelete = true }
+                    .buttonStyle(GreyButtonStyle(tint: Theme.red))
             }
         }
-        .navigationTitle(summary?.ledger.name ?? "Ledger")
+        .cardNavigation(summary?.ledger.name ?? "Ledger")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button("Add Entry", systemImage: "plus") { addingEntry = true }
@@ -157,26 +143,34 @@ private struct NewLedgerEntrySheet: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                TextField("What for", text: $description)
-                TextField("Amount", text: $amountText)
-                    .keyboardType(.decimalPad)
-                    .accessibilityIdentifier("ledgerEntryAmountField")
-                Picker("Direction", selection: $moneyOut) {
-                    Text("Money in").tag(false)
-                    Text("Money out").tag(true)
+            CardScreen {
+                CardGroup {
+                    TextField("What for", text: $description).rowPadding()
+                    TextField("Amount", text: $amountText)
+                        .keyboardType(.decimalPad)
+                        .rowPadding()
+                        .accessibilityIdentifier("ledgerEntryAmountField")
+                    FieldRow("Direction") {
+                        Picker("Direction", selection: $moneyOut) {
+                            Text("Money in").tag(false)
+                            Text("Money out").tag(true)
+                        }
+                        .pickerStyle(.segmented)
+                        .labelsHidden()
+                        .fixedSize()
+                    }
+                    if let errorMessage {
+                        Text(errorMessage).foregroundStyle(Theme.red).rowPadding().accessibilityIdentifier("ledgerEntryError")
+                    }
+                    if let warning {
+                        Text(warning).foregroundStyle(Theme.orange).rowPadding().accessibilityIdentifier("ledgerWarning")
+                    }
                 }
-                .pickerStyle(.segmented)
-                if let errorMessage {
-                    Text(errorMessage).foregroundStyle(.red).accessibilityIdentifier("ledgerEntryError")
-                }
-                if let warning {
-                    Text(warning).foregroundStyle(.orange).accessibilityIdentifier("ledgerWarning")
-                    Button("Done") { dismiss() }
+                if warning != nil {
+                    Button("Done") { dismiss() }.buttonStyle(PrimaryButtonStyle())
                 }
             }
-            .navigationTitle("New Entry")
-            .navigationBarTitleDisplayMode(.inline)
+            .cardNavigation("New Entry")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {

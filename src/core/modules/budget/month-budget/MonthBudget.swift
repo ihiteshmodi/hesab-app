@@ -4,6 +4,8 @@ public struct MonthBudget: Equatable, Sendable {
     public let leftToSpend: Money
     /// Bank-side spending in the viewed month; cash and ledger spending are left out.
     public let spentThisMonth: Money
+    /// Day of the month to what counted in "Spent this month" that day; days with nothing are left out.
+    public let spentByDay: [Int: Money]
     public let incomeThisMonth: Money
     /// Every expense of the viewed month, newest first.
     public let expenses: [Expense]
@@ -39,6 +41,9 @@ public struct MonthBudget: Equatable, Sendable {
         self.expenses = expensesInMonth
         self.incomeEntries = incomeInMonth
         self.spentThisMonth = expensesInMonth.reduce(.zero) { $0 + spentSpend($1) }
+        self.spentByDay = Dictionary(grouping: expensesInMonth, by: \.date.day)
+            .mapValues { $0.reduce(Money.zero) { $0 + spentSpend($1) } }
+            .filter { $0.value != .zero }
         self.incomeThisMonth = incomeInMonth.filter { countsAsIncome($0.kind) }.reduce(.zero) { $0 + $1.amount }
         let moneyIn = allIncome.filter(\.kind.addsToLeftToSpend).reduce(Money.zero) { $0 + $1.amount }
         let savings = allIncome.filter { !$0.kind.addsToLeftToSpend }.reduce(Money.zero) { $0 + $1.amount }

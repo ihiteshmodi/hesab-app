@@ -8,17 +8,12 @@ struct ReportsScreen: View {
     var body: some View {
         NavigationStack {
             let report = model.report
-            List {
-                Section {
-                    Picker("Group by", selection: Binding(
+            CardScreen {
+                CardPanel {
+                    PillSegments(selection: Binding(
                         get: { model.reportGrouping },
                         set: { model.showReport(grouping: $0, month: model.reportMonth, allTime: model.reportAllTime) }
-                    )) {
-                        Text("Category").tag(BreakdownGrouping.category)
-                        Text("Payment Method").tag(BreakdownGrouping.paymentMethod)
-                        Text("Entity").tag(BreakdownGrouping.entity)
-                    }
-                    .pickerStyle(.segmented)
+                    ), options: [(BreakdownGrouping.category, "Category"), (.paymentMethod, "Payment"), (.entity, "Entity")])
                     .accessibilityIdentifier("groupingPicker")
                     HStack {
                         Button("Previous Month", systemImage: "chevron.left") { move(-1) }
@@ -32,36 +27,40 @@ struct ReportsScreen: View {
                             .accessibilityIdentifier("nextReportMonth")
                     }
                     .buttonStyle(.borderless)
+                    .padding(.vertical, 6)
                     Toggle("All Time", isOn: Binding(
                         get: { model.reportAllTime },
                         set: { model.showReport(grouping: model.reportGrouping, month: model.reportMonth, allTime: $0) }
                     ))
                     .accessibilityIdentifier("allTimeToggle")
-                }
-                if report.isEmpty {
-                    Text("No spending in \(model.reportAllTime ? "this period" : monthName).")
-                        .foregroundStyle(.secondary)
-                        .accessibilityIdentifier("noSpending")
-                } else {
-                    Section {
+                    if report.isEmpty {
+                        Text("No spending in \(model.reportAllTime ? "this period" : monthName).")
+                            .foregroundStyle(Theme.secondary)
+                            .padding(.top, 6)
+                            .accessibilityIdentifier("noSpending")
+                    } else {
                         Chart(report.rows, id: \.name) { row in
                             SectorMark(angle: .value("Amount", Double(row.amount.paise) / 100), innerRadius: .ratio(0.6))
                                 .foregroundStyle(by: .value("Name", row.name))
                         }
                         .frame(height: 200)
+                        .padding(.vertical, 8)
                         HStack {
-                            Text("Total")
+                            Text("Total").fontWeight(.semibold)
                             Spacer()
-                            Text(IndianMoneyFormat.string(report.total)).monospacedDigit()
+                            Text(IndianMoneyFormat.string(report.total)).monospacedDigit().fontWeight(.semibold)
                                 .accessibilityIdentifier("reportTotal")
                         }
                     }
-                    Section {
+                }
+                if !report.isEmpty {
+                    CardGroup {
                         ForEach(report.rows, id: \.name) { row in
                             if model.reportGrouping == .category {
                                 NavigationLink {
                                     CategoryReportScreen(model: model, category: row.name)
-                                } label: { line(row) }
+                                } label: { line(row, chevron: true) }
+                                .buttonStyle(.plain)
                                 .accessibilityIdentifier("reportRow")
                             } else {
                                 line(row).accessibilityIdentifier("reportRow")
@@ -70,18 +69,17 @@ struct ReportsScreen: View {
                     }
                 }
             }
-            .navigationTitle("Reports")
+            .cardNavigation("Reports")
         }
     }
 
     private var monthName: String { String(model.reportMonth.title.split(separator: " ").first ?? "") }
 
-    private func line(_ row: BreakdownRow) -> some View {
-        HStack {
-            Text(row.name)
-            Spacer()
-            Text("\(row.sharePercent)%").foregroundStyle(.secondary)
+    private func line(_ row: BreakdownRow, chevron: Bool = false) -> some View {
+        CardRow(title: row.name) {
+            Text("\(row.sharePercent)%").foregroundStyle(Theme.secondary)
             Text(IndianMoneyFormat.string(row.amount)).monospacedDigit()
+            if chevron { Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary) }
         }
     }
 
@@ -95,31 +93,22 @@ struct CategoryReportScreen: View {
     let category: String
 
     var body: some View {
-        List {
+        CardScreen {
             if let detail = model.categoryBreakdown(category) {
-                Section("Sub-categories") {
+                CardGroup(header: "Sub-categories") {
                     ForEach(detail.rows, id: \.name) { row in
-                        HStack {
-                            Text(row.name)
-                            Spacer()
-                            Text(IndianMoneyFormat.string(row.amount)).monospacedDigit()
-                        }
+                        CardRow(title: row.name) { Text(IndianMoneyFormat.string(row.amount)).monospacedDigit() }
                     }
                 }
-                Section("Expenses") {
+                CardGroup(header: "Expenses") {
                     ForEach(detail.expenses, id: \.id) { expense in
-                        HStack {
-                            VStack(alignment: .leading) {
-                                Text(expense.description)
-                                Text(expense.date.shortTitle).font(.footnote).foregroundStyle(.secondary)
-                            }
-                            Spacer()
+                        CardRow(title: expense.description, subtitle: expense.date.shortTitle) {
                             Text(IndianMoneyFormat.string(expense.netAmount)).monospacedDigit()
                         }
                     }
                 }
             }
         }
-        .navigationTitle(category)
+        .cardNavigation(category)
     }
 }

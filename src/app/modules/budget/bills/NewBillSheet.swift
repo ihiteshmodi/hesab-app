@@ -24,6 +24,7 @@ struct NewBillSheet: View {
     @State private var errorMessage: String?
     @State private var confirmingDelete = false
     @State private var changingPlan = false
+    @FocusState private var typing: Bool
 
     init(model: BudgetViewModel, editing id: Int64? = nil, startingFrom item: PlannedItem? = nil) {
         self.model = model
@@ -64,59 +65,86 @@ struct NewBillSheet: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                Section {
-                    TextField("Name", text: $name).accessibilityIdentifier("billNameField")
+            CardScreen {
+                CardGroup {
+                    TextField("Name", text: $name).focused($typing).rowPadding().accessibilityIdentifier("billNameField")
                     TextField("Amount", text: $amountText)
                         .keyboardType(.decimalPad)
+                        .focused($typing)
+                        .rowPadding()
                         .accessibilityIdentifier("billAmountField")
-                    Picker("Category", selection: $category) {
-                        Text("Choose").tag("")
-                        ForEach(model.categories, id: \.name) { Text($0.name).tag($0.name) }
+                    FieldRow("Category") {
+                        Picker("Category", selection: $category) {
+                            Text("Choose").tag("")
+                            ForEach(model.categories, id: \.name) { Text($0.name).tag($0.name) }
+                        }
+                        .labelsHidden()
+                        .accessibilityIdentifier("billCategoryPicker")
                     }
-                    .accessibilityIdentifier("billCategoryPicker")
                     if !subCategories.isEmpty {
-                        Picker("Sub-category", selection: $subCategory) {
-                            Text("None").tag("")
-                            ForEach(subCategories, id: \.self) { Text($0).tag($0) }
+                        FieldRow("Sub-category") {
+                            Picker("Sub-category", selection: $subCategory) {
+                                Text("None").tag("")
+                                ForEach(subCategories, id: \.self) { Text($0).tag($0) }
+                            }
+                            .labelsHidden()
                         }
                     }
-                    Picker("Paid with", selection: $payment) {
-                        ForEach(paymentChoices, id: \.title) { Text($0.title).tag($0) }
+                    FieldRow("Paid with") {
+                        Picker("Paid with", selection: $payment) {
+                            ForEach(paymentChoices, id: \.title) { Text($0.title).tag($0) }
+                        }
+                        .labelsHidden()
                     }
-                    TextField("Shop or person (optional)", text: $entity)
+                    TextField("Shop or person (optional)", text: $entity).rowPadding()
                 }
-                Section {
-                    DatePicker("Due date", selection: $dueDate, displayedComponents: .date)
-                    Picker("Repeat", selection: $repeats) {
-                        ForEach(BillRepeat.allCases, id: \.self) { Text($0.title).tag($0) }
+                CardGroup {
+                    FieldRow("Due date") {
+                        DatePicker("Due date", selection: $dueDate, displayedComponents: .date).labelsHidden()
                     }
-                    .accessibilityIdentifier("billRepeatPicker")
+                    FieldRow("Repeat") {
+                        Picker("Repeat", selection: $repeats) {
+                            ForEach(BillRepeat.allCases, id: \.self) { Text($0.title).tag($0) }
+                        }
+                        .labelsHidden()
+                        .accessibilityIdentifier("billRepeatPicker")
+                    }
                     if repeats != .never {
-                        Toggle("Ends", isOn: $hasEnd)
-                        if hasEnd { DatePicker("End date", selection: $endDate, displayedComponents: .date) }
+                        Toggle("Ends", isOn: $hasEnd).rowPadding()
+                        if hasEnd {
+                            FieldRow("End date") {
+                                DatePicker("End date", selection: $endDate, displayedComponents: .date).labelsHidden()
+                            }
+                        }
                     }
                     Toggle("Add automatically", isOn: automaticBinding)
                         .disabled(repeats == .never)
-                    Picker("Alert", selection: $alert) {
-                        ForEach(BillAlert.allCases, id: \.self) { Text($0.title).tag($0) }
+                        .rowPadding()
+                        .accessibilityIdentifier("billAutoToggle")
+                    FieldRow("Alert") {
+                        Picker("Alert", selection: $alert) {
+                            ForEach(BillAlert.allCases, id: \.self) { Text($0.title).tag($0) }
+                        }
+                        .labelsHidden()
                     }
-                    TextField("Notes", text: $notes)
+                    TextField("Notes", text: $notes).rowPadding()
                 }
                 if let errorMessage {
-                    Section { Text(errorMessage).foregroundStyle(.red).accessibilityIdentifier("billError") }
+                    Text(errorMessage).foregroundStyle(Theme.red).padding(.horizontal, 18).accessibilityIdentifier("billError")
                 }
                 if editingID != nil {
-                    Section {
-                        Button("Change Plan") { changingPlan = true }
-                        Button("Delete Bill", role: .destructive) { confirmingDelete = true }
-                    }
+                    Button("Change Plan") { changingPlan = true }.buttonStyle(GreyButtonStyle())
+                    Button("Delete Bill", role: .destructive) { confirmingDelete = true }
+                        .buttonStyle(GreyButtonStyle(tint: Theme.red))
                 }
             }
-            .navigationTitle(editingID == nil ? "New Bill" : "Edit Bill")
-            .navigationBarTitleDisplayMode(.inline)
+            .cardNavigation(editingID == nil ? "New Bill" : "Edit Bill")
             .onChange(of: repeats) { automatic = repeats != .never }
             .toolbar {
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("Done") { typing = false }.accessibilityIdentifier("keyboardDoneButton")
+                }
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") { save() }.accessibilityIdentifier("saveBillButton")
@@ -168,15 +196,20 @@ private struct ChangePlanSheet: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                DatePicker("Old plan ends on", selection: $oldEnds, displayedComponents: .date)
-                TextField("New plan name", text: $name)
-                TextField("New amount", text: $amountText).keyboardType(.decimalPad)
-                DatePicker("New plan starts on", selection: $newStarts, displayedComponents: .date)
-                if let errorMessage { Text(errorMessage).foregroundStyle(.red) }
+            CardScreen {
+                CardGroup {
+                    FieldRow("Old plan ends on") {
+                        DatePicker("Old plan ends on", selection: $oldEnds, displayedComponents: .date).labelsHidden()
+                    }
+                    TextField("New plan name", text: $name).rowPadding()
+                    TextField("New amount", text: $amountText).keyboardType(.decimalPad).rowPadding()
+                    FieldRow("New plan starts on") {
+                        DatePicker("New plan starts on", selection: $newStarts, displayedComponents: .date).labelsHidden()
+                    }
+                }
+                if let errorMessage { Text(errorMessage).foregroundStyle(Theme.red).padding(.horizontal, 18) }
             }
-            .navigationTitle("Change Plan")
-            .navigationBarTitleDisplayMode(.inline)
+            .cardNavigation("Change Plan")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {

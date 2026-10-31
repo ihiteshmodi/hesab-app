@@ -172,7 +172,7 @@ struct SchemeBook {
     static let overdueDays = 7
 
     /// Day 1 of the month moved to the payout day, or to the last day of a shorter month.
-    private func payoutDate(_ scheme: PayoutScheme, in month: CalendarDate.YearMonth) -> CalendarDate {
+    func payoutDate(_ scheme: PayoutScheme, in month: CalendarDate.YearMonth) -> CalendarDate {
         // The first of a real month always exists.
         try! CalendarDate(year: month.year, month: month.month, day: 1).addingMonths(0, preferredDay: scheme.payoutDay)
     }

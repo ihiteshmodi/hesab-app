@@ -6,42 +6,34 @@ struct CashInHandScreen: View {
     @State private var setting = false
 
     var body: some View {
-        List {
+        CardScreen {
             if let cash = model.cash {
-                Section {
-                    HStack {
-                        Text("Cash in hand")
-                        Spacer()
-                        Text(IndianMoneyFormat.string(cash.balance)).monospacedDigit()
-                            .accessibilityIdentifier("cashBalance")
-                    }
+                CardPanel {
+                    CardCaption("Cash in hand")
+                    Text(IndianMoneyFormat.string(cash.balance)).font(.system(size: 34, weight: .bold)).monospacedDigit()
+                        .accessibilityIdentifier("cashBalance")
                     if let warning = cash.warning {
-                        Text(warning).foregroundStyle(.orange).accessibilityIdentifier("cashWarning")
+                        Text(warning).foregroundStyle(Theme.orange).accessibilityIdentifier("cashWarning")
                     }
                 }
-                Section("Where it went") {
+                CardGroup(header: "Where it went") {
                     if cash.lines.isEmpty {
                         Text("Nothing yet. Keep a cash withdrawal or set what you are holding.")
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Theme.secondary).rowPadding()
                     }
                     ForEach(Array(cash.lines.enumerated()), id: \.offset) { _, line in
-                        HStack {
-                            VStack(alignment: .leading) {
-                                Text(line.description)
-                                Text(line.date.shortTitle).font(.footnote).foregroundStyle(.secondary)
-                            }
-                            Spacer()
+                        CardRow(title: line.description, subtitle: line.date.shortTitle) {
                             VStack(alignment: .trailing) {
                                 Text(IndianMoneyFormat.string(line.amount)).monospacedDigit()
                                 Text(IndianMoneyFormat.string(line.runningBalance))
-                                    .font(.footnote).foregroundStyle(.secondary).monospacedDigit()
+                                    .font(.footnote).foregroundStyle(Theme.secondary).monospacedDigit()
                             }
                         }
                     }
                 }
             }
         }
-        .navigationTitle("Cash in Hand")
+        .cardNavigation("Cash in Hand")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button("Set Cash", systemImage: "pencil") { setting = true }
@@ -60,16 +52,18 @@ private struct SetCashSheet: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                TextField("Cash you are holding", text: $amountText)
-                    .keyboardType(.decimalPad)
-                    .accessibilityIdentifier("setCashField")
+            CardScreen {
+                CardGroup {
+                    TextField("Cash you are holding", text: $amountText)
+                        .keyboardType(.decimalPad)
+                        .rowPadding()
+                        .accessibilityIdentifier("setCashField")
+                }
                 if let errorMessage {
-                    Text(errorMessage).foregroundStyle(.red)
+                    Text(errorMessage).foregroundStyle(Theme.red).padding(.horizontal, 18)
                 }
             }
-            .navigationTitle("Set Cash in Hand")
-            .navigationBarTitleDisplayMode(.inline)
+            .cardNavigation("Set Cash in Hand")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {

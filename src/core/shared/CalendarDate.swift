@@ -28,6 +28,20 @@ public struct CalendarDate: Hashable, Comparable, Sendable {
             let index = year * 12 + (month - 1) + months
             return YearMonth(year: index / 12, month: index % 12 + 1)
         }
+
+        public var dayCount: Int { CalendarDate.daysIn(month: month, year: year) }
+
+        /// 0 is Sunday, so a calendar grid knows how many blanks come before day 1.
+        public var firstWeekday: Int {
+            // Sakamoto's method for the Gregorian calendar.
+            let offsets = [0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4]
+            let y = month < 3 ? year - 1 : year
+            return (y + y / 4 - y / 100 + y / 400 + offsets[month - 1] + 1) % 7
+        }
+
+        public func date(day: Int) -> CalendarDate? {
+            try? CalendarDate(year: year, month: month, day: day)
+        }
     }
 
     public let year: Int
@@ -76,7 +90,7 @@ public struct CalendarDate: Hashable, Comparable, Sendable {
         try! CalendarDate(year: year, month: month, day: Self.daysIn(month: month, year: year))
     }
 
-    private static func daysIn(month: Int, year: Int) -> Int {
+    fileprivate static func daysIn(month: Int, year: Int) -> Int {
         switch month {
         case 2: isLeap(year) ? 29 : 28
         case 4, 6, 9, 11: 30

@@ -7,9 +7,9 @@ struct CardBillsScreen: View {
     @State private var errorMessage: String?
 
     var body: some View {
-        List {
+        CardScreen {
             if let bills = model.cardBills {
-                Section {
+                CardPanel {
                     HStack {
                         Button("Previous Month", systemImage: "chevron.left") {
                             model.showCardBills(for: bills.month.shifted(by: -1))
@@ -26,30 +26,24 @@ struct CardBillsScreen: View {
                         .accessibilityIdentifier("nextCardMonth")
                     }
                     .buttonStyle(.borderless)
-                    HStack {
-                        Text("Total due")
-                        Spacer()
-                        Text(IndianMoneyFormat.string(bills.totalDue)).monospacedDigit()
-                            .accessibilityIdentifier("cardTotalDue")
-                    }
+                    CardCaption("Total due")
+                    Text(IndianMoneyFormat.string(bills.totalDue)).font(.system(size: 34, weight: .bold)).monospacedDigit()
+                        .accessibilityIdentifier("cardTotalDue")
                 }
                 if !bills.hasCardSpending {
-                    Text("No card spending in \(bills.month.title).").foregroundStyle(.secondary)
+                    Text("No card spending in \(bills.month.title).").foregroundStyle(Theme.secondary).padding(.horizontal, 18)
                 }
-                Section {
+                CardGroup {
                     ForEach(bills.lines, id: \.card.id) { line in
-                        HStack {
-                            VStack(alignment: .leading) {
-                                Text(line.card.name)
-                                Text(line.isPaid ? "Paid \(IndianMoneyFormat.string(line.paid))" : "Not paid")
-                                    .font(.footnote).foregroundStyle(.secondary)
-                            }
-                            Spacer()
+                        CardRow(
+                            title: line.card.name,
+                            subtitle: line.isPaid ? "Paid \(IndianMoneyFormat.string(line.paid))" : "Not paid"
+                        ) {
                             Text(IndianMoneyFormat.string(line.due)).monospacedDigit()
                             Button(line.isPaid && line.due == .zero ? "Unmark Paid" : "Mark Paid") {
                                 errorMessage = model.setBillPaid(line.card.id, paid: !(line.isPaid && line.due == .zero))
                             }
-                            .buttonStyle(.bordered)
+                            .buttonStyle(AddPillStyle(done: line.isPaid && line.due == .zero))
                             .accessibilityIdentifier("cardPaidButton")
                         }
                         .accessibilityElement(children: .contain)
@@ -58,11 +52,11 @@ struct CardBillsScreen: View {
                     }
                 }
                 if let errorMessage {
-                    Section { Text(errorMessage).foregroundStyle(.red) }
+                    Text(errorMessage).foregroundStyle(Theme.red).padding(.horizontal, 18)
                 }
             }
         }
-        .navigationTitle("Card Bills")
+        .cardNavigation("Card Bills")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button("Add Card", systemImage: "plus") { adding = true }
@@ -81,14 +75,15 @@ private struct NewCardSheet: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                TextField("Card name", text: $name).accessibilityIdentifier("cardNameField")
+            CardScreen {
+                CardGroup {
+                    TextField("Card name", text: $name).rowPadding().accessibilityIdentifier("cardNameField")
+                }
                 if let errorMessage {
-                    Text(errorMessage).foregroundStyle(.red).accessibilityIdentifier("cardError")
+                    Text(errorMessage).foregroundStyle(Theme.red).padding(.horizontal, 18).accessibilityIdentifier("cardError")
                 }
             }
-            .navigationTitle("New Card")
-            .navigationBarTitleDisplayMode(.inline)
+            .cardNavigation("New Card")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
