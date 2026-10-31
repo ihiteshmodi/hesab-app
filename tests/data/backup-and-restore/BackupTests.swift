@@ -64,6 +64,18 @@ struct BackupTests {
         #expect(try descriptions(target) == ["Milk", "Bread"])
     }
 
+    @Test func anImportIsSeenEvenRightAfterTheOldEntriesWereRead() throws {
+        let folder = try Folder()
+        let file = try backup(folder, containing: ["Milk", "Bread"])
+        let target = app(try AppDatabase.inMemory())
+        try record(target, ["Tea"])
+        _ = try descriptions(target)
+
+        try target.confirmImport(try target.prepareImport(file), keepingPreviousIn: folder.url)
+
+        #expect(try descriptions(target) == ["Milk", "Bread"])
+    }
+
     @Test func exportingTwiceOnTheSameDayReplacesTheEarlierFile() throws {
         let folder = try Folder()
         let source = app(try AppDatabase.inMemory())
