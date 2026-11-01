@@ -156,13 +156,13 @@ struct BudgetScreen: View {
         if let authMessage, pane == .spending {
             Text(authMessage).font(.footnote).foregroundStyle(Theme.red).accessibilityIdentifier("activityAuthMessage")
         }
-        Text(shown(budget.leftToSpend))
+        Text(IndianMoneyFormat.string(budget.leftToSpend))
             .font(.system(size: 42, weight: .bold)).monospacedDigit()
-            .foregroundStyle(!hidden && budget.leftToSpend < .zero ? Theme.red : Color.primary)
+            .foregroundStyle(budget.leftToSpend < .zero ? Theme.red : Color.primary)
             .minimumScaleFactor(0.5).lineLimit(1)
             .accessibilityIdentifier("leftToSpend")
         HStack(spacing: 10) {
-            tile(shown(budget.spentThisMonth), "Spent in \(monthName(budget.month))", id: "spentThisMonth")
+            tile(IndianMoneyFormat.string(budget.spentThisMonth), "Spent in \(monthName(budget.month))", id: "spentThisMonth")
             tile(shown(budget.incomeThisMonth), "Income in \(monthName(budget.month))", id: "incomeThisMonth")
         }
         let pending = budget.pendingRefundsEverywhere

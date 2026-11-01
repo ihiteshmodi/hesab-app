@@ -9,16 +9,18 @@ final class PrivacyUITests: XCTestCase {
     }
 
     @MainActor
-    func testHidingBalancesMasksLeftToSpendUntilTheEyeIsTapped() {
+    func testHidingBalancesMasksOnlyIncomeUntilTheEyeIsTapped() {
         let app = launchApp()
         openSettings(app)
         flip(app.switches["hideBalancesToggle"])
         goBack(app)
 
         XCTAssertTrue(app.staticTexts["leftToSpend"].waitForExistence(timeout: 20))
-        XCTAssertEqual(app.staticTexts["leftToSpend"].label, "₹ ••••")
-        app.buttons["activityEyeButton"].tap()
         XCTAssertEqual(app.staticTexts["leftToSpend"].label, "₹0.00")
+        XCTAssertEqual(app.staticTexts["spentThisMonth"].label, "₹0.00")
+        XCTAssertEqual(app.staticTexts["incomeThisMonth"].label, "₹ ••••")
+        app.buttons["activityEyeButton"].tap()
+        XCTAssertEqual(app.staticTexts["incomeThisMonth"].label, "₹0.00")
     }
 
     @MainActor
