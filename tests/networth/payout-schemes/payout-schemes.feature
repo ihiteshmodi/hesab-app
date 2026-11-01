@@ -127,3 +127,43 @@ Feature: Payout schemes and maturity reminders
     When Priya edits "Bond A" to have an invested amount of 0
     Then she sees "Enter an amount above 0"
     And "Bond A" is unchanged
+
+  # A scheme pays every month, every 3 months (quarterly), every 6 months (half-yearly) or every year.
+  # It has a first payout date; later payouts keep that day of the month, or the last day of the month when asked.
+  Scenario Outline: A scheme repeats at its own pace
+    Given a scheme paying <amount> <repeat>, first on 2026-12-10
+    And "Payout alert" is 5 days before
+    When today is <today>
+    Then the next payout expected is <expected>
+
+    Examples:
+      | repeat         | amount | today      | expected   |
+      | every month    | 1,000  | 2026-12-06 | 2026-12-10 |
+      | every 3 months | 3,000  | 2026-12-06 | 2026-12-10 |
+      | every 6 months | 6,000  | 2026-12-06 | 2026-12-10 |
+      | every year     | 12,000 | 2026-12-06 | 2026-12-10 |
+
+  Scenario: After a quarterly payout is recorded the next one is three months later
+    Given a scheme paying 3,000 every 3 months, first on 2026-12-10
+    When she records the December payout
+    Then the next payout expected is 2027-03-10
+    And nothing is expected in January or February
+
+  Scenario: A scheme whose first payout is in the future waits for it
+    Given a scheme paying 1,000 every month, first on 2026-12-24 and today is 2026-10-30
+    Then the next payout expected is 2026-12-24
+
+  Scenario: Monthly payout in the totals is the monthly equivalent
+    Given schemes paying 1,000 every month, 3,000 every 3 months and 12,000 every year
+    Then "Monthly payout" shows 3,000
+
+  Scenario: A scheme can pay on the last day of every month
+    Given a scheme paying every month on the last day
+    Then February's payout is on the 28th and March's on the 31st
+
+  Scenario: The scheme form has a pace, a first payout date and a last-day switch instead of a day stepper
+    When Priya adds a scheme
+    Then she chooses Every month, Every 3 months, Every 6 months or Every year
+    And she picks the date of the first payout, which starts a month from today
+    And she can switch on "Always on the last day of the month"
+

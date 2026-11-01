@@ -107,7 +107,14 @@ Feature: What is left to spend, and what was spent this month
     When she taps the eye again
     Then the amounts hide at once without asking
 
-  # Mockup 1: the month calendar shows what was spent each day.
+  # Mockup 1: the month calendar shows what was spent (red minus) and earned (green plus) each day.
+  Scenario: The month calendar shows what was earned each day
+    Given Priya recorded a salary of 1,50,000 on 2026-10-01, savings of 10,000 on 2026-10-02 and spent 200 on 2026-10-01
+    When she views October
+    Then 1 Oct shows "+1.5L" in green and "-200" in red
+    And 2 Oct shows nothing because savings are not income
+    And with Hide Balances on and the eye not used, the green amount shows "••••"
+
   Scenario: The month calendar shows what was spent each day
     Given Priya spent in October
       | date       | amount | paid with |
@@ -116,7 +123,7 @@ Feature: What is left to spend, and what was spent this month
       | 2026-10-02 | 261    | UPI       |
       | 2026-10-03 | 300    | Cash      |
     When she views October
-    Then the calendar shows 9,200 on 1 Oct and 261 on 2 Oct
+    Then the calendar shows 9,200 on 1 Oct and 261 on 2 Oct, each in red with a minus
     And 3 Oct shows nothing because cash does not count in "Spent this month"
     And the days add up to "Spent this month"
 

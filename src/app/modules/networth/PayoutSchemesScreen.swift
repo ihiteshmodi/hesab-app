@@ -34,13 +34,13 @@ struct PayoutSchemesScreen: View {
                                 Text(scheme.name).font(.headline)
                                 if scheme.isClosed { StatusPill(text: "closed") }
                             }
-                            Text("Pays on the \(scheme.payoutDay)th" + (scheme.maturity.map { " · matures \($0.shortTitle)" } ?? ""))
+                            Text(schedule(scheme) + (scheme.maturity.map { " · matures \($0.shortTitle)" } ?? ""))
                                 .font(.footnote).foregroundStyle(Theme.secondary)
                         }
                         Spacer(minLength: 8)
                         VStack(alignment: .trailing, spacing: 1) {
                             Text(money(scheme.invested)).monospacedDigit()
-                            Text("\(money(scheme.monthlyPayout)) / month").font(.footnote).foregroundStyle(Theme.green).monospacedDigit()
+                            Text("\(money(scheme.payoutAmount)) / \(scheme.frequency.unit)").font(.footnote).foregroundStyle(Theme.green).monospacedDigit()
                         }
                     }
                     .rowPadding()
@@ -80,6 +80,13 @@ struct PayoutSchemesScreen: View {
     }
 }
 
+/// "Every month on the 24th", "Every 3 months on the last day".
+private func schedule(_ scheme: PayoutScheme) -> String {
+    let day = scheme.payoutDay
+    let suffix = (11...13).contains(day % 100) ? "th" : ["th", "st", "nd", "rd"][day % 10 < 4 ? day % 10 : 0]
+    return "\(scheme.frequency.title) on " + (day == 31 ? "the last day" : "the \(day)\(suffix)")
+}
+
 struct NewSchemeSheet: View {
     let model: BudgetViewModel
     var editing: PayoutScheme?
@@ -87,7 +94,9 @@ struct NewSchemeSheet: View {
     @State private var name = ""
     @State private var investedText = ""
     @State private var payoutText = ""
-    @State private var payoutDay = 5
+    @State private var frequency = PayoutFrequency.monthly
+    @State private var firstPayout = Calendar.current.date(byAdding: .month, value: 1, to: Date()) ?? Date()
+    @State private var lastDay = false
     @State private var hasMaturity = false
     @State private var maturity = Date()
     @State private var errorMessage: String?
@@ -98,9 +107,21 @@ struct NewSchemeSheet: View {
                 CardGroup {
                     TextField("Name", text: $name).rowPadding().accessibilityIdentifier("schemeNameField")
                     TextField("Amount invested", text: $investedText).keyboardType(.decimalPad).rowPadding().accessibilityIdentifier("schemeInvestedField")
-                    TextField("Monthly payout", text: $payoutText).keyboardType(.decimalPad).rowPadding().accessibilityIdentifier("schemePayoutField")
-                    Stepper("Pays on day \(payoutDay)", value: $payoutDay, in: 1...31).rowPadding()
+                    TextField("Payout amount", text: $payoutText).keyboardType(.decimalPad).rowPadding().accessibilityIdentifier("schemePayoutField")
+                    FieldRow("Repeats") {
+                        Picker("Repeats", selection: $frequency) {
+                            ForEach(PayoutFrequency.allCases, id: \.self) { Text($0.title).tag($0) }
+                        }
+                        .labelsHidden()
+                        .accessibilityIdentifier("schemeFrequencyPicker")
+                    }
+                    FieldRow("First payout") {
+                        DatePicker("First payout", selection: $firstPayout, displayedComponents: .date).labelsHidden()
+                    }
+                    Toggle("Always on the last day of the month", isOn: $lastDay).rowPadding()
+                        .accessibilityIdentifier("schemeLastDayToggle")
                     Toggle("Has a maturity date", isOn: $hasMaturity).rowPadding()
+                        .accessibilityIdentifier("schemeMaturityToggle")
                     if hasMaturity {
                         FieldRow("Matures on") { DatePicker("Matures on", selection: $maturity, displayedComponents: .date).labelsHidden() }
                     }
@@ -112,8 +133,10 @@ struct NewSchemeSheet: View {
                 guard let editing, name.isEmpty else { return }
                 name = editing.name
                 investedText = IndianMoneyFormat.plain(editing.invested)
-                payoutText = IndianMoneyFormat.plain(editing.monthlyPayout)
-                payoutDay = editing.payoutDay
+                payoutText = IndianMoneyFormat.plain(editing.payoutAmount)
+                frequency = editing.frequency
+                lastDay = editing.payoutDay == 31
+                firstPayout = (editing.firstPayout ?? model.payoutDraft(editing.id)?.expectedDate)?.instant() ?? firstPayout
                 hasMaturity = editing.maturity != nil
                 maturity = editing.maturity?.instant() ?? Date()
             }
@@ -122,8 +145,10 @@ struct NewSchemeSheet: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
                         let scheme = NewPayoutScheme(
-                            name: name, invested: MoneyInput.parse(investedText), monthlyPayout: MoneyInput.parse(payoutText),
-                            payoutDay: payoutDay, maturity: hasMaturity ? CalendarDate(maturity) : nil
+                            name: name, invested: MoneyInput.parse(investedText), payoutAmount: MoneyInput.parse(payoutText),
+                            payoutDay: lastDay ? 31 : CalendarDate(firstPayout).day,
+                            maturity: hasMaturity ? CalendarDate(maturity) : nil,
+                            frequency: frequency, firstPayout: CalendarDate(firstPayout)
                         )
                         errorMessage = editing.map { model.updateScheme($0.id, scheme) } ?? model.addScheme(scheme)
                         if errorMessage == nil { dismiss() }

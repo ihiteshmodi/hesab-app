@@ -178,7 +178,7 @@ struct FullImportTests {
         #expect(schemes.map(\.name) == ["Bond A", "Bond B"])
         #expect(schemes[0].payoutDay == 24)
         #expect(schemes[0].maturity == day("2028-01-30"))
-        #expect(schemes[0].monthlyPayout == .rupees(800))
+        #expect(schemes[0].payoutAmount == .rupees(800))
         #expect(schemes[1].isClosed)
         #expect(report.bankBalance == .rupees(100_000))
         #expect(report.investments == portfolio.investments)
