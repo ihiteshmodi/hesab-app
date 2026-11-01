@@ -61,6 +61,21 @@ final class PortfolioUITests: XCTestCase {
     }
 
     @MainActor
+    func testTheLastDaySwitchGreysOutThePayoutDay() {
+        let app = launchApp()
+        selectTab(app, "Portfolio")
+        app.buttons["payoutSchemesLink"].tap()
+        app.buttons["addSchemeButton"].tap()
+        let day = app.buttons["schemePayoutDayPicker"]
+        XCTAssertTrue(day.waitForExistence(timeout: 20))
+        XCTAssertTrue(day.isEnabled)
+
+        app.switches["schemeLastDayToggle"].coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: 0.5)).tap()
+
+        XCTAssertFalse(day.isEnabled, "the payout day can still be changed")
+    }
+
+    @MainActor
     func testAnIncompleteSchemeShowsWhatToFix() {
         let app = launchApp()
         selectTab(app, "Portfolio")

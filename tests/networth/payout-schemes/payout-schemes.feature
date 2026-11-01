@@ -149,6 +149,12 @@ Feature: Payout schemes and maturity reminders
     Then the next payout expected is 2027-03-10
     And nothing is expected in January or February
 
+  Scenario: The first payout keeps its own date while later payouts use the payout day
+    Given a scheme paying every month, first on 2026-12-10 with payout day 24
+    Then the next payout expected is 2026-12-10
+    When she records it
+    Then the next payout expected is 2027-01-24
+
   Scenario: A scheme whose first payout is in the future waits for it
     Given a scheme paying 1,000 every month, first on 2026-12-24 and today is 2026-10-30
     Then the next payout expected is 2026-12-24
@@ -165,5 +171,6 @@ Feature: Payout schemes and maturity reminders
     When Priya adds a scheme
     Then she chooses Every month, Every 3 months, Every 6 months or Every year
     And she picks the date of the first payout, which starts a month from today
-    And she can switch on "Always on the last day of the month"
+    And "Pays on day" starts as the day of that first payout and can be changed on its own
+    And she can switch on "Always on the last day of the month", which greys out "Pays on day"
 
