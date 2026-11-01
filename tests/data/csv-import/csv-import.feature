@@ -76,7 +76,7 @@ Feature: One-time import of a reviewed expense list (Mac tool)
 
   # Everything the spreadsheet holds, not only expenses. Each extra file is optional.
   # income.csv: date, amount, kind (salary, savings, investment_income, money_received, borrowed), note
-  # bills.csv: name, amount, category, sub_category, entity, payment, next_due, repeat, ends, automatic, alert, notes
+  # bills.csv: name, amount, category, sub_category, entity, payment, next_due, repeat, ends, automatic, alert, notes, auto_debit (yes when the bank debits it by itself)
   # planned.csv: description, amount
   # ledgers.csv: name, counts_towards_net_worth; ledger_entries.csv: ledger, date, description, amount
   # portfolio.csv: kind (bank_balance, holding, allocation, scheme), name, amount, currency, rate, date, payout, payout_day, maturity, closed
@@ -108,6 +108,11 @@ Feature: One-time import of a reviewed expense list (Mac tool)
     When Priya runs the tool
     Then the bill exists with that due date
     And running the automatic bills on the import day adds no expense
+
+  Scenario: A bill is paid by hand unless the file says it debits by itself
+    Given a bill with auto_debit "yes" and a bill with it empty
+    When Priya runs the tool
+    Then the first never waits to be sent and the second does once added
 
   Scenario: Planned items keep their total
     Given two planned items of 600 and 2,000

@@ -20,6 +20,7 @@ struct NewBillSheet: View {
     @State private var endDate = Date()
     @State private var alert = BillAlert.none
     @State private var notes = ""
+    @State private var autoDebit = false
     @State private var errorMessage: String?
     @State private var confirmingDelete = false
     @State private var changingPlan = false
@@ -47,6 +48,7 @@ struct NewBillSheet: View {
             _endDate = State(initialValue: bill.endsOn?.instant() ?? Date())
             _alert = State(initialValue: bill.alert)
             _notes = State(initialValue: bill.notes)
+            _autoDebit = State(initialValue: bill.autoDebit)
         }
     }
 
@@ -114,6 +116,8 @@ struct NewBillSheet: View {
                             }
                         }
                     }
+                    Toggle("Debits by itself", isOn: $autoDebit).rowPadding()
+                        .accessibilityIdentifier("billAutoDebitToggle")
                     FieldRow("Alert") {
                         Picker("Alert", selection: $alert) {
                             ForEach(BillAlert.allCases, id: \.self) { Text($0.title).tag($0) }
@@ -160,7 +164,7 @@ struct NewBillSheet: View {
             name: name, amount: MoneyInput.parse(amountText), category: category, subCategory: subCategory,
             entity: entity, paymentMethod: payment.method, dueDate: CalendarDate(dueDate), repeats: repeats,
             endsOn: hasEnd && repeats != .never ? CalendarDate(endDate) : nil,
-            addAutomatically: false, alert: alert, notes: notes
+            addAutomatically: false, alert: alert, notes: notes, autoDebit: autoDebit
         )
         if let editingID {
             errorMessage = model.updateBill(editingID, bill)
@@ -208,7 +212,7 @@ private struct ChangePlanSheet: View {
                             name: name, amount: MoneyInput.parse(amountText), category: old.category,
                             subCategory: old.subCategory, entity: old.entity, paymentMethod: old.paymentMethod,
                             dueDate: CalendarDate(newStarts), repeats: old.repeats, addAutomatically: false,
-                            alert: old.alert, notes: old.notes
+                            alert: old.alert, notes: old.notes, autoDebit: old.autoDebit
                         )
                         errorMessage = model.changeBillPlan(billID, endsOn: CalendarDate(oldEnds), startingWith: replacement)
                         if errorMessage == nil {

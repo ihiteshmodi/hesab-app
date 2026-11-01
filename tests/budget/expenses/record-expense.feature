@@ -56,10 +56,11 @@ Feature: Record an expense
     When she changes only the amount
     Then the note is still "used coupon THANKYOU"
 
-  Scenario: An expense with no note shows no note line
+  Scenario: An expense with no note still shows the Notes row
     Given an expense of 549 without a note exists
     When she opens that expense
-    Then no note is shown
+    Then the Notes row shows "No note"
+    And the note can only be changed with the Edit button
 
   Scenario: Priya deletes an expense
     Given an expense of 1,250 exists

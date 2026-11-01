@@ -277,3 +277,43 @@ Feature: Bills, one-off or repeating, added to the budget with a tap
       | name | amount | message                 |
       |      | 1000   | Enter a name            |
       | Gym  | 0      | Enter an amount above 0 |
+
+  # A bill is either paid by the bank by itself ("auto-debit") or paid by Priya ("I pay it myself").
+  # Adding a bill puts it in the budget; a bill she pays herself then waits in "To send" until she says she sent it.
+  Scenario: A bill she pays herself waits to be sent after it is added
+    Given "Rent" is a bill she pays herself
+    When she adds "Rent" for November
+    Then "Rent" is listed as to send with its amount and due date
+    And the Bills badge counts it
+
+  Scenario: An auto-debit bill never waits to be sent
+    Given "Insurance premium" is an auto-debit bill
+    When she adds "Insurance premium" for November
+    Then nothing is listed as to send
+
+  Scenario: Priya ticks a bill as sent with the date
+    Given "Rent" for November was added and waits to be sent
+    When she marks it sent on 2026-11-02
+    Then it leaves the to send list and the badge drops
+
+  Scenario: Priya takes back a sent tick
+    Given "Rent" for November was marked sent
+    When she unmarks it
+    Then it is listed as to send again
+
+  Scenario: Switching a bill to auto-debit clears what waits to be sent
+    Given "Rent" for November was added and waits to be sent
+    When she changes "Rent" to auto-debit
+    Then nothing is listed as to send
+
+  Scenario: Priya taps a bill in Activity or in Due to add to change it
+    Given "Rent" is listed under Upcoming or Due to add
+    When she taps the bill, not its Add button
+    Then the Edit Bill form opens with a "Debits by itself" switch
+
+  Scenario: The to send list sits in the Activity summary card
+    Given "Rent" waits to be sent
+    When she opens Activity
+    Then the card under Left to spend lists "To send" with "Rent" and a Sent button
+    And choosing Sent asks for the date, which starts as today
+

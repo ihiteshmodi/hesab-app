@@ -44,3 +44,16 @@ Feature: Record income, savings, money received and borrowing
     Given a salary entry of 150,000
     When she chooses "Delete Entry" and confirms
     Then "Left to spend" drops by 150,000
+
+  Scenario: Priya changes an income entry
+    Given a salary entry of 150,000 on 2026-10-30
+    When she opens it and changes the amount to 160,000, the type to "Money Received", the note to "bonus" and the date to 2026-10-31
+    Then "Left to spend" shows 160,000
+    And the entry shows those new details
+
+  Scenario: A changed income entry is checked like a new one
+    Given a salary entry of 150,000
+    When she changes the amount to 0
+    Then she sees "Enter an amount above 0"
+    And the entry is unchanged
+

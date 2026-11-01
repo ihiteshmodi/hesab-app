@@ -29,8 +29,13 @@ final class PrivacyUITests: XCTestCase {
         let balance = app.staticTexts["savingsBalance"]
         XCTAssertTrue(balance.waitForExistence(timeout: 20))
         XCTAssertEqual(balance.label, "₹ ••••••")
+        XCTAssertEqual(app.staticTexts["savingsIncome"].label, "₹ ••••")
+        XCTAssertEqual(app.staticTexts["savingsCashFlow"].label, "₹ ••••")
+        XCTAssertFalse(app.buttons["Ledgers"].exists, "ledgers can be opened while the pane is locked")
         app.buttons["savingsEyeButton"].tap()
         XCTAssertTrue(app.staticTexts["₹0.00"].waitForExistence(timeout: 20))
+        XCTAssertEqual(app.staticTexts["savingsIncome"].label, "₹0.00")
+        XCTAssertTrue(app.buttons["Ledgers"].exists)
     }
 
     @MainActor

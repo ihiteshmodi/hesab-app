@@ -340,6 +340,17 @@ public final class AppDatabase: Sendable {
             }
         }
 
+        migrator.registerMigration("v16-bills-to-send") { db in
+            try db.alter(table: "bill") { table in
+                table.add(column: "auto_debit", .boolean).notNull().defaults(to: false)
+            }
+            try db.alter(table: "bill_occurrence") { table in
+                table.add(column: "sent_on", .text)
+            }
+            // Everything added before this version counts as already sent, so no old bill suddenly waits.
+            try db.execute(sql: "UPDATE bill_occurrence SET sent_on = due_date")
+        }
+
         return migrator
     }
 }

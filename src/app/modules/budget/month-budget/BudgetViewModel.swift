@@ -20,6 +20,7 @@ final class BudgetViewModel {
     private(set) var upcoming = Upcoming(items: [])
     private(set) var bills: [BillSummary] = []
     private(set) var autoAdded: [AutoAddedBill] = []
+    private(set) var billsToSend: [BillToSend] = []
     private(set) var attention = BillsAttention(badge: 0, autoAddedUnseen: 0, menuCount: 0)
     private(set) var preferences = Preferences()
     private(set) var currencies: [Currency] = []
@@ -59,6 +60,7 @@ final class BudgetViewModel {
             upcoming = try app.upcoming()
             bills = try app.bills()
             autoAdded = try app.autoAdded()
+            billsToSend = try app.billsToSend()
             attention = try app.billsAttention()
             preferences = try app.preferences()
             currencies = try app.currencies()
@@ -109,7 +111,9 @@ final class BudgetViewModel {
         run { try app.updateExpense(id, expense) }
     }
 
+    func updateIncome(_ id: Int64, _ income: NewIncome) -> String? { run { try app.updateIncome(id, income) } }
     func deleteIncome(_ id: Int64) -> String? { run { try app.deleteIncome(id) } }
+    func markBillSent(_ occurrenceID: Int64, on date: CalendarDate) -> String? { run { try app.markBillSent(occurrenceID, on: date) } }
     func deleteRepayment(_ id: Int64) -> String? { run { try app.deleteRepayment(id) } }
 
     // MARK: categories and entities
