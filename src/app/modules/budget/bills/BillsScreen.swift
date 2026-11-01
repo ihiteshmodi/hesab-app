@@ -45,9 +45,7 @@ struct BillsScreen: View {
                 if filter == .planned {
                     planned
                 } else if let calendar = model.billsCalendar(for: month) {
-                    if filter != .income, filter != .upcomingIncome, filter != .receivedIncome { dueToAdd }
                     if showingList { list(calendar) } else { calendarView(calendar) }
-                    if [.allTransactions, .income, .upcomingIncome].contains(filter) { upcomingIncome }
                     if filter != .income, filter != .upcomingIncome, filter != .receivedIncome { allBills }
                 }
             }
@@ -129,16 +127,6 @@ struct BillsScreen: View {
                     .accessibilityIdentifier("billDay-\(date)")
                 }
             }
-            let items = calendar.items(filter, on: day)
-            if let date = month.date(day: day) {
-                CardGroup(header: date.dayTitle) {
-                    if items.isEmpty {
-                        Text("Nothing on this day.").foregroundStyle(Theme.secondary).rowPadding()
-                            .accessibilityIdentifier("billDayEmpty")
-                    }
-                    ForEach(Array(items.enumerated()), id: \.offset) { _, item in itemRow(item) }
-                }
-            }
         }
     }
 
@@ -201,63 +189,26 @@ struct BillsScreen: View {
         selectedDay = today.yearMonth == month ? today.day : 1
     }
 
-    // MARK: lists under the calendar
-
-    @ViewBuilder private var upcomingIncome: some View {
-        if !model.upcomingIncome.isEmpty {
-            CardGroup(header: "Within your alert window") {
-                ForEach(Array(model.upcomingIncome.enumerated()), id: \.offset) { _, item in
-                    HStack(spacing: 8) {
-                        Text(item.label).font(.subheadline)
-                            .foregroundStyle(item.kind == .matured ? Theme.red : Color.primary)
-                        Spacer(minLength: 6)
-                        if item.kind == .payout {
-                            Button("Record") { recordingPayout = item.scheme }
-                                .buttonStyle(AddPillStyle())
-                                .accessibilityIdentifier("recordUpcomingPayoutButton")
-                        }
-                    }
-                    .rowPadding()
-                    .accessibilityElement(children: .contain)
-                    .accessibilityIdentifier("upcomingIncomeRow")
-                }
-            }
-        }
-    }
-
-    /// Bills due within the upcoming window wait here until she adds each one with the amount actually paid.
-    @ViewBuilder private var dueToAdd: some View {
-        if !model.upcoming.items.isEmpty {
-            CardGroup(header: "Due to add", footer: "Add puts the bill in Activity. Change the amount there if this month's bill is different.") {
-                ForEach(model.upcoming.items, id: \.bill.id) { item in
-                    CardRow(title: item.bill.name, subtitle: item.label) {
-                        Button("Add") { billToAdd = item.bill.id }.buttonStyle(AddPillStyle())
-                            .accessibilityIdentifier("addDueBillButton")
-                    }
-                    .contentShape(Rectangle())
-                    .onTapGesture { editingBill = item.bill.id }
-                    .accessibilityElement(children: .contain)
-                    .accessibilityIdentifier("dueBillRow")
-                }
-            }
-        }
-    }
+    // MARK: All bills
 
     @ViewBuilder private var allBills: some View {
         if !model.bills.isEmpty {
             CardGroup(header: "All bills", footer: "Tap a bill to change its usual amount, plan or end date. Use Add to put one month's bill in Activity.") {
                 ForEach(model.bills, id: \.bill.id) { summary in
                     HStack(spacing: 8) {
-                        ButtonRow(title: summary.bill.name, subtitle: detail(summary), value: IndianMoneyFormat.string(summary.bill.amount)) {
-                            editingBill = summary.bill.id
+                        Button { editingBill = summary.bill.id } label: {
+                            CardRow(title: summary.bill.name, subtitle: detail(summary)) {
+                                Text(IndianMoneyFormat.string(summary.bill.amount)).monospacedDigit()
+                            }
                         }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("billRow")
                         if summary.nextDue != nil {
                             Button("Add") { billToAdd = summary.bill.id }.buttonStyle(AddPillStyle())
                                 .padding(.trailing, 14)
                                 .accessibilityIdentifier("addBillRowButton")
                         }
                     }
-                    .accessibilityIdentifier("billRow")
                 }
             }
         }
@@ -295,10 +246,9 @@ struct BillsScreen: View {
     }
 
     private func detail(_ summary: BillSummary) -> String {
-        var parts = [summary.bill.repeats == .never ? "One-off" : summary.bill.repeats.title]
-        if let due = summary.nextDue { parts.append("Next due \(due.shortTitle)") } else { parts.append("Ended") }
-        if let added = summary.addedLabel { parts.append(added) }
-        return parts.joined(separator: " · ")
+        let repeats = summary.bill.repeats == .never ? "One-off" : summary.bill.repeats.title
+        guard let due = summary.nextDue else { return "\(repeats) · Ended" }
+        return "Due \(due.shortTitle) · \(repeats)"
     }
 
     // MARK: the filter menu (mockup 7)

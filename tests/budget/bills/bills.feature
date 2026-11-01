@@ -306,14 +306,48 @@ Feature: Bills, one-off or repeating, added to the budget with a tap
     When she changes "Rent" to auto-debit
     Then nothing is listed as to send
 
-  Scenario: Priya taps a bill in Activity or in Due to add to change it
-    Given "Rent" is listed under Upcoming or Due to add
+  # Editing a bill happens only on the Bills tab (All bills). Activity > Upcoming only adds.
+  Scenario: Tapping a bill in Upcoming does not open the editor
+    Given "Rent" is listed in Upcoming
     When she taps the bill, not its Add button
+    Then nothing opens
+
+  Scenario: Priya taps a bill in All bills to change it
+    Given "Rent" is listed under All bills on the Bills tab
+    When she taps it
     Then the Edit Bill form opens with a "Debits by itself" switch
 
-  Scenario: The to send list sits in the Activity summary card
-    Given "Rent" waits to be sent
+  # Like Pending refunds: a tile in the Activity summary card that opens a list.
+  Scenario: Pending to send is a tile that opens the list
+    Given "Rent" and "Society" wait to be sent
     When she opens Activity
-    Then the card under Left to spend lists "To send" with "Rent" and a Sent button
-    And choosing Sent asks for the date, which starts as today
+    Then a tile under Left to spend reads the count and total and "Pending to send"
+    When she taps the tile
+    Then she sees "Still to send" with the total and one row per bill with its due date and amount
+    When she taps "Rent" and saves the date it was sent
+    Then "Rent" leaves the list and the tile count drops
+
+  Scenario: The tile is hidden when nothing waits to be sent
+    Given nothing waits to be sent
+    When she opens Activity
+    Then there is no "Pending to send" tile
+
+  Scenario: The Upcoming tab shows how many things are coming
+    Given 2 bills are due soon and 1 payout is expected
+    When she opens Activity
+    Then the Upcoming tab shows a red count of 3
+
+  Scenario: Upcoming has an Expenses side and an Income side
+    When she opens Activity > Upcoming
+    Then she can choose Expenses or Income
+    And Expenses lists the bills she adds herself with Add, Create Bill, Add Several at Once and the filter button
+    And Income lists expected payouts and maturities, each with its date, and a Record button for payouts
+    And Income also has Create Income (a new payout scheme), Add Several at Once (record ticked payouts with their expected amounts) and the filter button
+
+  Scenario: The Bills tab holds only the calendar and All bills
+    When she opens the Bills tab
+    Then she sees the calendar and All bills
+    And there is no Due to add list, no list of the selected day under the calendar and no payout list
+    And each row in All bills shows the name, when it is next due and its amount, and opens the editor when tapped
+    And each row has an Add button that puts that month's bill in Activity
 

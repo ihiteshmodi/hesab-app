@@ -5,7 +5,7 @@ extension PayoutScheme: @retroactive Identifiable {}
 
 struct PayoutSchemesScreen: View {
     let model: BudgetViewModel
-    @Binding var hidden: Bool
+    let hidden: Bool
     let toggleHidden: () -> Void
     @State private var adding = false
     @State private var editing: PayoutScheme?
@@ -59,8 +59,10 @@ struct PayoutSchemesScreen: View {
         .cardNavigation("Payout Schemes")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
-                Button(hidden ? "Show" : "Hide", systemImage: hidden ? "eye" : "eye.slash") { toggleHidden() }
-                    .accessibilityIdentifier("schemesEyeButton")
+                if model.preferences.hideBalances {
+                    Button(hidden ? "Show" : "Hide", systemImage: hidden ? "eye" : "eye.slash") { toggleHidden() }
+                        .accessibilityIdentifier("schemesEyeButton")
+                }
             }
             ToolbarItem(placement: .primaryAction) {
                 Button("Add Scheme", systemImage: "plus") { adding = true }.accessibilityIdentifier("addSchemeButton")
@@ -78,7 +80,7 @@ struct PayoutSchemesScreen: View {
     }
 }
 
-private struct NewSchemeSheet: View {
+struct NewSchemeSheet: View {
     let model: BudgetViewModel
     var editing: PayoutScheme?
     @Environment(\.dismiss) private var dismiss

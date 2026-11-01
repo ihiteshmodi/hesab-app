@@ -24,17 +24,22 @@ Feature: Preferences
     Then those figures show "₹ ••••"
     When she taps the eye on the Activity screen
     Then the figures show until she leaves the screen
-    # Income in the summary card is hidden even with Hide Balances off; see month-budget.feature.
 
-  Scenario: The savings bank balance is hidden until she asks
-    Given she opens Activity and chooses the Savings tab
+  Scenario: With Hide Balances off nothing is masked and no eye is shown
+    Given "Hide Balances" is off
+    When she opens Activity, its Savings tab, Portfolio and Payout Schemes
+    Then every figure shows and there is no eye
+
+  Scenario: With Hide Balances on, the savings bank balance is hidden until she asks
+    Given "Hide Balances" is on and she opens Activity and chooses the Savings tab
     Then the savings bank balance shows "₹ ••••••" with a crossed-out eye
     And ledgers, cash in hand, amount to repay, income, expenses and cash flow show "₹ ••••"
     And ledgers, cash in hand and amount to repay cannot be opened
     When she taps the eye and authenticates with Face ID
     Then every figure on the pane shows until she leaves the screen
 
-  Scenario: Portfolio is hidden until she asks
+  Scenario: With Hide Balances on, Portfolio is hidden until she asks
+    Given "Hide Balances" is on
     When she opens the Portfolio tab
     Then net worth, available to allocate, investments and every row show "••••" with a crossed-out eye
     When she taps the eye and authenticates with Face ID

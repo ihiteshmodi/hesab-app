@@ -62,7 +62,7 @@ final class ActivityAndBillsUITests: XCTestCase {
     }
 
     @MainActor
-    func testTappingAnUpcomingBillOpensItForEditing() {
+    func testABillIsEditedInAllBillsAndNotFromUpcoming() {
         let app = launchApp()
         app.buttons["Upcoming"].tap()
         app.buttons["createBillButton"].tap()
@@ -71,13 +71,19 @@ final class ActivityAndBillsUITests: XCTestCase {
         let row = app.descendants(matching: .any)["upcomingRow"]
         XCTAssertTrue(row.waitForExistence(timeout: 20))
         row.staticTexts["Internet"].tap()
+        XCTAssertFalse(app.textFields["billNameField"].waitForExistence(timeout: 3), "Upcoming opened the editor")
 
+        selectTab(app, "Bills")
+        let bill = app.buttons["billRow"]
+        XCTAssertTrue(bill.waitForExistence(timeout: 20))
+        XCTAssertTrue(app.buttons["addBillRowButton"].exists, "All bills has no Add button")
+        bill.tap()
         XCTAssertTrue(app.textFields["billNameField"].waitForExistence(timeout: 20))
         XCTAssertTrue(app.switches["billAutoDebitToggle"].exists)
     }
 
     @MainActor
-    func testABillYouPayYourselfStaysInToSendUntilTickedSentWithADate() {
+    func testABillYouPayYourselfStaysPendingToSendUntilTickedSentWithADate() {
         let app = launchApp()
         app.buttons["Upcoming"].tap()
         app.buttons["createBillButton"].tap()
@@ -89,15 +95,43 @@ final class ActivityAndBillsUITests: XCTestCase {
         save.tap()
 
         app.buttons["Spending"].tap()
-        let row = app.descendants(matching: .any)["toSendRow"]
-        XCTAssertTrue(row.waitForExistence(timeout: 20))
-        XCTAssertTrue(row.staticTexts["Rent"].exists)
-        app.buttons["markSentButton"].tap()
+        let tile = app.buttons["pendingToSendTile"]
+        XCTAssertTrue(tile.waitForExistence(timeout: 20))
+        XCTAssertTrue(tile.label.contains("Pending to send"), "tile reads \(tile.label)")
+        tile.tap()
+        XCTAssertTrue(app.staticTexts["stillToSend"].waitForExistence(timeout: 20))
+        app.buttons["toSendRow"].tap()
         let saveSent = app.buttons["saveSentButton"]
         XCTAssertTrue(saveSent.waitForExistence(timeout: 20))
         saveSent.tap()
 
-        XCTAssertTrue(waitForAbsence(row), "the bill is still listed to send")
+        XCTAssertTrue(app.staticTexts["Nothing to send. Bills you pay yourself appear here after you add them."].waitForExistence(timeout: 20))
+    }
+
+    @MainActor
+    func testUpcomingShowsACountAndAnIncomeSideWithTheExpectedPayouts() {
+        let app = launchApp()
+        selectTab(app, "Portfolio")
+        app.buttons["payoutSchemesLink"].tap()
+        app.buttons["addSchemeButton"].tap()
+        type(app.textFields["schemeNameField"], "Bond A")
+        type(app.textFields["schemeInvestedField"], "500000")
+        type(app.textFields["schemePayoutField"], "4100")
+        app.switches.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: 0.5)).tap()
+        app.buttons["saveSchemeButton"].tap()
+        XCTAssertTrue(app.descendants(matching: .any)["schemeRow"].waitForExistence(timeout: 20))
+
+        selectTab(app, "Activity")
+        let upcoming = app.buttons["Upcoming"]
+        XCTAssertTrue(upcoming.waitForExistence(timeout: 20))
+        XCTAssertFalse((upcoming.value as? String ?? "").isEmpty, "the Upcoming tab shows no count")
+        upcoming.tap()
+        app.buttons["Income"].tap()
+        XCTAssertTrue(app.staticTexts["Matures today"].waitForExistence(timeout: 20))
+        XCTAssertTrue(app.staticTexts["Bond A"].exists)
+        XCTAssertTrue(app.buttons["createIncomeButton"].exists)
+        XCTAssertTrue(app.buttons["addSeveralIncomeButton"].exists)
+        XCTAssertTrue(app.buttons["editUpcomingFiltersButton"].exists)
     }
 
     @MainActor
@@ -125,6 +159,7 @@ final class ActivityAndBillsUITests: XCTestCase {
         let day = app.buttons["billDay-\(today)"]
         XCTAssertTrue(day.waitForExistence(timeout: 20))
         XCTAssertTrue(day.label.contains("1 due"), "day reads \(day.label)")
+        app.buttons["billsViewSwitch"].tap()
         let add = app.buttons["addCalendarBillButton"]
         XCTAssertTrue(add.waitForExistence(timeout: 20))
         add.tap()
@@ -136,7 +171,7 @@ final class ActivityAndBillsUITests: XCTestCase {
         XCTAssertTrue(app.descendants(matching: .any)["billCalendarRow"].waitForExistence(timeout: 20), "Rent is not shown as added")
         XCTAssertTrue(app.staticTexts["Rent"].exists)
         chooseFilter(app, "notAdded")
-        XCTAssertTrue(app.staticTexts["billDayEmpty"].waitForExistence(timeout: 20))
+        XCTAssertTrue(app.staticTexts["Nothing this month."].waitForExistence(timeout: 20))
     }
 
     @MainActor

@@ -9,7 +9,7 @@ final class PortfolioUITests: XCTestCase {
 
     @MainActor
     func testAmountsStayHiddenUntilTheEyeIsTappedAndTheBankBalanceSetsNetWorth() {
-        let app = launchApp()
+        let app = launchApp(["-ui-hide-balances"])
         selectTab(app, "Portfolio")
         let netWorth = app.staticTexts["netWorth"]
         XCTAssertTrue(netWorth.waitForExistence(timeout: 20))
@@ -86,9 +86,9 @@ final class PortfolioUITests: XCTestCase {
     }
 
     @MainActor
-    private func launchApp() -> XCUIApplication {
+    private func launchApp(_ extra: [String] = []) -> XCUIApplication {
         let app = XCUIApplication()
-        app.launchArguments = ["-ui-testing"]
+        app.launchArguments = ["-ui-testing"] + extra
         app.launch()
         return app
     }

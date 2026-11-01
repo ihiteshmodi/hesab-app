@@ -3,11 +3,11 @@ Feature: Payout schemes and maturity reminders
   I want to see what pays out and when each one matures
   So that I never miss a maturity and my monthly income is easy to record
 
-  # Expected payouts show on the Bills tab as "Upcoming Income"; maturities show there too.
+  # Expected payouts show in Activity > Upcoming > Income; maturities show there too.
   # There is no separate Reminders tab.
   # Payout amounts are approximate (month length changes them),
   # so recording a payout always shows a confirmation where the date and amount can be changed.
-  # A payout counts on the Bills tab from "Payout alert" days before its date (default 5).
+  # A payout counts in Upcoming from "Payout alert" days before its date (default 5).
 
   Background:
     Given these payout schemes
@@ -21,9 +21,9 @@ Feature: Payout schemes and maturity reminders
     Then "Invested" shows 900,000
     And "Monthly payout" shows 5,750
 
-  Scenario: A maturity within 90 days appears on the Bills tab
+  Scenario: A maturity within 90 days appears in Upcoming Income
     Given today is 2026-12-15
-    When she opens the Bills tab filtered to "Upcoming Income"
+    When she opens Activity > Upcoming > Income
     Then she sees "Bond A matures in 53 days"
     And "Bank FD" is not listed
     And "Post scheme" is not listed because it has no maturity date
@@ -31,7 +31,7 @@ Feature: Payout schemes and maturity reminders
   Scenario: A payout expected inside the alert window is listed
     Given "Payout alert" is 5 days before
     And today is 2026-11-20
-    When she opens the Bills tab filtered to "Upcoming Income"
+    When she opens Activity > Upcoming > Income
     Then she sees "Bond A payout expected 24 Nov, about 800"
     And "Bank FD" is not listed because its payout is 8 days away
 
@@ -72,7 +72,7 @@ Feature: Payout schemes and maturity reminders
 
   Scenario: A matured scheme asks to be closed
     Given today is 2027-02-07
-    When she opens the Bills tab filtered to "Upcoming Income"
+    When she opens Activity > Upcoming > Income
     Then she sees "Bond A matured 1 day ago"
     When she chooses "Close Scheme"
     Then "Invested" shows 800,000

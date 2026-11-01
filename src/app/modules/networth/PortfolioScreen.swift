@@ -4,7 +4,7 @@ import SwiftUI
 struct PortfolioScreen: View {
     let model: BudgetViewModel
     @Environment(\.scenePhase) private var scenePhase
-    @State private var hidden = true
+    @State private var revealed = false
     @State private var authMessage: String?
     @State private var settingBank = false
     @State private var addingHolding = false
@@ -12,6 +12,8 @@ struct PortfolioScreen: View {
     @State private var editingHolding: Holding?
     @State private var editingFund: AllocatedFund?
     @State private var errorMessage: String?
+
+    private var hidden: Bool { model.preferences.hideBalances && !revealed }
 
     private func money(_ value: Money) -> String { hidden ? "••••••" : IndianMoneyFormat.string(value) }
 
@@ -87,7 +89,7 @@ struct PortfolioScreen: View {
                             }
                         }
                         LinkRow(title: "Payout schemes", value: money(model.payouts.investedTotal), identifier: "payoutSchemesLink") {
-                            PayoutSchemesScreen(model: model, hidden: $hidden, toggleHidden: toggle)
+                            PayoutSchemesScreen(model: model, hidden: hidden, toggleHidden: toggle)
                         }
                         addButton("Add Investment", identifier: "addHoldingButton") { addingHolding = true }
                     }
@@ -105,8 +107,10 @@ struct PortfolioScreen: View {
             .cardNavigation("Portfolio", large: true)
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
-                    Button(hidden ? "Show" : "Hide", systemImage: hidden ? "eye" : "eye.slash") { toggle() }
-                        .accessibilityIdentifier("eyeButton")
+                    if model.preferences.hideBalances {
+                        Button(hidden ? "Show" : "Hide", systemImage: hidden ? "eye" : "eye.slash") { toggle() }
+                            .accessibilityIdentifier("eyeButton")
+                    }
                 }
             }
             .sheet(isPresented: $settingBank) { BankBalanceSheet(model: model) }
@@ -116,8 +120,8 @@ struct PortfolioScreen: View {
             .sheet(item: $editingFund) { FundSheet(model: model, editing: $0) }
         }
         // On the stack, not the root: pushing Payout Schemes must not hide the amounts again.
-        .onDisappear { hidden = true }
-        .onChange(of: scenePhase) { if scenePhase != .active { hidden = true } }
+        .onDisappear { revealed = false }
+        .onChange(of: scenePhase) { if scenePhase != .active { revealed = false } }
     }
 
     private func addButton(_ title: String, identifier: String, action: @escaping () -> Void) -> some View {
@@ -127,10 +131,10 @@ struct PortfolioScreen: View {
     }
 
     private func toggle() {
-        guard hidden else { hidden = true; return }
+        guard hidden else { revealed = false; return }
         Task {
             if await PrivacyGate.authenticate(reason: "Show your amounts") {
-                hidden = false
+                revealed = true
                 authMessage = nil
             } else {
                 authMessage = "Try Again"

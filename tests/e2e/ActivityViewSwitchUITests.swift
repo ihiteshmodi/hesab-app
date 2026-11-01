@@ -28,13 +28,12 @@ final class ActivityViewSwitchUITests: XCTestCase {
     }
 
     @MainActor
-    func testIncomeStaysHiddenEvenWithHideBalancesOffAndComesBackAfterLeaving() {
-        let app = launchApp()
+    func testIncomeIsHiddenWithHideBalancesOnAndComesBackAfterLeaving() {
+        let app = launchApp(["-ui-hide-balances"])
         addSalary(app, "150000")
 
         XCTAssertEqual(app.staticTexts["incomeThisMonth"].label, "₹ ••••")
-        XCTAssertEqual(app.staticTexts["leftToSpend"].label, "₹1,50,000.00")
-        XCTAssertEqual(app.staticTexts["spentThisMonth"].label, "₹0.00")
+        XCTAssertEqual(app.staticTexts["leftToSpend"].label, "₹ ••••")
 
         app.buttons["activityEyeButton"].tap()
         XCTAssertEqual(app.staticTexts["incomeThisMonth"].label, "₹1,50,000.00")
@@ -50,7 +49,7 @@ final class ActivityViewSwitchUITests: XCTestCase {
     @MainActor
     func testAFailedFaceIDKeepsIncomeHiddenAndSaysTryAgain() {
         let app = XCUIApplication()
-        app.launchArguments = ["-ui-testing", "-ui-auth-fail"]
+        app.launchArguments = ["-ui-testing", "-ui-auth-fail", "-ui-hide-balances"]
         app.launch()
         addSalary(app, "150000")
 
@@ -64,9 +63,9 @@ final class ActivityViewSwitchUITests: XCTestCase {
     private var today: Int { Calendar.current.component(.day, from: Date()) }
 
     @MainActor
-    private func launchApp() -> XCUIApplication {
+    private func launchApp(_ extra: [String] = []) -> XCUIApplication {
         let app = XCUIApplication()
-        app.launchArguments = ["-ui-testing"]
+        app.launchArguments = ["-ui-testing"] + extra
         app.launch()
         return app
     }
