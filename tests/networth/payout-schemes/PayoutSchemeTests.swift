@@ -298,6 +298,15 @@ struct PayoutSchemeTests {
         #expect(try payouts(.init(year: 2027, month: 3)) == 1)
     }
 
+    @Test func theFirstPayoutKeepsItsOwnDateWhileLaterOnesUseThePayoutDay() throws {
+        let app = try makeApp(today: "2026-12-01")
+        let fd = try periodic(app, every: .monthly, amount: 1_000, first: "2026-12-10", day: 24)
+
+        #expect(try app.payoutDraft(fd.id).expectedDate == day("2026-12-10"))
+        try app.recordPayout(fd.id, amount: .rupees(1_000), on: day("2026-12-10"))
+        #expect(try app.payoutDraft(fd.id).expectedDate == day("2027-01-24"))
+    }
+
     @Test func theLastDayOfEveryMonthSuitsShortAndLongMonths() throws {
         let app = try makeApp(today: "2027-02-20")
         let fd = try periodic(app, every: .monthly, amount: 500, first: "2027-01-31", day: 31)

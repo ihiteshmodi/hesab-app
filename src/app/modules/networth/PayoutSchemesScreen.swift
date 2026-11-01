@@ -97,6 +97,8 @@ struct NewSchemeSheet: View {
     @State private var frequency = PayoutFrequency.monthly
     @State private var firstPayout = Calendar.current.date(byAdding: .month, value: 1, to: Date()) ?? Date()
     @State private var lastDay = false
+    @State private var payoutDay = CalendarDate(Calendar.current.date(byAdding: .month, value: 1, to: Date()) ?? Date()).day
+    @State private var dayChosenByHand = false
     @State private var hasMaturity = false
     @State private var maturity = Date()
     @State private var errorMessage: String?
@@ -118,6 +120,15 @@ struct NewSchemeSheet: View {
                     FieldRow("First payout") {
                         DatePicker("First payout", selection: $firstPayout, displayedComponents: .date).labelsHidden()
                     }
+                    FieldRow("Pays on day") {
+                        Picker("Pays on day", selection: Binding(get: { payoutDay }, set: { payoutDay = $0; dayChosenByHand = true })) {
+                            ForEach(1...31, id: \.self) { Text("\($0)").tag($0) }
+                        }
+                        .labelsHidden()
+                        .disabled(lastDay)
+                        .opacity(lastDay ? 0.35 : 1)
+                        .accessibilityIdentifier("schemePayoutDayPicker")
+                    }
                     Toggle("Always on the last day of the month", isOn: $lastDay).rowPadding()
                         .accessibilityIdentifier("schemeLastDayToggle")
                     Toggle("Has a maturity date", isOn: $hasMaturity).rowPadding()
@@ -129,6 +140,7 @@ struct NewSchemeSheet: View {
                 }
             }
             .cardNavigation(editing == nil ? "New Scheme" : "Edit Scheme")
+            .onChange(of: firstPayout) { if !dayChosenByHand { payoutDay = CalendarDate(firstPayout).day } }
             .onAppear {
                 guard let editing, name.isEmpty else { return }
                 name = editing.name
@@ -136,6 +148,8 @@ struct NewSchemeSheet: View {
                 payoutText = IndianMoneyFormat.plain(editing.payoutAmount)
                 frequency = editing.frequency
                 lastDay = editing.payoutDay == 31
+                payoutDay = editing.payoutDay
+                dayChosenByHand = true
                 firstPayout = (editing.firstPayout ?? model.payoutDraft(editing.id)?.expectedDate)?.instant() ?? firstPayout
                 hasMaturity = editing.maturity != nil
                 maturity = editing.maturity?.instant() ?? Date()
@@ -146,7 +160,7 @@ struct NewSchemeSheet: View {
                     Button("Save") {
                         let scheme = NewPayoutScheme(
                             name: name, invested: MoneyInput.parse(investedText), payoutAmount: MoneyInput.parse(payoutText),
-                            payoutDay: lastDay ? 31 : CalendarDate(firstPayout).day,
+                            payoutDay: lastDay ? 31 : payoutDay,
                             maturity: hasMaturity ? CalendarDate(maturity) : nil,
                             frequency: frequency, firstPayout: CalendarDate(firstPayout)
                         )

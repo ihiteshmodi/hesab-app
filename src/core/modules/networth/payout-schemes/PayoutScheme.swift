@@ -225,7 +225,7 @@ struct SchemeBook {
         guard !scheme.isClosed, scheme.payoutAmount > .zero else { return nil }
         let start = scheme.firstPayout?.yearMonth ?? today.yearMonth
         for turn in 0..<Self.horizonInPayouts {
-            let date = payoutDate(scheme, in: start.shifted(by: turn * scheme.frequency.months))
+            let date = scheduledDate(scheme, in: start.shifted(by: turn * scheme.frequency.months))
             if recorded[scheme.id]?.contains(Self.monthKey(date.yearMonth)) == true { continue }
             if date >= today.adding(days: -Self.overdueDays) { return date }
         }
@@ -234,6 +234,12 @@ struct SchemeBook {
 
     /// Far more payouts than any scheme will have; stops the search for a scheme whose payouts are all recorded or old.
     private static let horizonInPayouts = 1_200
+
+    /// The first payout falls on its own date; every later one on the payout day.
+    func scheduledDate(_ scheme: PayoutScheme, in month: CalendarDate.YearMonth) -> CalendarDate {
+        if let first = scheme.firstPayout, first.yearMonth == month { return first }
+        return payoutDate(scheme, in: month)
+    }
 
     /// Whether the scheme's pace puts a payout in that month.
     func paysIn(_ scheme: PayoutScheme, _ month: CalendarDate.YearMonth) -> Bool {
