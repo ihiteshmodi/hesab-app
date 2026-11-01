@@ -47,12 +47,11 @@ final class TripsUITests: XCTestCase {
         let app = launchApp()
         selectTab(app, "Trips")
         app.buttons["newTripButton"].tap()
+        chooseTripCategory(app)
         type(app.textFields["tripNameField"], "Bali trip")
         app.buttons["tripCurrencyPicker"].tap()
         app.buttons["IDR"].tap()
         type(app.textFields["tripRateField"], "0.0053")
-        app.buttons["tripCategoryPicker"].tap()
-        app.buttons["Home & Utilities"].tap()
         app.buttons["saveTripButton"].tap()
         app.descendants(matching: .any)["tripRow"].firstMatch.tap()
         addPerson(app, "Raj")
@@ -130,12 +129,24 @@ final class TripsUITests: XCTestCase {
         save.tap()
     }
 
+    /// The form starts with a category already chosen; only pick one when it shows "Choose".
+    @MainActor
+    private func chooseTripCategory(_ app: XCUIApplication) {
+        XCTAssertTrue(app.textFields["tripNameField"].waitForExistence(timeout: 20), "the trip form never opened")
+        let picker = app.buttons["tripCategoryPicker"]
+        XCTAssertTrue(picker.waitForExistence(timeout: 20), "no category picker")
+        guard picker.label.hasSuffix("Choose") else { return }
+        picker.tap()
+        let option = app.buttons["Home & Utilities"]
+        XCTAssertTrue(option.waitForExistence(timeout: 20), "the category menu has no Home & Utilities")
+        option.tap()
+    }
+
     @MainActor
     private func newTrip(_ app: XCUIApplication, name: String) {
         app.buttons["newTripButton"].tap()
+        chooseTripCategory(app)
         type(app.textFields["tripNameField"], name)
-        app.buttons["tripCategoryPicker"].tap()
-        app.buttons["Home & Utilities"].tap()
         app.buttons["saveTripButton"].tap()
         XCTAssertTrue(app.descendants(matching: .any)["tripRow"].waitForExistence(timeout: 20))
     }
