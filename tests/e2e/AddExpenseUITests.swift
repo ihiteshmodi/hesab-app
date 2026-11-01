@@ -366,6 +366,24 @@ final class AddExpenseUITests: XCTestCase {
     }
 
     @MainActor
+    func testLongCategoryAndPaymentNamesStayOnOneLineInTheForm() {
+        let app = launchApp()
+        app.buttons["addMenu"].tap()
+        app.buttons["addExpenseButton"].tap()
+        let category = app.buttons["categoryPicker"]
+        XCTAssertTrue(category.waitForExistence(timeout: 20))
+        category.tap()
+        app.buttons["Monthly Fixed Expenses"].tap()
+        let payment = app.buttons["paymentPicker"]
+        payment.tap()
+        app.buttons["Cash Withdrawal"].tap()
+
+        // A wrapped value is about 50 points tall and runs into the row below.
+        XCTAssertLessThan(category.frame.height, 40, "the category value wraps onto two lines")
+        XCTAssertLessThan(payment.frame.height, 40, "the payment value wraps onto two lines")
+    }
+
+    @MainActor
     func testTheCashTileOpensTheCashListAndAddsCashWithATitle() {
         let app = launchApp()
         let tile = app.buttons["cashInHandTile"]

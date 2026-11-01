@@ -78,7 +78,7 @@ struct AmountToRepayScreen: View {
 
 /// Where money came from or went to.
 private enum Pocket: String, CaseIterable {
-    case cash = "Cash", bank = "Bank"
+    case bank = "Bank", cash = "Cash"
 }
 
 private struct BorrowingSheet: View {
