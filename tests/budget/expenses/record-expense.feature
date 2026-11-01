@@ -41,6 +41,26 @@ Feature: Record an expense
     When she changes the amount to 1,350
     Then "Left to spend" drops by a further 100
 
+  Scenario: Priya adds a note to an expense and sees it later
+    When she adds an expense of 549 with the note "used coupon THANKYOU"
+    And she opens that expense
+    Then the note "used coupon THANKYOU" is shown
+
+  Scenario: Priya changes a note while editing
+    Given an expense of 549 with the note "used coupon THANKYOU" exists
+    When she edits it and changes the note to "coupon gave 50 off"
+    Then the expense shows the note "coupon gave 50 off"
+
+  Scenario: Editing something else keeps the note
+    Given an expense of 549 with the note "used coupon THANKYOU" exists
+    When she changes only the amount
+    Then the note is still "used coupon THANKYOU"
+
+  Scenario: An expense with no note shows no note line
+    Given an expense of 549 without a note exists
+    When she opens that expense
+    Then no note is shown
+
   Scenario: Priya deletes an expense
     Given an expense of 1,250 exists
     When she chooses "Delete Expense" and confirms
