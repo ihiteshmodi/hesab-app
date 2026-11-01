@@ -9,6 +9,7 @@ struct PortfolioScreen: View {
     @State private var settingBank = false
     @State private var addingHolding = false
     @State private var addingFund = false
+    @State private var addingLedger = false
     @State private var editingHolding: Holding?
     @State private var editingFund: AllocatedFund?
     @State private var errorMessage: String?
@@ -44,18 +45,13 @@ struct PortfolioScreen: View {
                         .buttonStyle(.plain)
                         .accessibilityIdentifier("setBankBalanceButton")
                         ForEach(model.ledgers?.ledgers ?? [], id: \.ledger.id) { summary in
-                            Toggle(isOn: Binding(
-                                get: { summary.ledger.countsTowardsNetWorth },
-                                set: { errorMessage = model.setLedgerCountsTowardsNetWorth(summary.ledger.id, $0) }
-                            )) {
-                                VStack(alignment: .leading, spacing: 1) {
-                                    Text("\(summary.ledger.name) (counted)")
-                                    Text(money(summary.balance)).font(.footnote).foregroundStyle(Theme.secondary).monospacedDigit()
-                                }
-                            }
-                            .rowPadding()
-                            .accessibilityIdentifier("countLedger-\(summary.ledger.name)")
+                            LinkRow(
+                                title: summary.ledger.name,
+                                subtitle: summary.ledger.countsTowardsNetWorth ? "Counted in net worth" : "Not counted",
+                                value: money(summary.balance), identifier: "ledgerRow-\(summary.ledger.name)"
+                            ) { LedgerDetailScreen(model: model, ledgerID: summary.ledger.id, hidden: hidden) }
                         }
+                        addButton("Add Person", identifier: "addLedgerButton") { addingLedger = true }
                         CardRow(title: "Free to allocate") {
                             Text(money(portfolio.availableForAllocation)).monospacedDigit().fontWeight(.semibold)
                                 .accessibilityIdentifier("freeToAllocate")
@@ -116,6 +112,7 @@ struct PortfolioScreen: View {
             .sheet(isPresented: $settingBank) { BankBalanceSheet(model: model) }
             .sheet(isPresented: $addingHolding) { HoldingSheet(model: model) }
             .sheet(isPresented: $addingFund) { FundSheet(model: model) }
+            .sheet(isPresented: $addingLedger) { NewLedgerSheet(model: model) }
             .sheet(item: $editingHolding) { HoldingSheet(model: model, editing: $0) }
             .sheet(item: $editingFund) { FundSheet(model: model, editing: $0) }
         }

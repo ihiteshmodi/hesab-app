@@ -181,4 +181,66 @@ struct BorrowingTests {
         #expect(BorrowingError.notFound(1).message == "That borrowing no longer exists.")
         #expect(BorrowingError.repaymentNotFound(1).message == "That repayment no longer exists.")
     }
+
+    @Test func borrowingInCashRaisesCashInHandButNotLeftToSpend() throws {
+        let app = try appWithTwentyThousand()
+
+        try app.addIncome(NewIncome(kind: .borrowed, amount: .rupees(3_000), note: "Ben", viaCash: true))
+
+        #expect(try app.cashInHand().balance == .rupees(3_000))
+        #expect(try app.monthBudget().leftToSpend == .rupees(20_000))
+        #expect(try app.amountToRepay().total == .rupees(3_000))
+    }
+
+    @Test func borrowingIntoTheBankRaisesLeftToSpendButNotCash() throws {
+        let app = try appWithTwentyThousand()
+
+        try app.addIncome(NewIncome(kind: .borrowed, amount: .rupees(3_000), note: "Ben", viaCash: false))
+
+        #expect(try app.cashInHand().balance == .zero)
+        #expect(try app.monthBudget().leftToSpend == .rupees(23_000))
+    }
+
+    @Test func repayingFromCashLowersCashButNotLeftToSpend() throws {
+        let app = try appWithTwentyThousand()
+        let loan = try app.addIncome(NewIncome(kind: .borrowed, amount: .rupees(3_000), note: "Ben", viaCash: true))
+
+        try app.recordRepayment(loan.id, .rupees(1_000))
+
+        #expect(try app.cashInHand().balance == .rupees(2_000))
+        #expect(try app.monthBudget().leftToSpend == .rupees(20_000))
+    }
+
+    @Test func aRepaymentCanComeFromADifferentPocketThanTheBorrowing() throws {
+        let app = try appWithTwentyThousand()
+        let loan = try app.addIncome(NewIncome(kind: .borrowed, amount: .rupees(3_000), note: "Ben", viaCash: true))
+
+        try app.recordRepayment(loan.id, .rupees(1_000), fromCash: false)
+
+        #expect(try app.cashInHand().balance == .rupees(3_000))
+        #expect(try app.monthBudget().leftToSpend == .rupees(19_000))
+    }
+
+    @Test func cashBorrowingsAndRepaymentsShowInTheCashListWithTheirTitles() throws {
+        let app = try appWithTwentyThousand()
+        let loan = try app.addIncome(NewIncome(date: day("2026-10-30"), kind: .borrowed, amount: .rupees(3_000), note: "Ben", viaCash: true))
+        try app.recordRepayment(loan.id, .rupees(1_000), on: day("2026-10-30"))
+
+        let lines = try app.cashInHand().lines
+
+        #expect(lines.map(\.description) == ["Borrowed from Ben", "Repaid Ben"])
+        #expect(lines.map(\.amount) == [.rupees(3_000), .rupees(-1_000)])
+        #expect(lines.last?.runningBalance == .rupees(2_000))
+    }
+
+    @Test func aBorrowingEditedToBankMovesItsMoneyOutOfCash() throws {
+        let app = try appWithTwentyThousand()
+        let loan = try app.addIncome(NewIncome(kind: .borrowed, amount: .rupees(3_000), note: "Ben", viaCash: true))
+
+        try app.updateIncome(loan.id, NewIncome(kind: .borrowed, amount: .rupees(3_000), note: "Ben", viaCash: false))
+
+        #expect(try app.cashInHand().balance == .zero)
+        #expect(try app.monthBudget().leftToSpend == .rupees(23_000))
+    }
 }
+

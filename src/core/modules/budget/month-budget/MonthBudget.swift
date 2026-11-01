@@ -51,9 +51,10 @@ public struct MonthBudget: Equatable, Sendable {
         self.earnedByDay = Dictionary(grouping: incomeCounted, by: \.date.day)
             .mapValues { $0.reduce(Money.zero) { $0 + $1.amount } }
             .filter { $0.value != .zero }
-        let moneyIn = allIncome.filter(\.kind.addsToLeftToSpend).reduce(Money.zero) { $0 + $1.amount }
+        let moneyIn = allIncome.filter { $0.kind.addsToLeftToSpend && !($0.kind == .borrowed && $0.viaCash) }
+            .reduce(Money.zero) { $0 + $1.amount }
         let savings = allIncome.filter { !$0.kind.addsToLeftToSpend }.reduce(Money.zero) { $0 + $1.amount }
-        let repaid = allRepayments.reduce(Money.zero) { $0 + $1.amount }
+        let repaid = allRepayments.filter { !$0.fromCash }.reduce(Money.zero) { $0 + $1.amount }
         self.leftToSpend = moneyIn - savings - repaid - allExpenses.reduce(.zero) { $0 + bankSpend($1) }
         self.hasNoEntriesAtAll = allExpenses.isEmpty && allIncome.isEmpty
         self.refundsThisMonth = RefundSummary(expenses: expensesInMonth)

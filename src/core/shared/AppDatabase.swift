@@ -358,6 +358,15 @@ public final class AppDatabase: Sendable {
             }
         }
 
+        migrator.registerMigration("v18-borrowing-pockets") { db in
+            try db.alter(table: "income_entry") { table in
+                table.add(column: "via_cash", .boolean).notNull().defaults(to: false)
+            }
+            try db.alter(table: "repayment") { table in
+                table.add(column: "from_cash", .boolean).notNull().defaults(to: false)
+            }
+        }
+
         return migrator
     }
 }

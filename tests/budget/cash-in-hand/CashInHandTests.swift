@@ -146,4 +146,23 @@ struct CashInHandTests {
         #expect(lines.map(\.description) == ["ATM", "Chai"])
         #expect(lines.map(\.runningBalance) == [.rupees(10_000), .rupees(9_550)])
     }
+
+    @Test func addingCashWithATitleRaisesCashInHandAndShowsInTheList() throws {
+        let app = try makeApp(today: "2026-10-30")
+
+        try app.addCash(.rupees(2_000), note: "Gift from Dad")
+
+        let cash = try app.cashInHand()
+        #expect(cash.balance == .rupees(2_000))
+        #expect(cash.lines.map(\.description) == ["Gift from Dad"])
+        #expect(try app.monthBudget().leftToSpend == .zero)
+    }
+
+    @Test func addingCashNeedsAnAmountAboveZero() throws {
+        let app = try makeApp()
+
+        #expect(throws: CashError.amountMissingOrZero) { try app.addCash(.zero, note: "x") }
+        #expect(throws: CashError.amountMissingOrZero) { try app.addCash(nil, note: "x") }
+    }
 }
+

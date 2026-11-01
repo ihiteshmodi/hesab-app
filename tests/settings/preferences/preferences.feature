@@ -19,8 +19,9 @@ Feature: Preferences
 
   # Privacy
   # With Hide Balances on, only these are masked: "Income in <month>" in the summary card (the Activity eye),
-  # the whole Savings pane (its own eye), Portfolio and Payout Schemes (their eye). Everything else always shows:
-  # Left to spend, Spent, pending refunds, pending to send, upcoming amounts, lists, calendar, Bills, Reports, Trips.
+  # Portfolio, with the ledgers opened from it, and Payout Schemes (their eye). Everything else always shows:
+  # Left to spend, Spent, pending refunds, pending to send, cash in hand, amount to repay, upcoming amounts, lists,
+  # calendar, Bills, Reports, Trips.
   Scenario: Hiding balances masks only the private figures
     Given "Left to spend" shows ₹15,226.42 and there are pending refunds and an upcoming bill
     When she turns on "Hide Balances"
@@ -31,16 +32,13 @@ Feature: Preferences
 
   Scenario: With Hide Balances off nothing is masked and no eye is shown
     Given "Hide Balances" is off
-    When she opens Activity, its Savings tab, Portfolio and Payout Schemes
+    When she opens Activity, Portfolio and Payout Schemes
     Then every figure shows and there is no eye
 
-  Scenario: With Hide Balances on, the savings bank balance is hidden until she asks
-    Given "Hide Balances" is on and she opens Activity and chooses the Savings tab
-    Then the savings bank balance shows "₹ ••••••" with a crossed-out eye
-    And ledgers, cash in hand, amount to repay, income, expenses and cash flow show "₹ ••••"
-    And ledgers, cash in hand and amount to repay cannot be opened
-    When she taps the eye and authenticates with Face ID
-    Then every figure on the pane shows until she leaves the screen
+  Scenario: A person's ledger opened from a hidden Portfolio stays hidden
+    Given "Hide Balances" is on and Portfolio is hidden
+    When she opens a person's ledger from Portfolio
+    Then the balance and every entry amount show "••••••"
 
   Scenario: With Hide Balances on, Portfolio is hidden until she asks
     Given "Hide Balances" is on

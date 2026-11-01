@@ -7,7 +7,10 @@ public struct AddIncome: Sendable {
         guard let amount = new.amount, amount > .zero else { throw IncomeValidationError.amountMissingOrZero }
         guard let kind = new.kind else { throw IncomeValidationError.typeMissing }
         guard kind != .borrowed || !new.note.trimmed.isEmpty else { throw IncomeValidationError.lenderMissing }
-        return try income.add(date: new.date ?? clock.today(), kind: kind, amount: amount, note: new.note.trimmed)
+        return try income.add(
+            date: new.date ?? clock.today(), kind: kind, amount: amount, note: new.note.trimmed,
+            viaCash: kind == .borrowed && new.viaCash
+        )
     }
 }
 
@@ -19,7 +22,10 @@ public struct UpdateIncome: Sendable {
         guard let amount = new.amount, amount > .zero else { throw IncomeValidationError.amountMissingOrZero }
         guard let kind = new.kind else { throw IncomeValidationError.typeMissing }
         guard kind != .borrowed || !new.note.trimmed.isEmpty else { throw IncomeValidationError.lenderMissing }
-        try income.update(id, date: new.date ?? clock.today(), kind: kind, amount: amount, note: new.note.trimmed)
+        try income.update(
+            id, date: new.date ?? clock.today(), kind: kind, amount: amount, note: new.note.trimmed,
+            viaCash: kind == .borrowed && new.viaCash
+        )
     }
 }
 

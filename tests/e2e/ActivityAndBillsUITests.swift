@@ -50,7 +50,7 @@ final class ActivityAndBillsUITests: XCTestCase {
     @MainActor
     func testABillYouAddYourselfWaitsInUpcomingAndIsAddedFromThere() {
         let app = launchApp()
-        app.buttons["Upcoming"].tap()
+        app.buttons["Upcoming Expenses"].tap()
         XCTAssertTrue(app.staticTexts["upcomingEmpty"].waitForExistence(timeout: 20))
 
         app.buttons["createBillButton"].tap()
@@ -71,7 +71,7 @@ final class ActivityAndBillsUITests: XCTestCase {
     @MainActor
     func testABillIsEditedInAllBillsAndNotFromUpcoming() {
         let app = launchApp()
-        app.buttons["Upcoming"].tap()
+        app.buttons["Upcoming Expenses"].tap()
         app.buttons["createBillButton"].tap()
         fillBill(app, "Internet", "800")
 
@@ -92,7 +92,7 @@ final class ActivityAndBillsUITests: XCTestCase {
     @MainActor
     func testABillYouPayYourselfStaysPendingToSendUntilTickedSentWithADate() {
         let app = launchApp()
-        app.buttons["Upcoming"].tap()
+        app.buttons["Upcoming Expenses"].tap()
         app.buttons["createBillButton"].tap()
         fillBill(app, "Rent", "20000")
         XCTAssertTrue(app.descendants(matching: .any)["upcomingRow"].waitForExistence(timeout: 20))
@@ -129,11 +129,10 @@ final class ActivityAndBillsUITests: XCTestCase {
         XCTAssertTrue(app.descendants(matching: .any)["schemeRow"].waitForExistence(timeout: 20))
 
         selectTab(app, "Activity")
-        let upcoming = app.buttons["Upcoming"]
+        let upcoming = app.buttons["Upcoming Income"]
         XCTAssertTrue(upcoming.waitForExistence(timeout: 20))
-        XCTAssertFalse((upcoming.value as? String ?? "").isEmpty, "the Upcoming tab shows no count")
+        XCTAssertFalse((upcoming.value as? String ?? "").isEmpty, "the Upcoming Income tab shows no count")
         upcoming.tap()
-        app.buttons["Income"].tap()
         XCTAssertTrue(app.staticTexts["Matures today"].waitForExistence(timeout: 20))
         XCTAssertTrue(app.staticTexts["Bond A"].exists)
         XCTAssertTrue(app.buttons["createIncomeButton"].exists)
@@ -145,7 +144,7 @@ final class ActivityAndBillsUITests: XCTestCase {
     func testUpcomingBillAmountsStayVisibleWithHideBalancesOn() {
         let app = launchApp(["-ui-hide-balances"])
         XCTAssertEqual(app.staticTexts["leftToSpend"].label, "₹0.00")
-        app.buttons["Upcoming"].tap()
+        app.buttons["Upcoming Expenses"].tap()
         app.buttons["createBillButton"].tap()
         fillBill(app, "Internet", "800")
 
@@ -157,7 +156,7 @@ final class ActivityAndBillsUITests: XCTestCase {
     @MainActor
     func testANewBillWaitsToBeAddedAndNeverAddsItself() {
         let app = launchApp()
-        app.buttons["Upcoming"].tap()
+        app.buttons["Upcoming Expenses"].tap()
         app.buttons["createBillButton"].tap()
         fillBill(app, "Internet", "800")
 

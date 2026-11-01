@@ -34,6 +34,17 @@ Feature: People ledgers
       | Annual tax share    | -12,000 |
     Then the Neighbor ledger shows 28,000
 
+  # People ledgers live in Portfolio: tap a name to open and manage that person's entries.
+  Scenario: Priya opens a person's ledger from Portfolio
+    Given Mom 50,000 and Sam 70,000
+    When she opens Portfolio and taps "Mom"
+    Then she sees Mom's balance and entries, and can add or delete entries and delete the ledger
+    And she can switch "Counts towards my net worth" on or off there
+
+  Scenario: Priya adds a person from Portfolio
+    When she opens Portfolio and chooses "Add Person" and enters "Aunt"
+    Then "Aunt" appears in Portfolio with balance 0
+
   Scenario: Priya sees what is held for others
     Given Mom 50,000, Sam 70,000 and Neighbor 28,000
     When she opens Ledgers

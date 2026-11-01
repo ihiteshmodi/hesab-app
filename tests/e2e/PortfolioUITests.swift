@@ -61,6 +61,23 @@ final class PortfolioUITests: XCTestCase {
     }
 
     @MainActor
+    func testATapOnAPersonInPortfolioOpensTheirLedgerWithItsOwnSwitch() {
+        let app = launchApp()
+        selectTab(app, "Portfolio")
+        app.buttons["addLedgerButton"].tap()
+        let name = app.textFields["ledgerNameField"]
+        XCTAssertTrue(name.waitForExistence(timeout: 20))
+        name.tap()
+        name.typeText("Mom")
+        app.buttons["saveLedgerButton"].tap()
+
+        app.buttons["ledgerRow-Mom"].tap()
+
+        XCTAssertTrue(app.buttons["addLedgerEntryButton"].waitForExistence(timeout: 20))
+        XCTAssertTrue(app.switches["ledgerCountedToggle"].exists)
+    }
+
+    @MainActor
     func testTheLastDaySwitchGreysOutThePayoutDay() {
         let app = launchApp()
         selectTab(app, "Portfolio")

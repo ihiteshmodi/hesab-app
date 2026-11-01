@@ -24,35 +24,32 @@ final class PrivacyUITests: XCTestCase {
     }
 
     @MainActor
-    func testTheSavingsBankBalanceStaysHiddenUntilTheEyeIsTapped() {
-        let app = launchApp(["-ui-hide-balances"])
-        app.buttons["Savings"].tap()
-
-        let balance = app.staticTexts["savingsBalance"]
-        XCTAssertTrue(balance.waitForExistence(timeout: 20))
-        XCTAssertEqual(balance.label, "₹ ••••••")
-        XCTAssertEqual(app.staticTexts["savingsIncome"].label, "₹ ••••")
-        XCTAssertEqual(app.staticTexts["savingsCashFlow"].label, "₹ ••••")
-        XCTAssertFalse(app.buttons["Ledgers"].exists, "ledgers can be opened while the pane is locked")
-        app.buttons["savingsEyeButton"].tap()
-        XCTAssertTrue(app.staticTexts["₹0.00"].waitForExistence(timeout: 20))
-        XCTAssertEqual(app.staticTexts["savingsIncome"].label, "₹0.00")
-        XCTAssertTrue(app.buttons["Ledgers"].exists)
-    }
-
-    @MainActor
     func testWithHideBalancesOffNothingIsMaskedAndThereIsNoEye() {
         let app = launchApp()
         XCTAssertTrue(app.staticTexts["leftToSpend"].waitForExistence(timeout: 20))
         XCTAssertEqual(app.staticTexts["incomeThisMonth"].label, "₹0.00")
         XCTAssertFalse(app.buttons["activityEyeButton"].exists)
-        app.buttons["Savings"].tap()
-        XCTAssertEqual(app.staticTexts["savingsBalance"].label, "₹0.00")
-        XCTAssertFalse(app.buttons["savingsEyeButton"].exists)
         selectTab(app, "Portfolio")
         XCTAssertTrue(app.staticTexts["netWorth"].waitForExistence(timeout: 20))
         XCTAssertEqual(app.staticTexts["netWorth"].label, "₹0.00")
         XCTAssertFalse(app.buttons["eyeButton"].exists)
+    }
+
+    @MainActor
+    func testALedgerOpenedFromAHiddenPortfolioStaysHidden() {
+        let app = launchApp(["-ui-hide-balances"])
+        selectTab(app, "Portfolio")
+        app.buttons["addLedgerButton"].tap()
+        let name = app.textFields["ledgerNameField"]
+        XCTAssertTrue(name.waitForExistence(timeout: 20))
+        name.tap()
+        name.typeText("Mom")
+        app.buttons["saveLedgerButton"].tap()
+        app.buttons["ledgerRow-Mom"].tap()
+
+        let balance = app.staticTexts["ledgerBalance"]
+        XCTAssertTrue(balance.waitForExistence(timeout: 20))
+        XCTAssertEqual(balance.label, "••••••")
     }
 
     @MainActor
