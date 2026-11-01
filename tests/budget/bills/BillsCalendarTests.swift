@@ -31,7 +31,7 @@ struct BillsCalendarTests {
         let rent = try #require(try app.bills().first { $0.bill.name == "Rent" }).bill
         try app.addBillOccurrence(rent.id, try app.billDraft(rent.id))
         try app.addScheme(NewPayoutScheme(
-            name: "RBI bond", invested: .rupees(1_00_000), monthlyPayout: .rupees(2_000), payoutDay: 20, maturity: nil
+            name: "RBI bond", invested: .rupees(1_00_000), payoutAmount: .rupees(2_000), payoutDay: 20, maturity: nil
         ))
         try app.addIncome(NewIncome(date: day("2026-11-01"), kind: .salary, amount: .rupees(1_50_000)))
         return app
@@ -184,7 +184,7 @@ struct BillsCalendarTests {
     @Test func noPayoutIsExpectedAfterTheSchemeMatures() throws {
         let app = try makeApp()
         try app.addScheme(NewPayoutScheme(
-            name: "FD", invested: .rupees(50_000), monthlyPayout: .rupees(400), payoutDay: 20,
+            name: "FD", invested: .rupees(50_000), payoutAmount: .rupees(400), payoutDay: 20,
             maturity: day("2026-11-25")
         ))
 
@@ -199,7 +199,7 @@ struct BillsCalendarTests {
         try app.addBill(newBill("Rent", 20_000, due: "2026-11-01"))
         try app.addBill(newBill("Insurance", 1_500, due: "2026-11-01", repeats: .never))
         try app.addScheme(NewPayoutScheme(
-            name: "RBI bond", invested: .rupees(1_00_000), monthlyPayout: .rupees(2_000), payoutDay: 3, maturity: nil
+            name: "RBI bond", invested: .rupees(1_00_000), payoutAmount: .rupees(2_000), payoutDay: 3, maturity: nil
         ))
 
         let attention = try app.billsAttention()

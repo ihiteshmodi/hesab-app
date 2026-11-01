@@ -351,6 +351,13 @@ public final class AppDatabase: Sendable {
             try db.execute(sql: "UPDATE bill_occurrence SET sent_on = due_date")
         }
 
+        migrator.registerMigration("v17-payout-pace") { db in
+            try db.alter(table: "payout_scheme") { table in
+                table.add(column: "frequency_months", .integer).notNull().defaults(to: 1)
+                table.add(column: "first_payout", .text)
+            }
+        }
+
         return migrator
     }
 }

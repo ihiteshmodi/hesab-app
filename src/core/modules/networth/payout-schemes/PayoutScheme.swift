@@ -1,28 +1,69 @@
 import GRDB
 
+/// How often a scheme pays, in months.
+public enum PayoutFrequency: Int, CaseIterable, Sendable {
+    case monthly = 1, quarterly = 3, halfYearly = 6, yearly = 12
+
+    public var months: Int { rawValue }
+
+    public var title: String {
+        switch self {
+        case .monthly: "Every month"
+        case .quarterly: "Every 3 months"
+        case .halfYearly: "Every 6 months"
+        case .yearly: "Every year"
+        }
+    }
+
+    /// "month" in "800 / month".
+    public var unit: String {
+        switch self {
+        case .monthly: "month"
+        case .quarterly: "quarter"
+        case .halfYearly: "half-year"
+        case .yearly: "year"
+        }
+    }
+}
+
 public struct PayoutScheme: Equatable, Sendable {
     public let id: Int64
     public let name: String
     public let invested: Money
-    public let monthlyPayout: Money
+    /// What one payout pays, whatever the frequency.
+    public let payoutAmount: Money
+    /// 31 means the last day of every month.
     public let payoutDay: Int
     public let maturity: CalendarDate?
     public let isClosed: Bool
+    public let frequency: PayoutFrequency
+    /// Later payouts follow from this month at the scheme's pace; nil for schemes made before it existed (monthly).
+    public let firstPayout: CalendarDate?
+
+    /// What the scheme pays on average each month.
+    public var monthlyEquivalent: Money { Money(paise: payoutAmount.paise / frequency.months) }
 }
 
 public struct NewPayoutScheme: Sendable {
     public var name: String
     public var invested: Money?
-    public var monthlyPayout: Money?
+    public var payoutAmount: Money?
     public var payoutDay: Int
     public var maturity: CalendarDate?
+    public var frequency: PayoutFrequency
+    public var firstPayout: CalendarDate?
 
-    public init(name: String, invested: Money?, monthlyPayout: Money?, payoutDay: Int, maturity: CalendarDate?) {
+    public init(
+        name: String, invested: Money?, payoutAmount: Money?, payoutDay: Int, maturity: CalendarDate?,
+        frequency: PayoutFrequency = .monthly, firstPayout: CalendarDate? = nil
+    ) {
         self.name = name
         self.invested = invested
-        self.monthlyPayout = monthlyPayout
+        self.payoutAmount = payoutAmount
         self.payoutDay = payoutDay
         self.maturity = maturity
+        self.frequency = frequency
+        self.firstPayout = firstPayout
     }
 }
 
@@ -94,12 +135,16 @@ final class PayoutSchemeRepository: Sendable {
     func add(_ new: NewPayoutScheme, name: String, invested: Money, payout: Money) throws -> PayoutScheme {
         try database.writer.write { db in
             try db.execute(sql: """
-                INSERT INTO payout_scheme (name, invested_paise, payout_paise, payout_day, maturity, closed)
-                VALUES (?, ?, ?, ?, ?, 0)
-                """, arguments: [name, invested.paise, payout.paise, new.payoutDay, new.maturity?.isoString])
+                INSERT INTO payout_scheme (name, invested_paise, payout_paise, payout_day, maturity, closed, frequency_months, first_payout)
+                VALUES (?, ?, ?, ?, ?, 0, ?, ?)
+                """, arguments: [
+                    name, invested.paise, payout.paise, new.payoutDay, new.maturity?.isoString,
+                    new.frequency.months, new.firstPayout?.isoString
+                ])
             return PayoutScheme(
-                id: db.lastInsertedRowID, name: name, invested: invested, monthlyPayout: payout,
-                payoutDay: new.payoutDay, maturity: new.maturity, isClosed: false
+                id: db.lastInsertedRowID, name: name, invested: invested, payoutAmount: payout,
+                payoutDay: new.payoutDay, maturity: new.maturity, isClosed: false,
+                frequency: new.frequency, firstPayout: new.firstPayout
             )
         }
     }
@@ -109,9 +154,11 @@ final class PayoutSchemeRepository: Sendable {
             try Row.fetchAll(db, sql: "SELECT * FROM payout_scheme ORDER BY id").map { row in
                 PayoutScheme(
                     id: row["id"], name: row["name"], invested: Money(paise: row["invested_paise"]),
-                    monthlyPayout: Money(paise: row["payout_paise"]), payoutDay: row["payout_day"],
+                    payoutAmount: Money(paise: row["payout_paise"]), payoutDay: row["payout_day"],
                     maturity: try (row["maturity"] as String?).map { try CalendarDate(isoString: $0) },
-                    isClosed: row["closed"]
+                    isClosed: row["closed"],
+                    frequency: PayoutFrequency(rawValue: row["frequency_months"]) ?? .monthly,
+                    firstPayout: try (row["first_payout"] as String?).map { try CalendarDate(isoString: $0) }
                 )
             }
         }
@@ -125,9 +172,13 @@ final class PayoutSchemeRepository: Sendable {
     func update(_ id: Int64, _ new: NewPayoutScheme, name: String, invested: Money, payout: Money) throws {
         try database.writer.write { db in
             try db.execute(sql: """
-                UPDATE payout_scheme SET name = ?, invested_paise = ?, payout_paise = ?, payout_day = ?, maturity = ?
+                UPDATE payout_scheme SET name = ?, invested_paise = ?, payout_paise = ?, payout_day = ?, maturity = ?,
+                    frequency_months = ?, first_payout = ?
                 WHERE id = ?
-                """, arguments: [name, invested.paise, payout.paise, new.payoutDay, new.maturity?.isoString, id])
+                """, arguments: [
+                    name, invested.paise, payout.paise, new.payoutDay, new.maturity?.isoString,
+                    new.frequency.months, new.firstPayout?.isoString, id
+                ])
             guard db.changesCount > 0 else { throw PayoutSchemeError.notFound(id) }
         }
     }
@@ -171,12 +222,24 @@ struct SchemeBook {
 
     /// The next payout not yet recorded; one is still expected for a week after its day, then the next one is.
     func expectedPayout(_ scheme: PayoutScheme) -> CalendarDate? {
-        guard !scheme.isClosed, scheme.monthlyPayout > .zero else { return nil }
-        var month = today.yearMonth
-        if recorded[scheme.id]?.contains(Self.monthKey(month)) == true { month = month.shifted(by: 1) }
-        let thisMonth = payoutDate(scheme, in: month)
-        if thisMonth < today.adding(days: -Self.overdueDays) { return payoutDate(scheme, in: month.shifted(by: 1)) }
-        return thisMonth
+        guard !scheme.isClosed, scheme.payoutAmount > .zero else { return nil }
+        let start = scheme.firstPayout?.yearMonth ?? today.yearMonth
+        for turn in 0..<Self.horizonInPayouts {
+            let date = payoutDate(scheme, in: start.shifted(by: turn * scheme.frequency.months))
+            if recorded[scheme.id]?.contains(Self.monthKey(date.yearMonth)) == true { continue }
+            if date >= today.adding(days: -Self.overdueDays) { return date }
+        }
+        return nil
+    }
+
+    /// Far more payouts than any scheme will have; stops the search for a scheme whose payouts are all recorded or old.
+    private static let horizonInPayouts = 1_200
+
+    /// Whether the scheme's pace puts a payout in that month.
+    func paysIn(_ scheme: PayoutScheme, _ month: CalendarDate.YearMonth) -> Bool {
+        guard let first = scheme.firstPayout?.yearMonth else { return true }
+        let apart = (month.year - first.year) * 12 + month.month - first.month
+        return apart >= 0 && apart % scheme.frequency.months == 0
     }
 
     static let overdueDays = 7
@@ -193,7 +256,7 @@ struct SchemeBook {
             if let expected = expectedPayout(scheme), today.days(until: expected) <= preferences.payoutAlertDays {
                 items.append(UpcomingIncomeItem(
                     kind: .payout, scheme: scheme, date: expected,
-                    label: "\(scheme.name) payout expected \(expected.shortTitle), about \(IndianMoneyFormat.plain(scheme.monthlyPayout))"
+                    label: "\(scheme.name) payout expected \(expected.shortTitle), about \(IndianMoneyFormat.plain(scheme.payoutAmount))"
                 ))
             }
             if let maturity = scheme.maturity {
@@ -253,7 +316,7 @@ private func validatedScheme(_ new: NewPayoutScheme) throws -> (name: String, in
     let name = new.name.trimmed
     guard !name.isEmpty else { throw PayoutSchemeError.nameMissing }
     guard let invested = new.invested, invested > .zero else { throw PayoutSchemeError.amountMissingOrZero }
-    guard let payout = new.monthlyPayout, payout >= .zero else { throw PayoutSchemeError.payoutInvalid }
+    guard let payout = new.payoutAmount, payout >= .zero else { throw PayoutSchemeError.payoutInvalid }
     guard (1...31).contains(new.payoutDay) else { throw PayoutSchemeError.payoutDayInvalid }
     return (name, invested, payout)
 }
@@ -266,7 +329,7 @@ public struct GetPayoutSchemes: Sendable {
         let open = all.filter { !$0.isClosed }
         return PayoutOverview(
             schemes: all.map(SchemeLine.init), investedTotal: open.reduce(.zero) { $0 + $1.invested },
-            monthlyPayoutTotal: open.reduce(.zero) { $0 + $1.monthlyPayout }
+            monthlyPayoutTotal: open.reduce(.zero) { $0 + $1.monthlyEquivalent }
         )
     }
 }
@@ -290,7 +353,7 @@ public struct GetPayoutDraft: Sendable {
         let note = late == 0 ? "on the expected date"
             : late > 0 ? "\(late) day\(late == 1 ? "" : "s") later than expected"
             : "\(-late) day\(late == -1 ? "" : "s") earlier than expected"
-        return PayoutDraft(date: book.today, amount: scheme.monthlyPayout, expectedDate: expected, note: note)
+        return PayoutDraft(date: book.today, amount: scheme.payoutAmount, expectedDate: expected, note: note)
     }
 }
 

@@ -59,6 +59,19 @@ struct MonthBudgetTests {
         #expect(october.spentByDay.values.reduce(.zero, +) == october.spentThisMonth)
     }
 
+    @Test func theMonthCalendarShowsWhatWasEarnedEachDayButNotSavings() throws {
+        let app = try makeApp(today: "2026-10-30")
+        try app.addIncome(NewIncome(date: day("2026-10-01"), kind: .salary, amount: .rupees(150_000)))
+        try app.addIncome(NewIncome(date: day("2026-10-01"), kind: .investmentIncome, amount: .rupees(500)))
+        try app.addIncome(NewIncome(date: day("2026-10-02"), kind: .savings, amount: .rupees(10_000)))
+        try app.addIncome(NewIncome(date: day("2026-09-30"), kind: .salary, amount: .rupees(7)))
+
+        let october = try app.monthBudget()
+
+        #expect(october.earnedByDay == [1: .rupees(150_500)])
+        #expect(october.earnedByDay.values.reduce(.zero, +) == october.incomeThisMonth)
+    }
+
     @Test func nothingRecordedShowsZero() throws {
         let app = try makeApp()
 

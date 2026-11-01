@@ -171,7 +171,7 @@ struct ExtraPlan {
                 guard let day = Int(field("payout_day")) else { throw Self.bad(line, "portfolio", "\(field("payout_day")) is not a payout day") }
                 schemes.append((NewPayoutScheme(
                     name: field("name"), invested: amount,
-                    monthlyPayout: try Self.money(field("payout"), line: line, file: "portfolio"), payoutDay: day,
+                    payoutAmount: try Self.money(field("payout"), line: line, file: "portfolio"), payoutDay: day,
                     maturity: field("maturity").isEmpty ? nil : try Self.date(field("maturity"), line: line, file: "portfolio")
                 ), field("closed").lowercased() == "yes"))
             default:

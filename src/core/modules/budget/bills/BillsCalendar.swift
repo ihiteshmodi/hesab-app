@@ -112,12 +112,12 @@ extension BillBook {
 extension SchemeBook {
     func expectedPayouts(in month: CalendarDate.YearMonth) -> [CalendarItem] {
         schemes.compactMap { scheme -> CalendarItem? in
-            guard let next = expectedPayout(scheme) else { return nil }
+            guard paysIn(scheme, month), let next = expectedPayout(scheme) else { return nil }
             let date = payoutDate(scheme, in: month)
             // Recorded months are always before the next expected payout, so `date >= next` leaves them out.
             guard date >= next, scheme.maturity.map({ date <= $0 }) ?? true else { return nil }
             return CalendarItem(
-                kind: .expectedPayout, date: date, name: scheme.name, amount: scheme.monthlyPayout,
+                kind: .expectedPayout, date: date, name: scheme.name, amount: scheme.payoutAmount,
                 detail: "Payout expected", isAutomatic: false, canAdd: false, canRecord: date == next,
                 billID: nil, schemeID: scheme.id
             )

@@ -8,7 +8,7 @@ struct PayoutSchemeTests {
         _ app: BudgetApp, _ name: String, invested: Int, payout: Int, day payoutDay: Int, maturity: String?
     ) throws -> PayoutScheme {
         try app.addScheme(NewPayoutScheme(
-            name: name, invested: .rupees(invested), monthlyPayout: .rupees(payout), payoutDay: payoutDay,
+            name: name, invested: .rupees(invested), payoutAmount: .rupees(payout), payoutDay: payoutDay,
             maturity: maturity.map(day)
         ))
     }
@@ -143,7 +143,7 @@ struct PayoutSchemeTests {
         let app = try makeApp()
 
         let error = #expect(throws: PayoutSchemeError.self) {
-            try app.addScheme(NewPayoutScheme(name: name, invested: invested, monthlyPayout: payout, payoutDay: 5, maturity: nil))
+            try app.addScheme(NewPayoutScheme(name: name, invested: invested, payoutAmount: payout, payoutDay: 5, maturity: nil))
         }
 
         #expect(error?.message == message)
@@ -153,7 +153,7 @@ struct PayoutSchemeTests {
         let app = try makeApp()
 
         #expect(throws: PayoutSchemeError.payoutDayInvalid) {
-            try app.addScheme(NewPayoutScheme(name: "X", invested: .rupees(1), monthlyPayout: .rupees(1), payoutDay: 32, maturity: nil))
+            try app.addScheme(NewPayoutScheme(name: "X", invested: .rupees(1), payoutAmount: .rupees(1), payoutDay: 32, maturity: nil))
         }
         #expect(PayoutSchemeError.payoutDayInvalid.message == "Enter a payout day between 1 and 31")
         #expect(PayoutSchemeError.notFound(1).message == "That scheme no longer exists.")
@@ -218,13 +218,13 @@ struct PayoutSchemeTests {
         try app.recordPayout(bond.id, amount: .rupees(800), on: day("2026-10-24"))
 
         try app.updateScheme(bond.id, NewPayoutScheme(
-            name: "Bond A", invested: .rupees(100_000), monthlyPayout: .rupees(850), payoutDay: 26,
+            name: "Bond A", invested: .rupees(100_000), payoutAmount: .rupees(850), payoutDay: 26,
             maturity: day("2027-03-10")
         ))
 
         let edited = try #require(try app.payoutSchemes().schemes.first { $0.scheme.id == bond.id }).scheme
         #expect(edited.maturity == day("2027-03-10"))
-        #expect(edited.monthlyPayout == .rupees(850))
+        #expect(edited.payoutAmount == .rupees(850))
         #expect(edited.payoutDay == 26)
         #expect(try app.payoutDraft(bond.id).expectedDate == day("2026-11-26"))
     }
@@ -234,9 +234,91 @@ struct PayoutSchemeTests {
 
         #expect(throws: PayoutSchemeError.amountMissingOrZero) {
             try app.updateScheme(bond.id, NewPayoutScheme(
-                name: "Bond A", invested: .zero, monthlyPayout: .rupees(800), payoutDay: 24, maturity: nil
+                name: "Bond A", invested: .zero, payoutAmount: .rupees(800), payoutDay: 24, maturity: nil
             ))
         }
         #expect(try app.payoutSchemes().schemes.first { $0.scheme.id == bond.id }?.scheme.invested == .rupees(100_000))
     }
+
+    private func periodic(
+        _ app: BudgetApp, every frequency: PayoutFrequency, amount: Int, first: String, day payoutDay: Int
+    ) throws -> PayoutScheme {
+        try app.addScheme(NewPayoutScheme(
+            name: "FD", invested: .rupees(100_000), payoutAmount: .rupees(amount), payoutDay: payoutDay,
+            maturity: nil, frequency: frequency, firstPayout: day(first)
+        ))
+    }
+
+    @Test(arguments: [PayoutFrequency.monthly, .quarterly, .halfYearly, .yearly])
+    func aSchemeIsExpectedOnItsFirstPayoutWhateverItsPace(frequency: PayoutFrequency) throws {
+        let app = try makeApp(today: "2026-12-06")
+        let fd = try periodic(app, every: frequency, amount: 1_000, first: "2026-12-10", day: 10)
+
+        #expect(try app.payoutDraft(fd.id).expectedDate == day("2026-12-10"))
+        #expect(try labels(app) == ["FD payout expected 10 Dec, about 1,000"])
+    }
+
+    @Test(arguments: [(PayoutFrequency.monthly, "2027-01-10"), (.quarterly, "2027-03-10"), (.halfYearly, "2027-06-10"), (.yearly, "2027-12-10")])
+    func afterARecordedPayoutTheNextOneIsOnePaceLater(frequency: PayoutFrequency, next: String) throws {
+        let app = try makeApp(today: "2026-12-10")
+        let fd = try periodic(app, every: frequency, amount: 1_000, first: "2026-12-10", day: 10)
+
+        try app.recordPayout(fd.id, amount: .rupees(1_000), on: day("2026-12-10"))
+
+        #expect(try app.payoutDraft(fd.id).expectedDate == day(next))
+    }
+
+    @Test func aSchemeWhoseFirstPayoutIsInTheFutureWaitsForIt() throws {
+        let app = try makeApp(today: "2026-10-30")
+        let fd = try periodic(app, every: .monthly, amount: 1_000, first: "2026-12-24", day: 24)
+
+        #expect(try app.payoutDraft(fd.id).expectedDate == day("2026-12-24"))
+        #expect(try labels(app).isEmpty)
+    }
+
+    @Test func theMonthlyPayoutTotalIsTheMonthlyEquivalent() throws {
+        let app = try makeApp()
+        try periodic(app, every: .monthly, amount: 1_000, first: "2026-11-05", day: 5)
+        try periodic(app, every: .quarterly, amount: 3_000, first: "2026-11-05", day: 5)
+        try periodic(app, every: .yearly, amount: 12_000, first: "2026-11-05", day: 5)
+
+        #expect(try app.payoutSchemes().monthlyPayoutTotal == .rupees(3_000))
+    }
+
+    @Test func aQuarterlySchemeAppearsOnTheCalendarOnlyInItsMonths() throws {
+        let app = try makeApp(today: "2026-10-30")
+        try periodic(app, every: .quarterly, amount: 3_000, first: "2026-12-10", day: 10)
+        func payouts(_ month: CalendarDate.YearMonth) throws -> Int {
+            try app.billsCalendar(for: month).items(.upcomingIncome).count
+        }
+
+        #expect(try payouts(.init(year: 2026, month: 11)) == 0)
+        #expect(try payouts(.init(year: 2026, month: 12)) == 1)
+        #expect(try payouts(.init(year: 2027, month: 1)) == 0)
+        #expect(try payouts(.init(year: 2027, month: 3)) == 1)
+    }
+
+    @Test func theLastDayOfEveryMonthSuitsShortAndLongMonths() throws {
+        let app = try makeApp(today: "2027-02-20")
+        let fd = try periodic(app, every: .monthly, amount: 500, first: "2027-01-31", day: 31)
+
+        #expect(try app.payoutDraft(fd.id).expectedDate == day("2027-02-28"))
+        try app.recordPayout(fd.id, amount: .rupees(500), on: day("2027-02-28"))
+        #expect(try app.payoutDraft(fd.id).expectedDate == day("2027-03-31"))
+    }
+
+    @Test func thePaceAndFirstPayoutAreKeptAndCanBeEdited() throws {
+        let app = try makeApp()
+        let fd = try periodic(app, every: .quarterly, amount: 3_000, first: "2026-12-10", day: 10)
+
+        try app.updateScheme(fd.id, NewPayoutScheme(
+            name: "FD", invested: .rupees(100_000), payoutAmount: .rupees(6_000), payoutDay: 12,
+            maturity: nil, frequency: .halfYearly, firstPayout: day("2027-01-12")
+        ))
+
+        let edited = try #require(try app.payoutSchemes().schemes.first { $0.scheme.id == fd.id }).scheme
+        #expect(edited.frequency == .halfYearly)
+        #expect(edited.firstPayout == day("2027-01-12"))
+    }
 }
+

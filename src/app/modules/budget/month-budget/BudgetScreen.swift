@@ -251,7 +251,7 @@ struct BudgetScreen: View {
                 }
             }
         case .calendar:
-            MonthCalendarCard(budget: budget)
+            MonthCalendarCard(budget: budget, hideEarned: hidden)
         }
     }
 
@@ -473,19 +473,25 @@ enum UpcomingWindow {
 /// Mockup 1: what was spent on each day of the viewed month.
 private struct MonthCalendarCard: View {
     let budget: MonthBudget
+    let hideEarned: Bool
 
     var body: some View {
         CardPanel(padding: 14) {
             Text(budget.month.title).font(.system(size: 20, weight: .bold)).padding(.horizontal, 4)
+            Text("Red is spent, green is earned").font(.footnote).foregroundStyle(Theme.secondary).padding(.horizontal, 4)
             CalendarGrid(month: budget.month) { day in
                 VStack(spacing: 1) {
                     Text("\(day)").font(.system(size: 13))
+                    if let earned = budget.earnedByDay[day] {
+                        Text(hideEarned ? "+••••" : "+" + IndianMoneyFormat.compact(earned)).font(.system(size: 10.5, weight: .semibold))
+                            .foregroundStyle(Theme.green).minimumScaleFactor(0.6).lineLimit(1)
+                    }
                     if let spent = budget.spentByDay[day] {
-                        Text(IndianMoneyFormat.compact(spent)).font(.system(size: 10.5)).foregroundStyle(Theme.secondary)
-                            .minimumScaleFactor(0.7).lineLimit(1)
+                        Text("-" + IndianMoneyFormat.compact(spent)).font(.system(size: 10.5, weight: .semibold))
+                            .foregroundStyle(Theme.red).minimumScaleFactor(0.6).lineLimit(1)
                     }
                 }
-                .frame(maxWidth: .infinity, minHeight: 44)
+                .frame(maxWidth: .infinity, minHeight: 50)
                 .background(Theme.tile, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                 .accessibilityElement(children: .combine)
                 .accessibilityIdentifier("spentDay-\(day)")

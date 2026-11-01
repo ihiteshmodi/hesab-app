@@ -33,11 +33,18 @@ final class ActivityAndBillsUITests: XCTestCase {
     func testTheMonthCalendarShowsWhatWasSpentToday() {
         let app = launchApp()
         addExpense(app, "1250", "Groceries")
+        app.buttons["addMenu"].tap()
+        app.buttons["addIncomeButton"].tap()
+        type(app.textFields["incomeAmountField"], "5000")
+        app.buttons["incomeTypePicker"].tap()
+        app.buttons["Salary"].tap()
+        app.buttons["saveIncomeButton"].tap()
         app.buttons["Calendar"].tap()
 
         let day = app.descendants(matching: .any)["spentDay-\(today)"]
         XCTAssertTrue(day.waitForExistence(timeout: 20))
-        XCTAssertTrue(day.label.contains("₹1.2k"), "day reads \(day.label)")
+        XCTAssertTrue(day.label.contains("-₹1.2k"), "day reads \(day.label)")
+        XCTAssertTrue(day.label.contains("+₹5"), "day reads \(day.label)")
     }
 
     @MainActor
@@ -117,7 +124,7 @@ final class ActivityAndBillsUITests: XCTestCase {
         type(app.textFields["schemeNameField"], "Bond A")
         type(app.textFields["schemeInvestedField"], "500000")
         type(app.textFields["schemePayoutField"], "4100")
-        app.switches.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: 0.5)).tap()
+        app.switches["schemeMaturityToggle"].coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: 0.5)).tap()
         app.buttons["saveSchemeButton"].tap()
         XCTAssertTrue(app.descendants(matching: .any)["schemeRow"].waitForExistence(timeout: 20))
 

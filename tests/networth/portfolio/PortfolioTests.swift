@@ -15,7 +15,7 @@ struct PortfolioTests {
         try app.addAllocatedFund(name: "Trip", amount: .rupees(20_000))
         try app.addHolding(NewHolding(name: "Stocks", amount: .rupees(10_000)))
         try app.addScheme(NewPayoutScheme(
-            name: "Schemes", invested: .rupees(1_000_000), monthlyPayout: .rupees(1_000), payoutDay: 5, maturity: nil
+            name: "Schemes", invested: .rupees(1_000_000), payoutAmount: .rupees(1_000), payoutDay: 5, maturity: nil
         ))
         try app.addHolding(NewHolding(name: "Dollars", amount: .rupees(400), currency: "USD", rate: Decimal(string: "90.00")!))
         return app
