@@ -50,4 +50,31 @@ struct RecordExpenseTests {
         #expect(error?.message == message)
         #expect(try app.monthBudget().expenses.isEmpty)
     }
+
+    // MARK: notes
+
+    private func expenseWithNote(_ app: BudgetApp, _ note: String) throws -> Expense {
+        try app.addExpense(NewExpense(
+            date: day("2026-10-12"), description: "Gadget", amount: .rupees(549), category: "Shopping - Wants", notes: note
+        ))
+    }
+
+    @Test func aNoteIsKeptAndTrimmedWhenAnExpenseIsAdded() throws {
+        let app = try makeApp()
+
+        let saved = try expenseWithNote(app, "  used coupon THANKYOU ")
+
+        #expect(try app.monthBudget(for: .init(year: 2026, month: 10)).expenses.first { $0.id == saved.id }?.notes == "used coupon THANKYOU")
+    }
+
+    @Test func aNoteCanBeChangedWhileEditing() throws {
+        let app = try makeApp()
+        let saved = try expenseWithNote(app, "used coupon THANKYOU")
+
+        try app.updateExpense(saved.id ?? 0, NewExpense(
+            date: day("2026-10-12"), description: "Gadget", amount: .rupees(549), category: "Shopping - Wants", notes: "coupon gave 50 off"
+        ))
+
+        #expect(try app.monthBudget(for: .init(year: 2026, month: 10)).expenses.first?.notes == "coupon gave 50 off")
+    }
 }

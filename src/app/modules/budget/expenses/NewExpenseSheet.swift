@@ -16,6 +16,7 @@ struct NewExpenseSheet: View {
     @State private var subCategory = ""
     @State private var spentFor = ""
     @State private var tagsText = ""
+    @State private var notes = ""
     @State private var payment = PaymentChoice.all[0]
     @State private var keepAsCash = false
     @State private var dateStillToPick = false
@@ -50,6 +51,7 @@ struct NewExpenseSheet: View {
             _subCategory = State(initialValue: draft.subCategory)
             _spentFor = State(initialValue: draft.spentFor)
             _tagsText = State(initialValue: draft.tags.joined(separator: ", "))
+            _notes = State(initialValue: draft.notes)
             _payment = State(initialValue: PaymentChoice(method: draft.paymentMethod))
         }
         guard let editing else { return }
@@ -61,6 +63,7 @@ struct NewExpenseSheet: View {
         _subCategory = State(initialValue: editing.subCategory ?? "")
         _spentFor = State(initialValue: editing.spentFor ?? "")
         _tagsText = State(initialValue: editing.tags.joined(separator: ", "))
+        _notes = State(initialValue: editing.notes)
         _payment = State(initialValue: PaymentChoice(method: editing.paymentMethod))
         _keepAsCash = State(initialValue: editing.keptAsCash)
     }
@@ -125,6 +128,9 @@ struct NewExpenseSheet: View {
                         .buttonStyle(.plain)
                         .accessibilityIdentifier("entitySuggestion")
                     }
+                    TextField("Notes (optional)", text: $notes)
+                        .rowPadding()
+                        .accessibilityIdentifier("notesField")
                     if dateStillToPick {
                         Button { dateStillToPick = false } label: {
                             Text("Pick a date").foregroundStyle(Theme.blue).rowPadding()
@@ -245,7 +251,7 @@ struct NewExpenseSheet: View {
             amount: currency.isEmpty ? MoneyInput.parse(amountText) : nil,
             category: category, subCategory: subCategory, entity: entity, spentFor: spentFor,
             tags: tagsText.split(separator: ",").map(String.init), paymentMethod: payment.method,
-            notes: editing?.notes ?? "", keepAsCash: keepAsCash,
+            notes: notes, keepAsCash: keepAsCash,
             foreign: currency.isEmpty ? nil : ForeignSpend(
                 currency: currency, amount: MoneyInput.parse(amountText),
                 rate: Decimal(string: rateText.trimmingCharacters(in: .whitespaces)),

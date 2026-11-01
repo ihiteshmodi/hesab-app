@@ -238,6 +238,45 @@ final class AddExpenseUITests: XCTestCase {
     }
 
     @MainActor
+    func testANoteIsAddedShownAndChangedOnAnExpense() {
+        let app = launchApp()
+        app.buttons["addMenu"].tap()
+        app.buttons["addExpenseButton"].tap()
+        let amount = app.textFields["amountField"]
+        XCTAssertTrue(amount.waitForExistence(timeout: 20))
+        amount.tap()
+        amount.typeText("549")
+        let description = app.textFields["descriptionField"]
+        description.tap()
+        description.typeText("Gadget")
+        app.keyboards.buttons["Return"].tap()
+        app.buttons["categoryPicker"].tap()
+        app.buttons["Home & Utilities"].tap()
+        let note = app.textFields["notesField"]
+        focus(note, in: app)
+        note.typeText("used coupon THANKYOU")
+        app.keyboards.buttons["Return"].tap()
+        app.buttons["saveExpenseButton"].tap()
+
+        let row = app.descendants(matching: .any)["expenseRow"]
+        XCTAssertTrue(row.waitForExistence(timeout: 20))
+        row.tap()
+        XCTAssertEqual(app.staticTexts["expenseNote"].label, "used coupon THANKYOU")
+
+        app.buttons["editExpenseButton"].tap()
+        let edited = app.textFields["notesField"]
+        XCTAssertTrue(edited.waitForExistence(timeout: 20))
+        XCTAssertEqual(edited.value as? String, "used coupon THANKYOU")
+        focus(edited, in: app)
+        edited.typeText("twice")
+        app.keyboards.buttons["Return"].tap()
+        app.buttons["saveExpenseButton"].tap()
+        XCTAssertTrue(app.staticTexts["expenseNote"].waitForExistence(timeout: 20))
+        let changed = app.staticTexts["expenseNote"].label
+        XCTAssertTrue(changed.contains("twice") && changed.contains("coupon"), "the edited note was not shown: \(changed)")
+    }
+
+    @MainActor
     func testEditingAnExpenseAndSwitchingMonths() {
         let app = launchApp()
         app.buttons["addMenu"].tap()
@@ -330,6 +369,16 @@ final class AddExpenseUITests: XCTestCase {
         let row = app.descendants(matching: .any)["expenseRow"]
         XCTAssertTrue(row.waitForExistence(timeout: 20))
         XCTAssertTrue(row.label.contains("Rent"))
+    }
+
+    /// Taps a field until the keyboard is up.
+    @MainActor
+    private func focus(_ field: XCUIElement, in app: XCUIApplication) {
+        for _ in 0..<3 {
+            field.tap()
+            if app.keyboards.firstMatch.waitForExistence(timeout: 3) { return }
+        }
+        XCTFail("the keyboard never came up for \(field.identifier)")
     }
 
     @MainActor
