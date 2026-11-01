@@ -18,10 +18,14 @@ Feature: Preferences
   # See foreign-currency-spending.feature for what the home currency means and when it can change.
 
   # Privacy
-  Scenario: Hiding balances masks every balance
-    Given "Left to spend" shows ₹15,226.42 and the savings bank balance shows ₹3,05,134.63
+  # With Hide Balances on, only these are masked: Left to spend, Spent and Income in the summary card (one eye),
+  # the whole Savings pane (its own eye), Portfolio and Payout Schemes (their eye). Everything else always shows:
+  # pending refunds, pending to send, upcoming bill and income amounts, lists, calendar, Bills, Reports, Trips.
+  Scenario: Hiding balances masks only the private figures
+    Given "Left to spend" shows ₹15,226.42 and there are pending refunds and an upcoming bill
     When she turns on "Hide Balances"
-    Then those figures show "₹ ••••"
+    Then Left to spend, Spent and Income show "₹ ••••"
+    But the pending refunds, pending to send and upcoming bill amounts still show
     When she taps the eye on the Activity screen
     Then the figures show until she leaves the screen
 

@@ -135,6 +135,19 @@ final class ActivityAndBillsUITests: XCTestCase {
     }
 
     @MainActor
+    func testUpcomingBillAmountsStayVisibleWhileLeftToSpendIsHidden() {
+        let app = launchApp(["-ui-hide-balances"])
+        XCTAssertEqual(app.staticTexts["leftToSpend"].label, "₹ ••••")
+        app.buttons["Upcoming"].tap()
+        app.buttons["createBillButton"].tap()
+        fillBill(app, "Internet", "800")
+
+        let row = app.descendants(matching: .any)["upcomingRow"]
+        XCTAssertTrue(row.waitForExistence(timeout: 20))
+        XCTAssertTrue(row.staticTexts["₹800.00"].exists, "the amount is hidden: \(row.debugDescription)")
+    }
+
+    @MainActor
     func testANewBillWaitsToBeAddedAndNeverAddsItself() {
         let app = launchApp()
         app.buttons["Upcoming"].tap()
@@ -284,9 +297,9 @@ final class ActivityAndBillsUITests: XCTestCase {
     }
 
     @MainActor
-    private func launchApp() -> XCUIApplication {
+    private func launchApp(_ extra: [String] = []) -> XCUIApplication {
         let app = XCUIApplication()
-        app.launchArguments = ["-ui-testing"]
+        app.launchArguments = ["-ui-testing"] + extra
         app.launch()
         return app
     }
