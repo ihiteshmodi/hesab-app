@@ -164,5 +164,27 @@ struct CashInHandTests {
         #expect(throws: CashError.amountMissingOrZero) { try app.addCash(.zero, note: "x") }
         #expect(throws: CashError.amountMissingOrZero) { try app.addCash(nil, note: "x") }
     }
-}
 
+    @Test func cashAddedByHandCanBeChangedOrDeleted() throws {
+        let app = try makeApp(today: "2026-10-30")
+        try app.addCash(.rupees(2_000), note: "Gift from Dad")
+        let id = try #require(try app.cashInHand().lines.first?.adjustmentID)
+
+        try app.updateCashAdjustment(id, amount: .rupees(2_500), note: "Gift from Dad and Mom", on: day("2026-10-29"))
+
+        let edited = try #require(try app.cashInHand().lines.first)
+        #expect(edited.description == "Gift from Dad and Mom")
+        #expect(edited.date == day("2026-10-29"))
+        #expect(try app.cashInHand().balance == .rupees(2_500))
+
+        try app.deleteCashAdjustment(id)
+        #expect(try app.cashInHand().balance == .zero)
+    }
+
+    @Test func onlyCashAddedByHandHasAnAdjustmentToChange() throws {
+        let app = try appWithTwentyThousandInTheBank()
+        try withdraw(app, 5_000, keep: true)
+
+        #expect(try app.cashInHand().lines.compactMap(\.adjustmentID).isEmpty)
+    }
+}

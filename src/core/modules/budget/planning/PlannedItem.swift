@@ -69,6 +69,13 @@ final class PlannedRepository: Sendable {
         }
     }
 
+    func update(_ id: Int64, description: String, amount: Money) throws {
+        _ = try item(id)
+        try database.writer.write { db in
+            try db.execute(sql: "UPDATE planned_item SET description = ?, amount_paise = ? WHERE id = ?", arguments: [description, amount.paise, id])
+        }
+    }
+
     func delete(_ id: Int64) throws {
         _ = try item(id)
         try database.writer.write { db in try db.execute(sql: "DELETE FROM planned_item WHERE id = ?", arguments: [id]) }
@@ -84,6 +91,17 @@ public struct AddPlannedItem: Sendable {
         guard !description.isEmpty else { throw PlannedItemError.descriptionMissing }
         guard let amount = new.amount, amount > .zero else { throw PlannedItemError.amountMissingOrZero }
         return try planned.add(description: description, amount: amount)
+    }
+}
+
+public struct UpdatePlannedItem: Sendable {
+    let planned: PlannedRepository
+
+    public func callAsFunction(_ id: Int64, _ new: NewPlannedItem) throws {
+        let description = new.description.trimmed
+        guard !description.isEmpty else { throw PlannedItemError.descriptionMissing }
+        guard let amount = new.amount, amount > .zero else { throw PlannedItemError.amountMissingOrZero }
+        try planned.update(id, description: description, amount: amount)
     }
 }
 

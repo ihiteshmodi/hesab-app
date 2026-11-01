@@ -90,6 +90,16 @@ final class ActivityAndBillsUITests: XCTestCase {
     }
 
     @MainActor
+    func testABillCanBeSetToAddItselfAndDebitItself() {
+        let app = launchApp()
+        selectTab(app, "Bills")
+        app.buttons["billsAddMenu"].tap()
+        app.buttons["newBillButton"].tap()
+        XCTAssertTrue(app.switches["billAutoToggle"].waitForExistence(timeout: 20), "no Add to budget automatically switch")
+        XCTAssertTrue(app.switches["billAutoDebitToggle"].exists)
+    }
+
+    @MainActor
     func testABillYouPayYourselfStaysPendingToSendUntilTickedSentWithADate() {
         let app = launchApp()
         app.buttons["Upcoming Expenses"].tap()
@@ -239,6 +249,14 @@ final class ActivityAndBillsUITests: XCTestCase {
         let total = app.staticTexts["plannedTotal"]
         XCTAssertTrue(total.waitForExistence(timeout: 20))
         XCTAssertEqual(total.label, "₹25,000.00")
+
+        app.staticTexts["Sofa"].tap()
+        let edit = app.textFields["plannedDescriptionField"]
+        XCTAssertTrue(edit.waitForExistence(timeout: 20))
+        edit.tap()
+        edit.typeText("2")
+        app.buttons["savePlannedButton"].tap()
+        XCTAssertTrue(app.staticTexts["Sofa2"].waitForExistence(timeout: 20))
     }
 
     // MARK: helpers

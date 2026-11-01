@@ -166,55 +166,37 @@ struct BudgetScreen: View {
             tile(IndianMoneyFormat.string(budget.spentThisMonth), "Spent in \(monthName(budget.month))", id: "spentThisMonth")
             tile(shown(budget.incomeThisMonth), "Income in \(monthName(budget.month))", id: "incomeThisMonth")
         }
-        let pending = budget.pendingRefundsEverywhere
-        if pending.count > 0 {
-            Button { route = .pendingRefunds } label: {
-                HStack {
-                    Text("\(pending.count) · \(IndianMoneyFormat.string(pending.stillToCome))").font(.system(size: 17, weight: .bold)).monospacedDigit()
-                    Text("Pending refunds").font(.system(size: 12.5)).foregroundStyle(Theme.secondary)
-                    Spacer()
-                    Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
+        LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible())], spacing: 10) {
+            ForEach(summaryTiles(budget), id: \.id) { item in
+                Button(action: item.action) {
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(IndianMoneyFormat.string(item.amount)).font(.system(size: 19, weight: .bold)).monospacedDigit()
+                            .minimumScaleFactor(0.6).lineLimit(1)
+                        Text(item.caption).font(.system(size: 12.5)).foregroundStyle(Theme.secondary)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.vertical, 10).padding(.horizontal, 12)
+                    .background(Theme.tile, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
                 }
-                .padding(.vertical, 10).padding(.horizontal, 12)
-                .background(Theme.tile, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .buttonStyle(.plain)
+                .accessibilityIdentifier(item.id)
             }
-            .buttonStyle(.plain)
-            .accessibilityIdentifier("pendingRefundsTile")
         }
-        if !model.billsToSend.isEmpty {
-            let total = model.billsToSend.reduce(Money.zero) { $0 + $1.amount }
-            Button { openingToSend = true } label: {
-                HStack {
-                    Text("\(model.billsToSend.count) · \(IndianMoneyFormat.string(total))").font(.system(size: 17, weight: .bold)).monospacedDigit()
-                    Text("Pending to send").font(.system(size: 12.5)).foregroundStyle(Theme.secondary)
-                    Spacer()
-                    Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
-                }
-                .padding(.vertical, 10).padding(.horizontal, 12)
-                .background(Theme.tile, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-            }
-            .buttonStyle(.plain)
-            .accessibilityIdentifier("pendingToSendTile")
-        }
-        let cash = model.cash
-        summaryTile(count: cash?.lines.count ?? 0, amount: cash?.balance ?? .zero, caption: "Cash in hand", id: "cashInHandTile") { openingCash = true }
-        let owed = model.amountToRepay
-        summaryTile(count: owed?.borrowings.filter { !$0.isRepaid }.count ?? 0, amount: owed?.total ?? .zero, caption: "Amount to repay", id: "amountToRepayTile") { openingRepay = true }
     }
 
-    private func summaryTile(count: Int, amount: Money, caption: String, id: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            HStack {
-                Text("\(count) · \(IndianMoneyFormat.string(amount))").font(.system(size: 17, weight: .bold)).monospacedDigit()
-                Text(caption).font(.system(size: 12.5)).foregroundStyle(Theme.secondary)
-                Spacer()
-                Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
-            }
-            .padding(.vertical, 10).padding(.horizontal, 12)
-            .background(Theme.tile, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+    private func summaryTiles(_ budget: MonthBudget) -> [SummaryTile] {
+        let pending = budget.pendingRefundsEverywhere
+        let sendTotal = model.billsToSend.reduce(Money.zero) { $0 + $1.amount }
+        var tiles: [SummaryTile] = []
+        if pending.count > 0 {
+            tiles.append(SummaryTile(id: "pendingRefundsTile", amount: pending.stillToCome, caption: "Pending refunds") { route = .pendingRefunds })
         }
-        .buttonStyle(.plain)
-        .accessibilityIdentifier(id)
+        if !model.billsToSend.isEmpty {
+            tiles.append(SummaryTile(id: "pendingToSendTile", amount: sendTotal, caption: "Pending to send") { openingToSend = true })
+        }
+        tiles.append(SummaryTile(id: "cashInHandTile", amount: model.cash?.balance ?? .zero, caption: "Cash in hand") { openingCash = true })
+        tiles.append(SummaryTile(id: "amountToRepayTile", amount: model.amountToRepay?.total ?? .zero, caption: "Amount to repay") { openingRepay = true })
+        return tiles
     }
 
     private func tile(_ value: String, _ caption: String, id: String) -> some View {
@@ -359,6 +341,14 @@ enum ActivityPane: String, CaseIterable {
     case spending = "Spending"
     case upcomingExpenses = "Upcoming Expenses"
     case upcomingIncome = "Upcoming Income"
+}
+
+/// A tap target under Left to spend: an amount and what it is.
+private struct SummaryTile {
+    let id: String
+    let amount: Money
+    let caption: String
+    let action: () -> Void
 }
 
 /// What the Spending pane lists below its summary card.

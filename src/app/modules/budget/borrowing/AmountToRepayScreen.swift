@@ -128,6 +128,8 @@ private struct BorrowingSheet: View {
 private struct RepaymentSheet: View {
     let model: BudgetViewModel
     let borrowingID: Int64
+    @State private var editingRepayment: Repayment?
+    @State private var editingBorrowing: IncomeEntry?
     @Environment(\.dismiss) private var dismiss
     @State private var amountText = ""
     @State private var date = Date()
@@ -164,11 +166,14 @@ private struct RepaymentSheet: View {
                 }
                 if let repayments = model.amountToRepay?.borrowings.first(where: { $0.borrowing.id == borrowingID })?.repayments,
                    !repayments.isEmpty {
-                    CardGroup(header: "Repaid so far", footer: "Touch and hold an entry to delete it.") {
+                    CardGroup(header: "Repaid so far", footer: "Tap an entry to change it. Touch and hold to delete it.") {
                         ForEach(repayments, id: \.id) { repayment in
-                            CardRow(title: repayment.date.shortTitle, subtitle: repayment.fromCash ? "From cash" : "From bank") {
-                                Text(IndianMoneyFormat.string(repayment.amount)).monospacedDigit()
+                            Button { editingRepayment = repayment } label: {
+                                CardRow(title: repayment.date.shortTitle, subtitle: repayment.fromCash ? "From cash" : "From bank") {
+                                    Text(IndianMoneyFormat.string(repayment.amount)).monospacedDigit()
+                                }
                             }
+                            .buttonStyle(.plain)
                             .accessibilityIdentifier("repaymentRow")
                             .contextMenu {
                                 Button("Delete", systemImage: "trash", role: .destructive) {
@@ -180,7 +185,15 @@ private struct RepaymentSheet: View {
                 }
             }
             .cardNavigation("Record Repayment")
+            .sheet(item: $editingRepayment) { EditRepaymentSheet(model: model, repayment: $0) }
+            .sheet(item: $editingBorrowing) { NewIncomeSheet(model: model, editing: $0) }
             .toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    Button("Edit Borrowing", systemImage: "pencil") {
+                        editingBorrowing = model.amountToRepay?.borrowings.first { $0.borrowing.id == borrowingID }?.borrowing
+                    }
+                    .accessibilityIdentifier("editBorrowingButton")
+                }
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
@@ -190,6 +203,56 @@ private struct RepaymentSheet: View {
                         if errorMessage == nil { dismiss() }
                     }
                     .accessibilityIdentifier("saveRepaymentButton")
+                }
+            }
+        }
+    }
+}
+
+extension Repayment: @retroactive Identifiable {}
+
+private struct EditRepaymentSheet: View {
+    let model: BudgetViewModel
+    let repayment: Repayment
+    @Environment(\.dismiss) private var dismiss
+    @State private var amountText: String
+    @State private var date: Date
+    @State private var pocket: Pocket
+    @State private var errorMessage: String?
+
+    init(model: BudgetViewModel, repayment: Repayment) {
+        self.model = model
+        self.repayment = repayment
+        _amountText = State(initialValue: IndianMoneyFormat.plain(repayment.amount))
+        _date = State(initialValue: repayment.date.instant())
+        _pocket = State(initialValue: repayment.fromCash ? .cash : .bank)
+    }
+
+    var body: some View {
+        NavigationStack {
+            CardScreen {
+                CardGroup {
+                    TextField("Amount repaid", text: $amountText).keyboardType(.decimalPad).rowPadding()
+                        .accessibilityIdentifier("editRepaymentAmountField")
+                    FieldRow("Date") { DatePicker("Date", selection: $date, displayedComponents: .date).labelsHidden() }
+                    FieldRow("Paid from") {
+                        Picker("Paid from", selection: $pocket) {
+                            ForEach(Pocket.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+                        }
+                        .pickerStyle(.segmented)
+                    }
+                }
+                if let errorMessage { Text(errorMessage).foregroundStyle(Theme.red).padding(.horizontal, 18) }
+            }
+            .cardNavigation("Edit Repayment")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") {
+                        errorMessage = model.updateRepayment(repayment.id, amountText: amountText, on: CalendarDate(date), fromCash: pocket == .cash)
+                        if errorMessage == nil { dismiss() }
+                    }
+                    .accessibilityIdentifier("saveEditedRepaymentButton")
                 }
             }
         }

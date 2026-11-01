@@ -386,6 +386,36 @@ final class AddExpenseUITests: XCTestCase {
     }
 
     @MainActor
+    func testCashAddedByHandCanBeChangedAndDeleted() {
+        let app = launchApp()
+        app.buttons["cashInHandTile"].tap()
+        app.buttons["addCashButton"].tap()
+        let amount = app.textFields["addCashAmountField"]
+        XCTAssertTrue(amount.waitForExistence(timeout: 20))
+        focus(amount, in: app)
+        amount.typeText("2000")
+        let title = app.textFields["addCashTitleField"]
+        title.tap()
+        title.typeText("Gift")
+        app.buttons["saveAddCashButton"].tap()
+
+        let row = app.buttons["cashLineRow"]
+        XCTAssertTrue(row.waitForExistence(timeout: 20))
+        row.tap()
+        let edit = app.textFields["addCashTitleField"]
+        XCTAssertTrue(edit.waitForExistence(timeout: 20))
+        edit.tap()
+        edit.typeText(" from Dad")
+        app.buttons["saveAddCashButton"].tap()
+        XCTAssertTrue(app.buttons["cashLineRow"].waitForExistence(timeout: 20))
+        XCTAssertTrue(app.buttons["cashLineRow"].label.contains("Gift from Dad"))
+
+        app.buttons["cashLineRow"].tap()
+        app.buttons["deleteCashEntryButton"].tap()
+        XCTAssertEqual(app.staticTexts["cashBalance"].label, "₹0.00")
+    }
+
+    @MainActor
     func testABorrowingInCashRaisesCashAndMovesToRepaidOnceSettled() {
         let app = launchApp()
         let tile = app.buttons["amountToRepayTile"]

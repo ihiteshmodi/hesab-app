@@ -15,6 +15,7 @@ struct BillsScreen: View {
     @State private var billToAdd: Int64?
     @State private var plannedToAdd: Int64?
     @State private var plannedToSchedule: PlannedItem?
+    @State private var editingPlanned: PlannedItem?
     @State private var editingBill: Int64?
     @State private var recordingPayout: PayoutScheme?
     @State private var errorMessage: String?
@@ -69,6 +70,7 @@ struct BillsScreen: View {
             }
             .sheet(isPresented: $addingBill) { NewBillSheet(model: model) }
             .sheet(isPresented: $addingPlanned) { NewPlannedSheet(model: model) }
+            .sheet(item: $editingPlanned) { NewPlannedSheet(model: model, editing: $0) }
             .sheet(isPresented: $addingSeveral) { AddSeveralSheet(model: model) }
             .sheet(item: $editingBill) { id in NewBillSheet(model: model, editing: id) }
             .sheet(item: $recordingPayout) { RecordPayoutSheet(model: model, scheme: $0) }
@@ -221,7 +223,7 @@ struct BillsScreen: View {
     }
 
     @ViewBuilder private var planned: some View {
-        CardGroup(header: "Planned (no date)", footer: "Expenses you know are coming but cannot date yet. Touch and hold one to delete it or give it a date.") {
+        CardGroup(header: "Planned (no date)", footer: "Expenses you know are coming but cannot date yet. Tap one to change it. Touch and hold to delete it or give it a date.") {
             if model.planned.items.isEmpty {
                 Text("Nothing planned yet. Add an expense you know is coming.").foregroundStyle(Theme.secondary).rowPadding()
             }
@@ -230,6 +232,8 @@ struct BillsScreen: View {
                     Text(IndianMoneyFormat.string(item.amount)).monospacedDigit()
                     Button("Add") { plannedToAdd = item.id }.buttonStyle(AddPillStyle()).accessibilityIdentifier("addPlannedButton")
                 }
+                .contentShape(Rectangle())
+                .onTapGesture { editingPlanned = item }
                 .contextMenu {
                     Button("Give a Date", systemImage: "calendar") { plannedToSchedule = item }
                     Button("Delete", systemImage: "trash", role: .destructive) { errorMessage = model.deletePlanned(item.id) }
@@ -313,10 +317,18 @@ private extension CalendarDate {
 
 private struct NewPlannedSheet: View {
     let model: BudgetViewModel
+    var editing: PlannedItem?
     @Environment(\.dismiss) private var dismiss
-    @State private var description = ""
-    @State private var amountText = ""
+    @State private var description: String
+    @State private var amountText: String
     @State private var errorMessage: String?
+
+    init(model: BudgetViewModel, editing item: PlannedItem? = nil) {
+        self.model = model
+        editing = item
+        _description = State(initialValue: item?.description ?? "")
+        _amountText = State(initialValue: item.map { IndianMoneyFormat.plain($0.amount) } ?? "")
+    }
 
     var body: some View {
         NavigationStack {
@@ -330,12 +342,13 @@ private struct NewPlannedSheet: View {
                     Text(errorMessage).foregroundStyle(Theme.red).padding(.horizontal, 18).accessibilityIdentifier("plannedError")
                 }
             }
-            .cardNavigation("New Planned Item")
+            .cardNavigation(editing == nil ? "New Planned Item" : "Edit Planned Item")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
-                        errorMessage = model.addPlanned(description: description, amountText: amountText)
+                        errorMessage = editing.map { model.updatePlanned($0.id, description: description, amountText: amountText) }
+                            ?? model.addPlanned(description: description, amountText: amountText)
                         if errorMessage == nil { dismiss() }
                     }
                     .accessibilityIdentifier("savePlannedButton")

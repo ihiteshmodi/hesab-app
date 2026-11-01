@@ -146,6 +146,10 @@ final class BudgetViewModel {
         run { try app.addPlannedItem(NewPlannedItem(description: description, amount: MoneyInput.parse(amountText))) }
     }
 
+    func updatePlanned(_ id: Int64, description: String, amountText: String) -> String? {
+        run { try app.updatePlannedItem(id, NewPlannedItem(description: description, amount: MoneyInput.parse(amountText))) }
+    }
+
     func deletePlanned(_ id: Int64) -> String? { run { try app.deletePlannedItem(id) } }
     func addPlannedAsExpense(_ id: Int64, _ expense: NewExpense) -> String? { run { try app.addPlannedAsExpense(id, expense) } }
 
@@ -331,15 +335,19 @@ final class BudgetViewModel {
         run { try app.addLedger(NewLedger(name: name, countsTowardsNetWorth: countsTowardsNetWorth)) }
     }
 
+    func renameLedger(_ id: Int64, to name: String) -> String? { run { try app.renameLedger(id, name) } }
     func deleteLedger(_ id: Int64) -> String? { run { try app.deleteLedger(id) } }
     func deleteLedgerEntry(_ id: Int64) -> String? { run { try app.deleteLedgerEntry(id) } }
 
     /// A warning is not a refusal: the entry is saved and the warning is shown beside it.
-    func addLedgerEntry(_ ledgerID: Int64, description: String, amountText: String, moneyOut: Bool) -> (error: String?, warning: String?) {
+    func addLedgerEntry(
+        _ ledgerID: Int64, description: String, amountText: String, moneyOut: Bool, date: CalendarDate? = nil, editing entryID: Int64? = nil
+    ) -> (error: String?, warning: String?) {
         let magnitude = MoneyInput.parse(amountText)
         let value = magnitude.map { moneyOut ? Money.zero - $0 : $0 }
+        let new = NewLedgerEntry(date: date, description: description, value: value)
         do {
-            let added = try app.addLedgerEntry(ledgerID, NewLedgerEntry(description: description, value: value))
+            let added = try entryID.map { try app.updateLedgerEntry($0, new) } ?? app.addLedgerEntry(ledgerID, new)
             reload()
             return (nil, added.warning)
         } catch let error as LedgerError {
@@ -368,6 +376,17 @@ final class BudgetViewModel {
     func addBorrowing(lender: String, amountText: String, date: CalendarDate, viaCash: Bool) -> String? {
         run { try app.addIncome(NewIncome(date: date, kind: .borrowed, amount: MoneyInput.parse(amountText), note: lender, viaCash: viaCash)) }
     }
+
+    func updateRepayment(_ id: Int64, amountText: String, on date: CalendarDate, fromCash: Bool) -> String? {
+        run { try app.updateRepayment(id, amount: MoneyInput.parse(amountText), on: date, fromCash: fromCash) }
+    }
+
+    func updateCashAdjustment(_ id: Int64, amountText: String, removed: Bool, title: String, date: CalendarDate) -> String? {
+        let amount = MoneyInput.parse(amountText).map { removed ? Money.zero - $0 : $0 }
+        return run { try app.updateCashAdjustment(id, amount: amount, note: title, on: date) }
+    }
+
+    func deleteCashAdjustment(_ id: Int64) -> String? { run { try app.deleteCashAdjustment(id) } }
 
     func addCash(amountText: String, title: String, date: CalendarDate) -> String? {
         run { try app.addCash(MoneyInput.parse(amountText), note: title, on: date) }

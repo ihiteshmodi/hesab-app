@@ -81,6 +81,9 @@ struct LedgerDetailScreen: View {
     var hidden = false
     @Environment(\.dismiss) private var dismiss
     @State private var addingEntry = false
+    @State private var editingLine: LedgerLine?
+    @State private var renaming = false
+    @State private var newName = ""
     @State private var confirmingDelete = false
     @State private var errorMessage: String?
 
@@ -105,11 +108,15 @@ struct LedgerDetailScreen: View {
                     .rowPadding()
                     .accessibilityIdentifier("ledgerCountedToggle")
                 }
-                CardGroup(header: "Entries", footer: summary.lines.isEmpty ? nil : "Touch and hold an entry to delete it.") {
+                CardGroup(header: "Entries", footer: summary.lines.isEmpty ? nil : "Tap an entry to change it. Touch and hold to delete it.") {
                     ForEach(Array(summary.lines.enumerated()), id: \.offset) { _, line in
-                        CardRow(title: line.description, subtitle: line.date.shortTitle) {
-                            Text(money(line.amount)).monospacedDigit()
+                        Button { if line.entryID != nil { editingLine = line } } label: {
+                            CardRow(title: line.description, subtitle: line.date.shortTitle) {
+                                Text(money(line.amount)).monospacedDigit()
+                            }
                         }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("ledgerEntryRow")
                         .contextMenu {
                             if let entryID = line.entryID {
                                 Button("Delete", systemImage: "trash", role: .destructive) { errorMessage = model.deleteLedgerEntry(entryID) }
@@ -127,11 +134,21 @@ struct LedgerDetailScreen: View {
         .cardNavigation(summary?.ledger.name ?? "Ledger")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
+                Button("Rename", systemImage: "pencil") { newName = summary?.ledger.name ?? ""; renaming = true }
+                    .accessibilityIdentifier("renameLedgerButton")
+            }
+            ToolbarItem(placement: .primaryAction) {
                 Button("Add Entry", systemImage: "plus") { addingEntry = true }
                     .accessibilityIdentifier("addLedgerEntryButton")
             }
         }
+        .alert("Rename", isPresented: $renaming) {
+            TextField("Person", text: $newName)
+            Button("Cancel", role: .cancel) {}
+            Button("Save") { errorMessage = model.renameLedger(ledgerID, to: newName) }
+        }
         .sheet(isPresented: $addingEntry) { NewLedgerEntrySheet(model: model, ledgerID: ledgerID) }
+        .sheet(item: $editingLine) { NewLedgerEntrySheet(model: model, ledgerID: ledgerID, editing: $0) }
         .confirmationDialog("Delete this ledger and all its entries?", isPresented: $confirmingDelete, titleVisibility: .visible) {
             Button("Delete Ledger", role: .destructive) {
                 errorMessage = model.deleteLedger(ledgerID)
@@ -141,21 +158,37 @@ struct LedgerDetailScreen: View {
     }
 }
 
+extension LedgerLine: @retroactive Identifiable {
+    public var id: Int64 { entryID ?? 0 }
+}
+
 private struct NewLedgerEntrySheet: View {
     let model: BudgetViewModel
     let ledgerID: Int64
+    var editing: LedgerLine?
     @Environment(\.dismiss) private var dismiss
-    @State private var description = ""
-    @State private var amountText = ""
-    @State private var moneyOut = false
+    @State private var description: String
+    @State private var amountText: String
+    @State private var moneyOut: Bool
+    @State private var date: Date
     @State private var errorMessage: String?
     @State private var warning: String?
+
+    init(model: BudgetViewModel, ledgerID: Int64, editing line: LedgerLine? = nil) {
+        self.model = model
+        self.ledgerID = ledgerID
+        editing = line
+        _description = State(initialValue: line?.description ?? "")
+        _amountText = State(initialValue: line.map { IndianMoneyFormat.plain($0.amount < .zero ? .zero - $0.amount : $0.amount) } ?? "")
+        _moneyOut = State(initialValue: (line?.amount ?? .zero) < .zero)
+        _date = State(initialValue: line?.date.instant() ?? Date())
+    }
 
     var body: some View {
         NavigationStack {
             CardScreen {
                 CardGroup {
-                    TextField("What for", text: $description).rowPadding()
+                    TextField("What for", text: $description).rowPadding().accessibilityIdentifier("ledgerEntryTitleField")
                     TextField("Amount", text: $amountText)
                         .keyboardType(.decimalPad)
                         .rowPadding()
@@ -169,6 +202,7 @@ private struct NewLedgerEntrySheet: View {
                         .labelsHidden()
                         .fixedSize()
                     }
+                    FieldRow("Date") { DatePicker("Date", selection: $date, displayedComponents: .date).labelsHidden() }
                     if let errorMessage {
                         Text(errorMessage).foregroundStyle(Theme.red).rowPadding().accessibilityIdentifier("ledgerEntryError")
                     }
@@ -180,7 +214,7 @@ private struct NewLedgerEntrySheet: View {
                     Button("Done") { dismiss() }.buttonStyle(PrimaryButtonStyle())
                 }
             }
-            .cardNavigation("New Entry")
+            .cardNavigation(editing == nil ? "New Entry" : "Edit Entry")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
@@ -191,7 +225,10 @@ private struct NewLedgerEntrySheet: View {
     }
 
     private func save() {
-        let result = model.addLedgerEntry(ledgerID, description: description, amountText: amountText, moneyOut: moneyOut)
+        let result = model.addLedgerEntry(
+            ledgerID, description: description, amountText: amountText, moneyOut: moneyOut,
+            date: CalendarDate(date), editing: editing?.entryID
+        )
         errorMessage = result.error
         warning = result.warning
         if result.error == nil && result.warning == nil { dismiss() }

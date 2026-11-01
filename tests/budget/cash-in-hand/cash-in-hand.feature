@@ -67,3 +67,8 @@ Feature: Cash in hand
     And the list shows "Gift from Dad" on today's date with the new running balance
     And "Left to spend" does not change
 
+  Scenario: Priya changes or deletes cash she added by hand
+    Given she added 2,000 with the title "Gift from Dad"
+    When she taps that line in Cash in Hand and changes the amount, title or date, or deletes it
+    Then cash in hand follows
+    And withdrawals and cash expenses are changed from their own expense, not here

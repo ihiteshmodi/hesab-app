@@ -6,6 +6,8 @@ public struct CashLine: Equatable, Sendable {
     public let description: String
     public let amount: Money
     public let runningBalance: Money
+    /// Set for cash added by hand, the only lines changed or deleted from the cash list.
+    public let adjustmentID: Int64?
 }
 
 public struct CashInHand: Equatable, Sendable {
@@ -17,7 +19,10 @@ public struct CashInHand: Equatable, Sendable {
     init(
         expenses: [Expense], adjustments: [CashAdjustment], borrowings: [IncomeEntry] = [], repayments: [Repayment] = []
     ) {
-        struct Movement { let kind: CashLine.Kind; let date: CalendarDate; let description: String; let amount: Money; let id: Int64 }
+        struct Movement {
+            let kind: CashLine.Kind; let date: CalendarDate; let description: String; let amount: Money; let id: Int64
+            var adjustmentID: Int64? = nil
+        }
         var movements: [Movement] = expenses.compactMap { expense in
             if expense.keptAsCash {
                 return Movement(kind: .withdrawalKept, date: expense.date, description: expense.description, amount: expense.amount, id: expense.id ?? 0)
@@ -28,7 +33,7 @@ public struct CashInHand: Equatable, Sendable {
             return nil
         }
         movements += adjustments.map {
-            Movement(kind: .adjustment, date: $0.date, description: $0.note, amount: $0.amount, id: $0.id)
+            Movement(kind: .adjustment, date: $0.date, description: $0.note, amount: $0.amount, id: $0.id, adjustmentID: $0.editable ? $0.id : nil)
         }
         let cashLoans = borrowings.filter { $0.kind == .borrowed && $0.viaCash }
         movements += cashLoans.map {
@@ -50,7 +55,10 @@ public struct CashInHand: Equatable, Sendable {
         var running = Money.zero
         lines = movements.map {
             running = running + $0.amount
-            return CashLine(kind: $0.kind, date: $0.date, description: $0.description, amount: $0.amount, runningBalance: running)
+            return CashLine(
+                kind: $0.kind, date: $0.date, description: $0.description, amount: $0.amount, runningBalance: running,
+                adjustmentID: $0.adjustmentID
+            )
         }
         balance = running
         warning = running < .zero
@@ -64,4 +72,14 @@ public struct CashAdjustment: Equatable, Sendable {
     public let date: CalendarDate
     public let amount: Money
     public let note: String
+    /// Cash typed in by hand; trip leftovers are changed from their trip.
+    public let editable: Bool
+
+    public init(id: Int64, date: CalendarDate, amount: Money, note: String, editable: Bool = false) {
+        self.id = id
+        self.date = date
+        self.amount = amount
+        self.note = note
+        self.editable = editable
+    }
 }

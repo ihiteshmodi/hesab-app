@@ -98,4 +98,18 @@ struct PlannedExpenseTests {
         #expect(try app.monthBudget().expenses.isEmpty)
         #expect(PlannedItemError.notFound(1).message == "That planned item no longer exists.")
     }
+
+    @Test func aPlannedItemCanBeChangedAndKeepsItsPlace() throws {
+        let app = try makeApp()
+        let sofa = try app.addPlannedItem(NewPlannedItem(description: "Sofa", amount: .rupees(25_000)))
+
+        try app.updatePlannedItem(sofa.id, NewPlannedItem(description: "Big sofa", amount: .rupees(30_000)))
+
+        let list = try app.plannedItems()
+        #expect(list.items.map(\.description) == ["Big sofa"])
+        #expect(list.total == .rupees(30_000))
+        #expect(throws: PlannedItemError.amountMissingOrZero) {
+            try app.updatePlannedItem(sofa.id, NewPlannedItem(description: "Sofa", amount: .zero))
+        }
+    }
 }

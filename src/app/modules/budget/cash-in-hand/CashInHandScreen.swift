@@ -5,6 +5,7 @@ struct CashInHandScreen: View {
     let model: BudgetViewModel
     @State private var setting = false
     @State private var adding = false
+    @State private var editingLine: CashLine?
 
     var body: some View {
         CardScreen {
@@ -23,13 +24,17 @@ struct CashInHandScreen: View {
                             .foregroundStyle(Theme.secondary).rowPadding()
                     }
                     ForEach(Array(cash.lines.enumerated()), id: \.offset) { _, line in
-                        CardRow(title: line.description, subtitle: line.date.shortTitle) {
-                            VStack(alignment: .trailing) {
-                                Text(IndianMoneyFormat.string(line.amount)).monospacedDigit()
-                                Text(IndianMoneyFormat.string(line.runningBalance))
-                                    .font(.footnote).foregroundStyle(Theme.secondary).monospacedDigit()
+                        Button { if line.adjustmentID != nil { editingLine = line } } label: {
+                            CardRow(title: line.description, subtitle: line.date.shortTitle) {
+                                VStack(alignment: .trailing) {
+                                    Text(IndianMoneyFormat.string(line.amount)).monospacedDigit()
+                                    Text(IndianMoneyFormat.string(line.runningBalance))
+                                        .font(.footnote).foregroundStyle(Theme.secondary).monospacedDigit()
+                                }
                             }
                         }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("cashLineRow")
                     }
                 }
             }
@@ -45,16 +50,32 @@ struct CashInHandScreen: View {
         }
         .sheet(isPresented: $setting) { SetCashSheet(model: model) }
         .sheet(isPresented: $adding) { AddCashSheet(model: model) }
+        .sheet(item: $editingLine) { AddCashSheet(model: model, editing: $0) }
     }
+}
+
+extension CashLine: @retroactive Identifiable {
+    public var id: Int64 { adjustmentID ?? 0 }
 }
 
 private struct AddCashSheet: View {
     let model: BudgetViewModel
+    var editing: CashLine?
     @Environment(\.dismiss) private var dismiss
-    @State private var amountText = ""
-    @State private var title = ""
-    @State private var date = Date()
+    @State private var amountText: String
+    @State private var title: String
+    @State private var date: Date
+    @State private var removed: Bool
     @State private var errorMessage: String?
+
+    init(model: BudgetViewModel, editing line: CashLine? = nil) {
+        self.model = model
+        editing = line
+        _amountText = State(initialValue: line.map { IndianMoneyFormat.plain($0.amount < .zero ? .zero - $0.amount : $0.amount) } ?? "")
+        _title = State(initialValue: line?.description ?? "")
+        _date = State(initialValue: line?.date.instant() ?? Date())
+        _removed = State(initialValue: (line?.amount ?? .zero) < .zero)
+    }
 
     var body: some View {
         NavigationStack {
@@ -63,18 +84,39 @@ private struct AddCashSheet: View {
                     TextField("Amount", text: $amountText).keyboardType(.decimalPad).rowPadding()
                         .accessibilityIdentifier("addCashAmountField")
                     TextField("Title", text: $title).rowPadding().accessibilityIdentifier("addCashTitleField")
+                    if editing != nil {
+                        FieldRow("Direction") {
+                            Picker("Direction", selection: $removed) {
+                                Text("Added").tag(false)
+                                Text("Removed").tag(true)
+                            }
+                            .pickerStyle(.segmented)
+                        }
+                    }
                     FieldRow("Date") { DatePicker("Date", selection: $date, displayedComponents: .date).labelsHidden() }
                 }
                 if let errorMessage {
                     Text(errorMessage).foregroundStyle(Theme.red).padding(.horizontal, 18).accessibilityIdentifier("addCashError")
                 }
+                if let editing, let id = editing.adjustmentID {
+                    Button("Delete", role: .destructive) {
+                        errorMessage = model.deleteCashAdjustment(id)
+                        if errorMessage == nil { dismiss() }
+                    }
+                    .buttonStyle(GreyButtonStyle(tint: Theme.red))
+                    .accessibilityIdentifier("deleteCashEntryButton")
+                }
             }
-            .cardNavigation("Add Cash")
+            .cardNavigation(editing == nil ? "Add Cash" : "Edit Cash")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
-                        errorMessage = model.addCash(amountText: amountText, title: title, date: CalendarDate(date))
+                        if let id = editing?.adjustmentID {
+                            errorMessage = model.updateCashAdjustment(id, amountText: amountText, removed: removed, title: title, date: CalendarDate(date))
+                        } else {
+                            errorMessage = model.addCash(amountText: amountText, title: title, date: CalendarDate(date))
+                        }
                         if errorMessage == nil { dismiss() }
                     }
                     .accessibilityIdentifier("saveAddCashButton")

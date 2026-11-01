@@ -84,3 +84,15 @@ Feature: People ledgers
   Scenario: Priya deletes a person's ledger
     When she chooses "Delete Ledger" for "Aunt" and confirms
     Then "Aunt" and all her entries are gone
+
+
+  # Every entry and every person can be changed, not only added or deleted.
+  Scenario: Priya changes an old entry in a person's ledger
+    Given Mom's ledger has "Carry over" 60,000 on 2 Sep and "Withdrawal" -10,000
+    When she taps "Carry over" and changes it to "Carry over one time" 65,000 on 2 Sep
+    Then Mom's balance shows 55,000
+
+  Scenario: Priya renames a person
+    When she opens Mom's ledger and renames it to "Mummy"
+    Then the ledger is called "Mummy" everywhere
+    And a name already used by another person is refused

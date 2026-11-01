@@ -218,6 +218,7 @@ struct UpcomingFiltersSheet: View {
 }
 
 /// A choice in a list with a tick on the chosen one.
+@MainActor
 func tickRow(_ title: String, _ chosen: Bool, choose: @escaping () -> Void) -> some View {
     Button(action: choose) {
         CardRow(title: title) {

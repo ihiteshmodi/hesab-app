@@ -185,4 +185,42 @@ struct LedgerTests {
             try app.addLedgerEntry(99, NewLedgerEntry(description: "Ghost", value: .rupees(1)))
         }
     }
+
+    @Test func anOldEntryCanBeChangedAndTheBalanceFollows() throws {
+        let app = try makeApp(today: "2026-10-30")
+        let mom = try ledger(app, "Mom")
+        let first = try entry(app, mom, "Carry over", 60_000).entry
+        try entry(app, mom, "Withdrawal", -10_000)
+
+        try app.updateLedgerEntry(first.id, NewLedgerEntry(date: day("2026-09-02"), description: "Carry over one time", value: .rupees(65_000)))
+
+        let line = try #require(try app.ledgers().ledgers.first { $0.ledger.id == mom.id }?.lines.first { $0.entryID == first.id })
+        #expect(line.description == "Carry over one time")
+        #expect(line.date == day("2026-09-02"))
+        #expect(try balance(app, mom) == .rupees(55_000))
+    }
+
+    @Test func aChangedEntryNeedsAnAmountAndWarnsWhenItOverdrawsThePerson() throws {
+        let app = try makeApp()
+        let mom = try ledger(app, "Mom")
+        let first = try entry(app, mom, "Carry over", 1_000).entry
+
+        #expect(throws: LedgerError.valueMissingOrZero) {
+            try app.updateLedgerEntry(first.id, NewLedgerEntry(description: "x", value: .zero))
+        }
+        let result = try app.updateLedgerEntry(first.id, NewLedgerEntry(description: "Gave away", value: .rupees(-1_500)))
+        #expect(result.warning == "You have paid out 1,500 more than you hold for Mom.")
+    }
+
+    @Test func aPersonCanBeRenamedButNotToAnExistingName() throws {
+        let app = try makeApp()
+        let mom = try ledger(app, "Mom")
+        try ledger(app, "Sam")
+
+        try app.renameLedger(mom.id, "Mummy")
+
+        #expect(try app.ledgers().ledgers.map(\.ledger.name).sorted() == ["Mummy", "Sam"])
+        #expect(throws: LedgerError.nameTaken("Sam")) { try app.renameLedger(mom.id, "sam") }
+        #expect(throws: LedgerError.nameMissing) { try app.renameLedger(mom.id, "  ") }
+    }
 }
