@@ -9,6 +9,9 @@ public struct Preferences: Equatable, Sendable {
     public var showExactDays = false
     public var includePastDue = true
     public var payoutAlertDays = 5
+    /// How far ahead a scheme's maturity shows under Upcoming Income.
+    public var maturityAlertDays = 90
+    public var includeMaturedSchemes = true
     public var countMoneyReceivedAsIncome = true
     public var countBorrowedAsIncome = false
     public var includeCashAndLedgerInSpent = false
@@ -28,6 +31,8 @@ public struct Preferences: Equatable, Sendable {
         showExactDays = bool("show_exact_days", showExactDays)
         includePastDue = bool("include_past_due", includePastDue)
         payoutAlertDays = int("payout_alert_days", payoutAlertDays)
+        maturityAlertDays = int("maturity_alert_days", maturityAlertDays)
+        includeMaturedSchemes = bool("include_matured_schemes", includeMaturedSchemes)
         countMoneyReceivedAsIncome = bool("count_money_received_as_income", countMoneyReceivedAsIncome)
         countBorrowedAsIncome = bool("count_borrowed_as_income", countBorrowedAsIncome)
         includeCashAndLedgerInSpent = bool("include_cash_and_ledger_in_spent", includeCashAndLedgerInSpent)
@@ -44,6 +49,8 @@ public struct Preferences: Equatable, Sendable {
             "show_exact_days": showExactDays ? "1" : "0",
             "include_past_due": includePastDue ? "1" : "0",
             "payout_alert_days": String(payoutAlertDays),
+            "maturity_alert_days": String(maturityAlertDays),
+            "include_matured_schemes": includeMaturedSchemes ? "1" : "0",
             "count_money_received_as_income": countMoneyReceivedAsIncome ? "1" : "0",
             "count_borrowed_as_income": countBorrowedAsIncome ? "1" : "0",
             "include_cash_and_ledger_in_spent": includeCashAndLedgerInSpent ? "1" : "0",

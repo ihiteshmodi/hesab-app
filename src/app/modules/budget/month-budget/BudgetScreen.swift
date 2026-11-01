@@ -14,6 +14,7 @@ struct BudgetScreen: View {
     @State private var addingScheme = false
     @State private var addingSeveralPayouts = false
     @State private var editingFilters = false
+    @State private var editingIncomeFilters = false
     @State private var billToAdd: Int64?
     @State private var editingIncome: IncomeEntry?
     @State private var openingToSend = false
@@ -95,6 +96,7 @@ struct BudgetScreen: View {
             .sheet(isPresented: $addingScheme) { NewSchemeSheet(model: model) }
             .sheet(isPresented: $addingSeveralPayouts) { AddSeveralPayoutsSheet(model: model) }
             .sheet(isPresented: $editingFilters) { UpcomingFiltersSheet(model: model) }
+            .sheet(isPresented: $editingIncomeFilters) { UpcomingIncomeFiltersSheet(model: model) }
             .sheet(item: $openedExpense) { id in ExpenseDetailSheet(model: model, expenseID: id) }
             .sheet(item: $editingIncome) { NewIncomeSheet(model: model, editing: $0) }
                         .sheet(item: $billToAdd) { id in
@@ -296,7 +298,8 @@ struct BudgetScreen: View {
                 .accessibilityIdentifier("createIncomeButton")
             Button("Add Several at Once") { addingSeveralPayouts = true }.buttonStyle(GreyButtonStyle()).padding(.vertical, 8)
                 .accessibilityIdentifier("addSeveralIncomeButton")
-            upcomingFilterButton
+            Button("Edit upcoming income filters") { editingIncomeFilters = true }.buttonStyle(GreyButtonStyle()).padding(.vertical, 8)
+                .accessibilityIdentifier("editUpcomingIncomeFiltersButton")
         }
     }
 

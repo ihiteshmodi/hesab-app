@@ -174,3 +174,22 @@ Feature: Payout schemes and maturity reminders
     And "Pays on day" starts as the day of that first payout and can be changed on its own
     And she can switch on "Always on the last day of the month", which greys out "Pays on day"
 
+  # The filter button on Activity > Upcoming Income sets how far ahead payouts and maturities show, and whether
+  # schemes that already matured stay listed. It does not change the bill filters on Upcoming Expenses.
+  Scenario: The maturity window decides how far ahead maturities show
+    Given today is 2026-12-15 and Bond A matures in 53 days
+    When she sets "Show maturities within" to 30 days
+    Then Bond A is not listed under Upcoming Income
+    When she sets it to 60 days
+    Then "Bond A matures in 53 days" is listed
+
+  Scenario: Matured schemes can be hidden from Upcoming Income
+    Given a scheme that matured a month ago
+    When she turns off "Show matured schemes"
+    Then it is no longer listed under Upcoming Income
+
+  Scenario: The payout window filters expected payouts
+    Given "Payout alert" is 5 days and Bond A pays in 8 days
+    When she sets "Show payouts due within" to 14 days
+    Then Bond A's payout is listed
+
