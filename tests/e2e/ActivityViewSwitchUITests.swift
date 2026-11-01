@@ -33,7 +33,7 @@ final class ActivityViewSwitchUITests: XCTestCase {
         addSalary(app, "150000")
 
         XCTAssertEqual(app.staticTexts["incomeThisMonth"].label, "₹ ••••")
-        XCTAssertEqual(app.staticTexts["leftToSpend"].label, "₹ ••••")
+        XCTAssertEqual(app.staticTexts["leftToSpend"].label, "₹1,50,000.00")
 
         app.buttons["activityEyeButton"].tap()
         XCTAssertEqual(app.staticTexts["incomeThisMonth"].label, "₹1,50,000.00")

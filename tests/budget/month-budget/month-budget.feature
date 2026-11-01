@@ -84,6 +84,11 @@ Feature: What is left to spend, and what was spent this month
     Then "Left to spend", "Spent in October" and "Income in October" show their amounts
     And there is no eye on the screen
 
+  Scenario: With Hide Balances on, Left to spend and Spent still show
+    Given Hide Balances is on and Priya recorded a salary of 1,50,000 this month
+    When she opens Activity
+    Then "Left to spend" and "Spent in October" show their amounts while "Income in October" shows "₹ ••••"
+
   Scenario: With Hide Balances on, income stays hidden until she taps the eye
     Given Hide Balances is on and Priya recorded a salary of 1,50,000 this month
     When she opens Activity

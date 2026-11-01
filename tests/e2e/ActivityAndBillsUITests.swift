@@ -135,9 +135,9 @@ final class ActivityAndBillsUITests: XCTestCase {
     }
 
     @MainActor
-    func testUpcomingBillAmountsStayVisibleWhileLeftToSpendIsHidden() {
+    func testUpcomingBillAmountsStayVisibleWithHideBalancesOn() {
         let app = launchApp(["-ui-hide-balances"])
-        XCTAssertEqual(app.staticTexts["leftToSpend"].label, "₹ ••••")
+        XCTAssertEqual(app.staticTexts["leftToSpend"].label, "₹0.00")
         app.buttons["Upcoming"].tap()
         app.buttons["createBillButton"].tap()
         fillBill(app, "Internet", "800")
