@@ -250,9 +250,11 @@ struct BillsScreen: View {
     }
 
     private func detail(_ summary: BillSummary) -> String {
-        let repeats = summary.bill.repeats == .never ? "One-off" : summary.bill.repeats.title
+        // Non-breaking spaces keep "Every 3 Months" and "Due 13 Nov" from splitting across lines.
+        let glue: (String) -> String = { $0.replacingOccurrences(of: " ", with: "\u{00A0}") }
+        let repeats = glue(summary.bill.repeats == .never ? "One-off" : summary.bill.repeats.title)
         guard let due = summary.nextDue else { return "\(repeats) · Ended" }
-        return "Due \(due.shortTitle) · \(repeats)"
+        return "\(glue("Due \(due.shortTitle)")) · \(repeats)"
     }
 
     // MARK: the filter menu (mockup 7)

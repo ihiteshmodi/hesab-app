@@ -34,8 +34,10 @@ struct PayoutSchemesScreen: View {
                                 Text(scheme.name).font(.headline)
                                 if scheme.isClosed { StatusPill(text: "closed") }
                             }
-                            Text(schedule(scheme) + (scheme.maturity.map { " · matures \($0.shortTitle)" } ?? ""))
-                                .font(.footnote).foregroundStyle(Theme.secondary)
+                            Text(schedule(scheme)).font(.footnote).foregroundStyle(Theme.secondary)
+                            if let maturity = scheme.maturity {
+                                Text("Matures \(maturity.shortTitle)").font(.footnote).foregroundStyle(Theme.secondary)
+                            }
                         }
                         Spacer(minLength: 8)
                         VStack(alignment: .trailing, spacing: 1) {

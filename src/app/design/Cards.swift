@@ -172,9 +172,9 @@ struct FieldRow<Control: View>: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            Text(label)
+            Text(label).lineLimit(1).layoutPriority(0)
             Spacer(minLength: 8)
-            control.foregroundStyle(Theme.secondary)
+            control.foregroundStyle(Theme.secondary).lineLimit(1).fixedSize(horizontal: true, vertical: false).layoutPriority(1)
         }
         .rowPadding()
     }

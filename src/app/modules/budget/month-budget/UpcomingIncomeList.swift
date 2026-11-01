@@ -8,7 +8,7 @@ struct UpcomingIncomeList: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            CardCaption("Income you expect · \(UpcomingWindow.caption(model.preferences.upcomingWindowDays))")
+            CardCaption(window)
                 .padding(.bottom, 4)
             if model.upcomingIncome.isEmpty {
                 Text("No income expected soon.").foregroundStyle(Theme.secondary).padding(.vertical, 12)
@@ -16,19 +16,19 @@ struct UpcomingIncomeList: View {
             }
             ForEach(Array(model.upcomingIncome.enumerated()), id: \.offset) { index, item in
                 if index > 0 { Rectangle().fill(Theme.separator).frame(height: 1) }
-                HStack(spacing: 8) {
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text(item.scheme.name)
-                        Text(detail(item)).font(.footnote)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(item.scheme.name).frame(maxWidth: .infinity, alignment: .leading)
+                    HStack(spacing: 8) {
+                        Text(detail(item)).font(.footnote).lineLimit(1)
                             .foregroundStyle(item.kind == .matured ? Theme.red : Theme.secondary)
-                    }
-                    Spacer(minLength: 6)
-                    if item.kind == .payout {
-                        Text("about \(IndianMoneyFormat.string(item.scheme.payoutAmount))")
-                            .monospacedDigit().font(.system(size: 15.5))
-                        Button("Record") { recording = item.scheme }
-                            .buttonStyle(AddPillStyle())
-                            .accessibilityIdentifier("recordUpcomingPayoutButton")
+                        Spacer(minLength: 6)
+                        if item.kind == .payout {
+                            Text("about \(IndianMoneyFormat.string(item.scheme.payoutAmount))")
+                                .monospacedDigit().font(.system(size: 15.5))
+                            Button("Record") { recording = item.scheme }
+                                .buttonStyle(AddPillStyle())
+                                .accessibilityIdentifier("recordUpcomingPayoutButton")
+                        }
                     }
                 }
                 .padding(.vertical, 10)
@@ -39,10 +39,18 @@ struct UpcomingIncomeList: View {
         .sheet(item: $recording) { RecordPayoutSheet(model: model, scheme: $0) }
     }
 
-    /// "Payout expected 3 Nov", "Matures in 53 days", "Matured 268 days ago".
+    private var window: String {
+        let payouts = model.preferences.payoutAlertDays
+        let payoutText = payouts == 0 ? "payouts on the day" : "payouts within \(payouts) day\(payouts == 1 ? "" : "s")"
+        return "Income you expect · \(payoutText), maturities within \(model.preferences.maturityAlertDays) days"
+    }
+
+    /// "Expected 3 Nov", "Matures in 53 days", "Matured 268 days ago".
     private func detail(_ item: UpcomingIncomeItem) -> String {
         let rest = String(item.label.dropFirst(item.scheme.name.count + 1))
-        let text = item.kind == .payout ? String(rest.prefix { $0 != "," }) : rest
+        let text = item.kind == .payout
+            ? String(rest.prefix { $0 != "," }).replacingOccurrences(of: "payout expected", with: "expected")
+            : rest
         return text.prefix(1).uppercased() + text.dropFirst()
     }
 }

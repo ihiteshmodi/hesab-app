@@ -121,7 +121,7 @@ struct NewBillSheet: View {
                     Toggle("Debits by itself", isOn: $autoDebit).rowPadding()
                         .accessibilityIdentifier("billAutoDebitToggle")
                     if repeats != .never {
-                        Toggle("Add to budget automatically on its day", isOn: $automatic).rowPadding()
+                        Toggle("Add automatically on its day", isOn: $automatic).rowPadding()
                             .accessibilityIdentifier("billAutoToggle")
                     }
                     FieldRow("Alert") {

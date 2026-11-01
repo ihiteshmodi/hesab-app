@@ -12,6 +12,7 @@ enum CompositionRoot {
             let app = BudgetApp(database: database, clock: SystemDayClock())
             // The in-memory test database starts empty, so a test asks for the lock to be on from the first screen.
             if arguments.contains("-ui-testing"), arguments.contains("-ui-app-lock") { try app.updatePreferences { $0.appLock = true } }
+            if arguments.contains("-ui-testing"), arguments.contains("-ui-demo-data") { DemoData.seed(app) }
             if arguments.contains("-ui-testing"), arguments.contains("-ui-hide-balances") { try app.updatePreferences { $0.hideBalances = true } }
             return app
         } catch {
