@@ -169,7 +169,7 @@ struct BudgetScreen: View {
         if pending.count > 0 {
             Button { route = .pendingRefunds } label: {
                 HStack {
-                    Text("\(pending.count) · \(shown(pending.stillToCome))").font(.system(size: 17, weight: .bold)).monospacedDigit()
+                    Text("\(pending.count) · \(IndianMoneyFormat.string(pending.stillToCome))").font(.system(size: 17, weight: .bold)).monospacedDigit()
                     Text("Pending refunds").font(.system(size: 12.5)).foregroundStyle(Theme.secondary)
                     Spacer()
                     Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
@@ -184,7 +184,7 @@ struct BudgetScreen: View {
             let total = model.billsToSend.reduce(Money.zero) { $0 + $1.amount }
             Button { openingToSend = true } label: {
                 HStack {
-                    Text("\(model.billsToSend.count) · \(shown(total))").font(.system(size: 17, weight: .bold)).monospacedDigit()
+                    Text("\(model.billsToSend.count) · \(IndianMoneyFormat.string(total))").font(.system(size: 17, weight: .bold)).monospacedDigit()
                     Text("Pending to send").font(.system(size: 12.5)).foregroundStyle(Theme.secondary)
                     Spacer()
                     Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
@@ -263,7 +263,7 @@ struct BudgetScreen: View {
                 .accessibilityIdentifier("upcomingKindPicker")
             switch upcomingKind {
             case .expenses: upcomingExpensesCard
-            case .income: UpcomingIncomeList(model: model, hidden: hidden)
+            case .income: UpcomingIncomeList(model: model)
             }
         }
     }
@@ -287,7 +287,7 @@ struct BudgetScreen: View {
                             .foregroundStyle(item.label.hasPrefix("Past") ? Theme.red : Theme.secondary)
                     }
                     Spacer(minLength: 6)
-                    Text(shown(item.bill.amount)).monospacedDigit().font(.system(size: 15.5))
+                    Text(IndianMoneyFormat.string(item.bill.amount)).monospacedDigit().font(.system(size: 15.5))
                     Button("Add") { billToAdd = item.bill.id }
                         .buttonStyle(AddPillStyle())
                         .accessibilityIdentifier("addUpcomingBillButton")

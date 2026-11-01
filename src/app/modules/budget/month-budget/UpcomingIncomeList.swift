@@ -4,7 +4,6 @@ import SwiftUI
 /// Payouts and maturities coming up, one clean row each. Recording is here; editing a scheme stays in Portfolio.
 struct UpcomingIncomeList: View {
     let model: BudgetViewModel
-    let hidden: Bool
     @State private var recording: PayoutScheme?
 
     var body: some View {
@@ -25,7 +24,7 @@ struct UpcomingIncomeList: View {
                     }
                     Spacer(minLength: 6)
                     if item.kind == .payout {
-                        Text(hidden ? "₹ ••••" : "about \(IndianMoneyFormat.string(item.scheme.monthlyPayout))")
+                        Text("about \(IndianMoneyFormat.string(item.scheme.monthlyPayout))")
                             .monospacedDigit().font(.system(size: 15.5))
                         Button("Record") { recording = item.scheme }
                             .buttonStyle(AddPillStyle())
