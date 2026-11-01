@@ -78,6 +78,46 @@ final class PortfolioUITests: XCTestCase {
     }
 
     @MainActor
+    func testAnOldLedgerEntryAndThePersonCanBeChanged() {
+        let app = launchApp()
+        selectTab(app, "Portfolio")
+        app.buttons["addLedgerButton"].tap()
+        let name = app.textFields["ledgerNameField"]
+        XCTAssertTrue(name.waitForExistence(timeout: 20))
+        name.tap()
+        name.typeText("Mom")
+        app.buttons["saveLedgerButton"].tap()
+        app.buttons["ledgerRow-Mom"].tap()
+        app.buttons["addLedgerEntryButton"].tap()
+        let title = app.textFields["ledgerEntryTitleField"]
+        XCTAssertTrue(title.waitForExistence(timeout: 20))
+        title.tap()
+        title.typeText("Carry over")
+        let amount = app.textFields["ledgerEntryAmountField"]
+        amount.tap()
+        amount.typeText("60000")
+        app.buttons["saveLedgerEntryButton"].tap()
+
+        let row = app.buttons["ledgerEntryRow"]
+        XCTAssertTrue(row.waitForExistence(timeout: 20))
+        row.tap()
+        let edit = app.textFields["ledgerEntryTitleField"]
+        XCTAssertTrue(edit.waitForExistence(timeout: 20))
+        edit.tap()
+        edit.typeText(" one time")
+        app.buttons["saveLedgerEntryButton"].tap()
+        XCTAssertTrue(app.buttons["ledgerEntryRow"].waitForExistence(timeout: 20))
+        XCTAssertTrue(app.buttons["ledgerEntryRow"].label.contains("Carry over one time"), "row reads \(app.buttons["ledgerEntryRow"].label)")
+
+        app.buttons["renameLedgerButton"].tap()
+        let field = app.alerts.textFields.firstMatch
+        XCTAssertTrue(field.waitForExistence(timeout: 20))
+        field.typeText("my")
+        app.alerts.buttons["Save"].tap()
+        XCTAssertTrue(app.navigationBars["Mommy"].waitForExistence(timeout: 20))
+    }
+
+    @MainActor
     func testTheLastDaySwitchGreysOutThePayoutDay() {
         let app = launchApp()
         selectTab(app, "Portfolio")

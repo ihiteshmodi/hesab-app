@@ -21,6 +21,25 @@ public struct RecordRepayment: Sendable {
     }
 }
 
+/// Changes a repayment already recorded; it may still not exceed what was owed.
+public struct UpdateRepayment: Sendable {
+    let income: IncomeRepository
+    let borrowings: BorrowingRepository
+
+    public func callAsFunction(_ id: Int64, amount: Money?, on date: CalendarDate?, fromCash: Bool) throws {
+        guard let amount, amount > .zero else { throw BorrowingError.amountMissingOrZero }
+        let all = try borrowings.all()
+        guard let repayment = all.first(where: { $0.id == id }) else { throw BorrowingError.repaymentNotFound(id) }
+        guard let loan = try income.all().first(where: { $0.id == repayment.borrowingID }) else {
+            throw BorrowingError.notFound(repayment.borrowingID)
+        }
+        let others = all.filter { $0.borrowingID == loan.id && $0.id != id }
+        let owedBeforeThis = loan.amount - others.reduce(Money.zero) { $0 + $1.amount }
+        guard amount <= owedBeforeThis else { throw BorrowingError.moreThanOwed(owedBeforeThis) }
+        try borrowings.update(id, date: date ?? repayment.date, amount: amount, fromCash: fromCash)
+    }
+}
+
 public struct DeleteRepayment: Sendable {
     let borrowings: BorrowingRepository
 

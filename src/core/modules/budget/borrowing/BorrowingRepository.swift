@@ -17,6 +17,16 @@ final class BorrowingRepository: Sendable {
         }
     }
 
+    func update(_ id: Int64, date: CalendarDate, amount: Money, fromCash: Bool) throws {
+        try database.writer.write { db in
+            try db.execute(
+                sql: "UPDATE repayment SET date = ?, amount_paise = ?, from_cash = ? WHERE id = ?",
+                arguments: [date.isoString, amount.paise, fromCash, id]
+            )
+            guard db.changesCount > 0 else { throw BorrowingError.repaymentNotFound(id) }
+        }
+    }
+
     func delete(_ id: Int64) throws {
         try database.writer.write { db in
             guard try RepaymentRecord.deleteOne(db, key: id) else { throw BorrowingError.repaymentNotFound(id) }

@@ -242,5 +242,31 @@ struct BorrowingTests {
         #expect(try app.cashInHand().balance == .zero)
         #expect(try app.monthBudget().leftToSpend == .rupees(23_000))
     }
-}
 
+    @Test func aRepaymentCanBeChangedWithinWhatWasOwed() throws {
+        let app = try appWithTwentyThousand()
+        let loan = try borrow(app, 10_000, from: "Savings")
+        let repayment = try app.recordRepayment(loan.id, .rupees(4_000), on: day("2026-10-01"))
+
+        try app.updateRepayment(repayment.id, amount: .rupees(7_000), on: day("2026-10-02"), fromCash: false)
+
+        let edited = try #require(try line(app, loan).repayments.first)
+        #expect(edited.amount == .rupees(7_000))
+        #expect(edited.date == day("2026-10-02"))
+        #expect(try app.amountToRepay().total == .rupees(3_000))
+        #expect(throws: BorrowingError.moreThanOwed(.rupees(10_000))) {
+            try app.updateRepayment(repayment.id, amount: .rupees(11_000), on: day("2026-10-02"), fromCash: false)
+        }
+    }
+
+    @Test func aRepaymentCanBeMovedFromBankToCash() throws {
+        let app = try appWithTwentyThousand()
+        let loan = try borrow(app, 10_000, from: "Savings")
+        let repayment = try app.recordRepayment(loan.id, .rupees(4_000))
+
+        try app.updateRepayment(repayment.id, amount: .rupees(4_000), on: nil, fromCash: true)
+
+        #expect(try app.monthBudget().leftToSpend == .rupees(30_000))
+        #expect(try app.cashInHand().balance == .rupees(-4_000))
+    }
+}

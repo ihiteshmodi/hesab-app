@@ -83,3 +83,9 @@ Feature: Amount to repay
     When she chooses "Add Borrowing", enters "Ben", 3,000 and "Cash"
     Then the borrowing is listed under "Active" and "Amount to repay" shows 3,000
 
+  Scenario: Priya changes a borrowing or a repayment
+    Given she borrowed 10,000 from "Ben" in cash and repaid 4,000
+    When she opens the borrowing and chooses "Edit Borrowing" to change the amount or lender
+    Then the owed amount follows
+    When she taps the repayment and changes its amount, date or pocket
+    Then the owed amount and the pocket totals follow, and it cannot exceed what was owed

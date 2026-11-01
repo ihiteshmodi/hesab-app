@@ -15,8 +15,30 @@ public struct GetCashInHand: Sendable {
 
 public enum CashError: Error, Equatable, Sendable {
     case amountMissingOrZero
+    case notFound(Int64)
 
-    public var message: String { "Enter an amount above 0" }
+    public var message: String {
+        switch self {
+        case .amountMissingOrZero: "Enter an amount above 0"
+        case .notFound: "That cash entry no longer exists."
+        }
+    }
+}
+
+public struct UpdateCashAdjustment: Sendable {
+    let adjustments: CashAdjustmentRepository
+
+    public func callAsFunction(_ id: Int64, amount: Money?, note: String, on date: CalendarDate) throws {
+        guard let amount, amount != .zero else { throw CashError.amountMissingOrZero }
+        let title = note.trimmed
+        try adjustments.update(id, date: date, amount: amount, note: title.isEmpty ? "Cash added" : title)
+    }
+}
+
+public struct DeleteCashAdjustment: Sendable {
+    let adjustments: CashAdjustmentRepository
+
+    public func callAsFunction(_ id: Int64) throws { try adjustments.delete(id) }
 }
 
 /// Cash that came in some other way, with a title for the list.

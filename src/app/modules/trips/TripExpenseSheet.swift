@@ -157,8 +157,9 @@ struct TripExpenseSheet: View {
                 }
                 CardGroup(header: "Notes and receipt") {
                     TextField("Notes", text: $note).accessibilityIdentifier("tripNoteField").rowPadding()
+                    let photoTitle = receipt != nil || (hadReceipt && !receiptTouched) ? "Replace receipt photo" : "Add receipt photo"
                     PhotosPicker(selection: $photo, matching: .images) {
-                        Label(receipt != nil || (hadReceipt && !receiptTouched) ? "Replace receipt photo" : "Add receipt photo", systemImage: "photo")
+                        Label(photoTitle, systemImage: "photo")
                     }
                     .rowPadding()
                     if CameraPicker.isAvailable {
@@ -191,7 +192,7 @@ struct TripExpenseSheet: View {
             }
             .onChange(of: photo) {
                 guard let photo else { return }
-                Task {
+                Task { @MainActor in
                     if let data = try? await photo.loadTransferable(type: Data.self), let small = ReceiptImage.compressed(data) {
                         receipt = small
                         receiptTouched = true

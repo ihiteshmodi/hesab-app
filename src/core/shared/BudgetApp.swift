@@ -17,6 +17,12 @@ public final class BudgetApp: Sendable {
     public let cashInHand: GetCashInHand
     public let setCashInHand: SetCashInHand
     public let addCash: AddCash
+    public let updateCashAdjustment: UpdateCashAdjustment
+    public let deleteCashAdjustment: DeleteCashAdjustment
+    public let updateRepayment: UpdateRepayment
+    public let updatePlannedItem: UpdatePlannedItem
+    public let updateLedgerEntry: UpdateLedgerEntry
+    public let renameLedger: RenameLedger
     public let updateIncome: UpdateIncome
     public let deleteIncome: DeleteIncome
     public let monthBudget: GetMonthBudget
@@ -142,6 +148,11 @@ public final class BudgetApp: Sendable {
         ledgers = GetLedgers(ledgers: ledgerBook, expenses: expenses)
         cashInHand = GetCashInHand(expenses: expenses, adjustments: cash, trips: tripBook, income: income, repayments: borrowingBook)
         addCash = AddCash(adjustments: cash, clock: clock)
+        updateCashAdjustment = UpdateCashAdjustment(adjustments: cash)
+        deleteCashAdjustment = DeleteCashAdjustment(adjustments: cash)
+        updateRepayment = UpdateRepayment(income: income, borrowings: borrowingBook)
+        updateLedgerEntry = UpdateLedgerEntry(ledgers: ledgerBook, expenses: expenses)
+        renameLedger = RenameLedger(ledgers: ledgerBook)
         setCashInHand = SetCashInHand(expenses: expenses, adjustments: cash, trips: tripBook, income: income, repayments: borrowingBook, clock: clock)
         addExpense = AddExpense(expenses: expenses, clock: clock)
         updateExpense = UpdateExpense(expenses: expenses, clock: clock)
@@ -192,6 +203,7 @@ public final class BudgetApp: Sendable {
         entityHistory = GetEntityHistory(entities: entityBook, expenses: expenses)
         let plannedBook = PlannedRepository(database: database)
         addPlannedItem = AddPlannedItem(planned: plannedBook)
+        updatePlannedItem = UpdatePlannedItem(planned: plannedBook)
         plannedItems = GetPlannedItems(planned: plannedBook)
         deletePlannedItem = DeletePlannedItem(planned: plannedBook)
         addPlannedAsExpense = AddPlannedAsExpense(planned: plannedBook, addExpense: addExpense)

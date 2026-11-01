@@ -52,6 +52,24 @@ final class LedgerRepository: Sendable {
         }
     }
 
+    func rename(_ id: Int64, to name: String) throws {
+        try database.writer.write { db in
+            try db.execute(sql: "UPDATE ledger SET name = ? WHERE id = ?", arguments: [name, id])
+            guard db.changesCount > 0 else { throw LedgerError.notFound(id) }
+        }
+    }
+
+    func updateEntry(_ id: Int64, date: CalendarDate, description: String, amount: Money) throws -> LedgerEntry {
+        try database.writer.write { db in
+            guard var record = try LedgerEntryRecord.fetchOne(db, key: id) else { throw LedgerError.notFound(id) }
+            record.date = date.isoString
+            record.description = description
+            record.amountPaise = amount.paise
+            try record.update(db)
+            return try record.entry()
+        }
+    }
+
     func deleteEntry(_ id: Int64) throws {
         try database.writer.write { db in
             guard try LedgerEntryRecord.deleteOne(db, key: id) else { throw LedgerError.notFound(id) }

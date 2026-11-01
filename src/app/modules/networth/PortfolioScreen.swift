@@ -93,7 +93,7 @@ struct PortfolioScreen: View {
                         CardGroup(header: "Exchange rates") {
                             ForEach(portfolio.rates, id: \.currency) { rate in
                                 CardRow(title: "1 \(rate.currency)") {
-                                    Text("\(rate.rate) (set \(rate.setOn.shortTitle))").foregroundStyle(Theme.secondary)
+                                    Text(verbatim: "\(rate.rate) (set \(rate.setOn.shortTitle))").foregroundStyle(Theme.secondary)
                                 }
                             }
                         }

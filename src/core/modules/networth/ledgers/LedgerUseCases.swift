@@ -46,6 +46,42 @@ public struct AddLedgerEntry: Sendable {
     }
 }
 
+/// Changes an old entry; the balance and the overdrawn warning are worked out again.
+public struct UpdateLedgerEntry: Sendable {
+    let ledgers: LedgerRepository
+    let expenses: ExpenseRepository
+
+    @discardableResult
+    public func callAsFunction(_ entryID: Int64, _ new: NewLedgerEntry) throws -> LedgerEntryAdded {
+        guard let value = new.value, value != .zero else { throw LedgerError.valueMissingOrZero }
+        guard let existing = try ledgers.allEntries().first(where: { $0.id == entryID }) else { throw LedgerError.notFound(entryID) }
+        let ledger = try ledgers.ledger(existing.ledgerID)
+        let entry = try ledgers.updateEntry(
+            entryID, date: new.date ?? existing.date, description: new.description.trimmed, amount: value
+        )
+        let balance = LedgerBook.summaries(
+            ledgers: [ledger], entries: try ledgers.allEntries(), expenses: try expenses.all()
+        )[0].balance
+        let warning = value < .zero && balance < .zero
+            ? "You have paid out \(IndianMoneyFormat.plain(.zero - balance)) more than you hold for \(ledger.name)."
+            : nil
+        return LedgerEntryAdded(entry: entry, warning: warning)
+    }
+}
+
+public struct RenameLedger: Sendable {
+    let ledgers: LedgerRepository
+
+    public func callAsFunction(_ id: Int64, _ name: String) throws {
+        let name = name.trimmed
+        guard !name.isEmpty else { throw LedgerError.nameMissing }
+        if let other = try ledgers.allLedgers().first(where: { $0.id != id && $0.name.lowercased() == name.lowercased() }) {
+            throw LedgerError.nameTaken(other.name)
+        }
+        try ledgers.rename(id, to: name)
+    }
+}
+
 public struct DeleteLedgerEntry: Sendable {
     let ledgers: LedgerRepository
 

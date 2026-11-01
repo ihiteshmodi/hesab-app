@@ -52,7 +52,7 @@ final class TripsUITests: XCTestCase {
         app.buttons["IDR"].tap()
         type(app.textFields["tripRateField"], "0.0053")
         app.buttons["tripCategoryPicker"].tap()
-        app.buttons["Transport"].tap()
+        app.buttons["Home & Utilities"].tap()
         app.buttons["saveTripButton"].tap()
         app.descendants(matching: .any)["tripRow"].firstMatch.tap()
         addPerson(app, "Raj")
@@ -135,7 +135,7 @@ final class TripsUITests: XCTestCase {
         app.buttons["newTripButton"].tap()
         type(app.textFields["tripNameField"], name)
         app.buttons["tripCategoryPicker"].tap()
-        app.buttons["Transport"].tap()
+        app.buttons["Home & Utilities"].tap()
         app.buttons["saveTripButton"].tap()
         XCTAssertTrue(app.descendants(matching: .any)["tripRow"].waitForExistence(timeout: 20))
     }

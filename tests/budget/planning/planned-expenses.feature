@@ -63,3 +63,9 @@ Feature: Planned expenses (no date yet)
   Scenario: Nothing is planned
     Given there are no planned items
     Then she sees "Nothing planned yet. Add an expense you know is coming."
+
+
+  Scenario: Priya changes a planned item
+    Given a planned item "Sofa" of 25,000
+    When she taps it and changes it to "Big sofa" 30,000
+    Then the planned total shows 30,000
