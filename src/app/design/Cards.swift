@@ -222,17 +222,27 @@ struct ButtonRow: View {
 struct PillSegments<Value: Hashable>: View {
     @Binding var selection: Value
     let options: [(value: Value, title: String)]
+    var badges: [Value: Int] = [:]
 
     var body: some View {
         HStack(spacing: 0) {
             ForEach(options, id: \.value) { option in
                 Button { selection = option.value } label: {
                     Text(option.title).font(.system(size: 15.5, weight: .semibold))
+                        .overlay(alignment: .topTrailing) {
+                            if let count = badges[option.value], count > 0 {
+                                Text("\(count)").font(.system(size: 11, weight: .bold)).foregroundStyle(.white)
+                                    .padding(.horizontal, 5).frame(minWidth: 17, minHeight: 17)
+                                    .background(Theme.red, in: Capsule()).offset(x: 14, y: -9)
+                            }
+                        }
                         .frame(maxWidth: .infinity).padding(.vertical, 9)
                         .background(selection == option.value ? Theme.selectedSegment : .clear, in: Capsule())
                         .contentShape(Capsule())
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel(option.title)
+                .accessibilityValue(badges[option.value].map { $0 > 0 ? "\($0)" : "" } ?? "")
                 .accessibilityAddTraits(selection == option.value ? .isSelected : [])
             }
         }

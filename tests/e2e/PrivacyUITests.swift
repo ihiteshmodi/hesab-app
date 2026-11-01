@@ -23,7 +23,7 @@ final class PrivacyUITests: XCTestCase {
 
     @MainActor
     func testTheSavingsBankBalanceStaysHiddenUntilTheEyeIsTapped() {
-        let app = launchApp()
+        let app = launchApp(["-ui-hide-balances"])
         app.buttons["Savings"].tap()
 
         let balance = app.staticTexts["savingsBalance"]
@@ -39,8 +39,23 @@ final class PrivacyUITests: XCTestCase {
     }
 
     @MainActor
-    func testPortfolioHidesAgainAfterSwitchingTabs() {
+    func testWithHideBalancesOffNothingIsMaskedAndThereIsNoEye() {
         let app = launchApp()
+        XCTAssertTrue(app.staticTexts["leftToSpend"].waitForExistence(timeout: 20))
+        XCTAssertEqual(app.staticTexts["incomeThisMonth"].label, "₹0.00")
+        XCTAssertFalse(app.buttons["activityEyeButton"].exists)
+        app.buttons["Savings"].tap()
+        XCTAssertEqual(app.staticTexts["savingsBalance"].label, "₹0.00")
+        XCTAssertFalse(app.buttons["savingsEyeButton"].exists)
+        selectTab(app, "Portfolio")
+        XCTAssertTrue(app.staticTexts["netWorth"].waitForExistence(timeout: 20))
+        XCTAssertEqual(app.staticTexts["netWorth"].label, "₹0.00")
+        XCTAssertFalse(app.buttons["eyeButton"].exists)
+    }
+
+    @MainActor
+    func testPortfolioHidesAgainAfterSwitchingTabs() {
+        let app = launchApp(["-ui-hide-balances"])
         selectTab(app, "Portfolio")
         app.buttons["eyeButton"].tap()
         XCTAssertEqual(app.staticTexts["netWorth"].label, "₹0.00")
@@ -53,7 +68,7 @@ final class PrivacyUITests: XCTestCase {
 
     @MainActor
     func testAFailedFaceIDKeepsPortfolioHiddenAndSaysTryAgain() {
-        let app = launchApp(["-ui-auth-fail"])
+        let app = launchApp(["-ui-auth-fail", "-ui-hide-balances"])
         selectTab(app, "Portfolio")
         app.buttons["eyeButton"].tap()
 

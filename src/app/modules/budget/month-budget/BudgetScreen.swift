@@ -11,26 +11,27 @@ struct BudgetScreen: View {
     @State private var addingIncome = false
     @State private var addingBill = false
     @State private var addingSeveral = false
+    @State private var addingScheme = false
+    @State private var addingSeveralPayouts = false
     @State private var editingFilters = false
     @State private var billToAdd: Int64?
-    @State private var editingBill: Int64?
     @State private var editingIncome: IncomeEntry?
-    @State private var sending: BillToSend?
+    @State private var openingToSend = false
+    @State private var upcomingKind = UpcomingKind.expenses
     @State private var openedExpense: Int64?
     @State private var reviewingAutoAdded = false
     @State private var errorMessage: String?
     @State private var pane = ActivityPane.spending
     @State private var view = ActivityView.expenses
     @State private var revealed = false
-    @State private var savingsShown = false
+    @State private var savingsRevealed = false
     @State private var authMessage: String?
 
     private var hidden: Bool { model.preferences.hideBalances && !revealed }
+    private var savingsShown: Bool { !model.preferences.hideBalances || savingsRevealed }
 
     private func shown(_ money: Money) -> String { hidden ? "₹ ••••" : IndianMoneyFormat.string(money) }
 
-    /// Income stays masked on every visit, whatever Hide Balances says; the eye is the only way to see it.
-    private func shownIncome(_ money: Money) -> String { revealed ? IndianMoneyFormat.string(money) : "₹ ••••" }
 
     var body: some View {
         NavigationStack {
@@ -41,7 +42,8 @@ struct BudgetScreen: View {
                 if let budget = model.budget {
                     if !model.notices.isEmpty { notice }
                     CardPanel {
-                        PillSegments(selection: $pane, options: ActivityPane.allCases.map { ($0, $0.rawValue) })
+                        PillSegments(selection: $pane, options: ActivityPane.allCases.map { ($0, $0.rawValue) },
+                                     badges: [.upcoming: model.upcoming.items.count + model.upcomingIncome.count])
                             .padding(.bottom, 6)
                             .accessibilityIdentifier("activityPanePicker")
                         switch pane {
@@ -58,10 +60,10 @@ struct BudgetScreen: View {
                 }
             }
             .cardNavigation("Activity")
-            .onDisappear { revealed = false; savingsShown = false }
+            .onDisappear { revealed = false; savingsRevealed = false }
             .onChange(of: pane) { authMessage = nil }
             .onChange(of: scenePhase) {
-                if scenePhase != .active { revealed = false; savingsShown = false }
+                if scenePhase != .active { revealed = false; savingsRevealed = false }
             }
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
@@ -84,16 +86,17 @@ struct BudgetScreen: View {
             }
             .navigationDestination(item: $route) { $0.screen(model) }
             .navigationDestination(isPresented: $reviewingAutoAdded) { AutoAddedScreen(model: model) }
+            .navigationDestination(isPresented: $openingToSend) { ToSendScreen(model: model) }
             .sheet(isPresented: $addingExpense) { NewExpenseSheet(model: model) }
             .sheet(isPresented: $addingIncome) { NewIncomeSheet(model: model) }
             .sheet(isPresented: $addingBill) { NewBillSheet(model: model) }
             .sheet(isPresented: $addingSeveral) { AddSeveralSheet(model: model) }
+            .sheet(isPresented: $addingScheme) { NewSchemeSheet(model: model) }
+            .sheet(isPresented: $addingSeveralPayouts) { AddSeveralPayoutsSheet(model: model) }
             .sheet(isPresented: $editingFilters) { UpcomingFiltersSheet(model: model) }
             .sheet(item: $openedExpense) { id in ExpenseDetailSheet(model: model, expenseID: id) }
-            .sheet(item: $editingBill) { NewBillSheet(model: model, editing: $0) }
             .sheet(item: $editingIncome) { NewIncomeSheet(model: model, editing: $0) }
-            .sheet(item: $sending) { SentSheet(model: model, bill: $0) }
-            .sheet(item: $billToAdd) { id in
+                        .sheet(item: $billToAdd) { id in
                 if let draft = model.billDraft(id) {
                     NewExpenseSheet(model: model, draft: draft) { model.addBillOccurrence(id, $0) }
                 }
@@ -144,9 +147,11 @@ struct BudgetScreen: View {
         HStack {
             CardCaption("Left to spend")
             Spacer()
-            Button(revealed ? "Hide" : "Show with Face ID", systemImage: revealed ? "eye.slash" : "eye") { toggleRevealed() }
-                .labelStyle(.iconOnly).buttonStyle(.plain).foregroundStyle(Theme.secondary)
-                .accessibilityIdentifier("activityEyeButton")
+            if model.preferences.hideBalances {
+                Button(revealed ? "Hide" : "Show with Face ID", systemImage: revealed ? "eye.slash" : "eye") { toggleRevealed() }
+                    .labelStyle(.iconOnly).buttonStyle(.plain).foregroundStyle(Theme.secondary)
+                    .accessibilityIdentifier("activityEyeButton")
+            }
         }
         if let authMessage, pane == .spending {
             Text(authMessage).font(.footnote).foregroundStyle(Theme.red).accessibilityIdentifier("activityAuthMessage")
@@ -158,7 +163,7 @@ struct BudgetScreen: View {
             .accessibilityIdentifier("leftToSpend")
         HStack(spacing: 10) {
             tile(shown(budget.spentThisMonth), "Spent in \(monthName(budget.month))", id: "spentThisMonth")
-            tile(shownIncome(budget.incomeThisMonth), "Income in \(monthName(budget.month))", id: "incomeThisMonth")
+            tile(shown(budget.incomeThisMonth), "Income in \(monthName(budget.month))", id: "incomeThisMonth")
         }
         let pending = budget.pendingRefundsEverywhere
         if pending.count > 0 {
@@ -175,33 +180,20 @@ struct BudgetScreen: View {
             .buttonStyle(.plain)
             .accessibilityIdentifier("pendingRefundsTile")
         }
-        toSendBlock
-    }
-
-    /// Bills she pays herself stay here until she ticks them sent, with the date.
-    @ViewBuilder private var toSendBlock: some View {
         if !model.billsToSend.isEmpty {
-            VStack(alignment: .leading, spacing: 0) {
-                Text("To send · \(model.billsToSend.count)").font(.system(size: 12.5)).foregroundStyle(Theme.secondary)
-                    .padding(.bottom, 2).accessibilityIdentifier("toSendHeader")
-                ForEach(model.billsToSend, id: \.occurrenceID) { bill in
-                    HStack(spacing: 8) {
-                        VStack(alignment: .leading, spacing: 1) {
-                            Text(bill.billName)
-                            Text("Due \(bill.dueDate.shortTitle)").font(.footnote).foregroundStyle(Theme.secondary)
-                        }
-                        Spacer(minLength: 6)
-                        Text(shown(bill.amount)).monospacedDigit().font(.system(size: 15.5))
-                        Button("Sent") { sending = bill }.buttonStyle(AddPillStyle())
-                            .accessibilityIdentifier("markSentButton")
-                    }
-                    .padding(.vertical, 6)
-                    .accessibilityElement(children: .contain)
-                    .accessibilityIdentifier("toSendRow")
+            let total = model.billsToSend.reduce(Money.zero) { $0 + $1.amount }
+            Button { openingToSend = true } label: {
+                HStack {
+                    Text("\(model.billsToSend.count) · \(shown(total))").font(.system(size: 17, weight: .bold)).monospacedDigit()
+                    Text("Pending to send").font(.system(size: 12.5)).foregroundStyle(Theme.secondary)
+                    Spacer()
+                    Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
                 }
+                .padding(.vertical, 10).padding(.horizontal, 12)
+                .background(Theme.tile, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
             }
-            .padding(.vertical, 10).padding(.horizontal, 12)
-            .background(Theme.tile, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("pendingToSendTile")
         }
     }
 
@@ -266,6 +258,17 @@ struct BudgetScreen: View {
     // MARK: Upcoming
 
     private var upcomingCard: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            PillSegments(selection: $upcomingKind, options: UpcomingKind.allCases.map { ($0, $0.rawValue) })
+                .accessibilityIdentifier("upcomingKindPicker")
+            switch upcomingKind {
+            case .expenses: upcomingExpensesCard
+            case .income: UpcomingIncomeList(model: model, hidden: hidden)
+            }
+        }
+    }
+
+    private var upcomingExpensesCard: some View {
         VStack(alignment: .leading, spacing: 0) {
             CardCaption("Bills you add yourself · \(UpcomingWindow.caption(model.preferences.upcomingWindowDays))")
                 .padding(.bottom, 4)
@@ -290,8 +293,6 @@ struct BudgetScreen: View {
                         .accessibilityIdentifier("addUpcomingBillButton")
                 }
                 .padding(.vertical, 10)
-                .contentShape(Rectangle())
-                .onTapGesture { editingBill = item.bill.id }
                 .accessibilityElement(children: .contain)
                 .accessibilityIdentifier("upcomingRow")
             }
@@ -299,6 +300,25 @@ struct BudgetScreen: View {
     }
 
     @ViewBuilder private var upcomingActions: some View {
+        if upcomingKind == .expenses { upcomingExpenseActions } else { upcomingIncomeActions }
+    }
+
+    private var upcomingIncomeActions: some View {
+        VStack(spacing: 0) {
+            Button("Create Income") { addingScheme = true }.buttonStyle(PrimaryButtonStyle()).padding(.vertical, 8)
+                .accessibilityIdentifier("createIncomeButton")
+            Button("Add Several at Once") { addingSeveralPayouts = true }.buttonStyle(GreyButtonStyle()).padding(.vertical, 8)
+                .accessibilityIdentifier("addSeveralIncomeButton")
+            upcomingFilterButton
+        }
+    }
+
+    private var upcomingFilterButton: some View {
+        Button("Edit upcoming bill filters") { editingFilters = true }.buttonStyle(GreyButtonStyle()).padding(.vertical, 8)
+            .accessibilityIdentifier("editUpcomingFiltersButton")
+    }
+
+    @ViewBuilder private var upcomingExpenseActions: some View {
         let automatic = model.bills.filter { $0.bill.addAutomatically && !$0.isEnded }.map(\.bill.name)
         if !automatic.isEmpty {
             Text("\(ListFormatter.localizedString(byJoining: automatic)) add\(automatic.count == 1 ? "s itself" : " themselves") on \(automatic.count == 1 ? "its" : "their") day, so \(automatic.count == 1 ? "it is" : "they are") not listed here.")
@@ -310,8 +330,7 @@ struct BudgetScreen: View {
                 .accessibilityIdentifier("createBillButton")
             Button("Add Several at Once") { addingSeveral = true }.buttonStyle(GreyButtonStyle()).padding(.vertical, 8)
                 .accessibilityIdentifier("addSeveralButton")
-            Button("Edit upcoming bill filters") { editingFilters = true }.buttonStyle(GreyButtonStyle()).padding(.vertical, 8)
-                .accessibilityIdentifier("editUpcomingFiltersButton")
+            upcomingFilterButton
         }
     }
 
@@ -335,11 +354,12 @@ struct BudgetScreen: View {
         HStack {
             CardCaption("Savings bank balance")
             Spacer()
+            if model.preferences.hideBalances {
             Button(savingsShown ? "Hide" : "Show with Face ID", systemImage: savingsShown ? "eye.slash" : "eye") {
-                guard !savingsShown else { savingsShown = false; return }
+                guard !savingsRevealed else { savingsRevealed = false; return }
                 Task {
                     if await PrivacyGate.authenticate(reason: "Show your savings bank balance") {
-                        savingsShown = true
+                        savingsRevealed = true
                         authMessage = nil
                     } else {
                         authMessage = "Try Again"
@@ -349,6 +369,7 @@ struct BudgetScreen: View {
             .labelStyle(.iconOnly).buttonStyle(.plain).foregroundStyle(Theme.secondary)
             .accessibilityLabel(savingsShown ? "Hide savings balance" : "Show savings balance")
             .accessibilityIdentifier("savingsEyeButton")
+            }
         }
         Text(savingsShown ? IndianMoneyFormat.string(model.portfolio?.bankBalance ?? .zero) : "₹ ••••••")
             .font(.system(size: 42, weight: .bold)).monospacedDigit().minimumScaleFactor(0.5).lineLimit(1)
@@ -398,6 +419,10 @@ struct BudgetScreen: View {
         }
         .frame(maxWidth: .infinity)
     }
+}
+
+enum UpcomingKind: String, CaseIterable {
+    case expenses = "Expenses", income = "Income"
 }
 
 enum ActivityPane: String, CaseIterable {
@@ -535,42 +560,6 @@ struct ExpenseRow: View {
 extension IncomeEntry: @retroactive Identifiable {}
 extension BillToSend: @retroactive Identifiable {
     public var id: Int64 { occurrenceID }
-}
-
-/// Ticks a bill she pays herself as sent, on the day she actually sent it.
-private struct SentSheet: View {
-    let model: BudgetViewModel
-    let bill: BillToSend
-    @Environment(\.dismiss) private var dismiss
-    @State private var date = Date()
-    @State private var errorMessage: String?
-
-    var body: some View {
-        NavigationStack {
-            CardScreen {
-                CardGroup {
-                    CardRow(title: bill.billName, subtitle: "Due \(bill.dueDate.shortTitle)") {
-                        Text(IndianMoneyFormat.string(bill.amount)).monospacedDigit()
-                    }
-                    FieldRow("Sent on") {
-                        DatePicker("Sent on", selection: $date, displayedComponents: .date).labelsHidden()
-                    }
-                }
-                if let errorMessage { Text(errorMessage).foregroundStyle(Theme.red).padding(.horizontal, 18) }
-            }
-            .cardNavigation("Mark as Sent")
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
-                        errorMessage = model.markBillSent(bill.occurrenceID, on: CalendarDate(date))
-                        if errorMessage == nil { dismiss() }
-                    }
-                    .accessibilityIdentifier("saveSentButton")
-                }
-            }
-        }
-    }
 }
 
 extension Int64: @retroactive Identifiable {

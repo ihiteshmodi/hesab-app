@@ -77,18 +77,24 @@ Feature: What is left to spend, and what was spent this month
     When she chooses "Calendar"
     Then she sees the month calendar but neither list
 
-  # The income figure stays out of sight on every visit; Left to spend and Spent stay visible.
-  Scenario: Income in the summary card stays hidden until she taps the eye
-    Given Priya recorded a salary of 1,50,000 this month
+  # Hide Balances (Settings) decides what is masked. Off: every figure shows and there is no eye.
+  Scenario: With Hide Balances off every figure shows
+    Given Hide Balances is off and Priya recorded a salary of 1,50,000 this month
     When she opens Activity
-    Then "Income in October" shows "₹ ••••" while "Left to spend" and "Spent in October" show their amounts
+    Then "Left to spend", "Spent in October" and "Income in October" show their amounts
+    And there is no eye on the screen
+
+  Scenario: With Hide Balances on, income stays hidden until she taps the eye
+    Given Hide Balances is on and Priya recorded a salary of 1,50,000 this month
+    When she opens Activity
+    Then "Income in October" shows "₹ ••••"
     When she taps the eye on the Activity screen
     Then "Income in October" shows "₹1,50,000.00"
     When she leaves the screen and comes back
     Then "Income in October" shows "₹ ••••" again
 
   Scenario: The eye on the Activity screen asks for Face ID before showing
-    Given Priya recorded a salary of 1,50,000 this month
+    Given Hide Balances is on and Priya recorded a salary of 1,50,000 this month
     When she taps the eye and Face ID fails
     Then "Income in October" still shows "₹ ••••" and she sees "Try Again"
     When she taps the eye and Face ID succeeds
