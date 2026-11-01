@@ -329,5 +329,23 @@ struct PayoutSchemeTests {
         #expect(edited.frequency == .halfYearly)
         #expect(edited.firstPayout == day("2027-01-12"))
     }
-}
 
+    @Test(arguments: [(30, false), (60, true)])
+    func theMaturityWindowDecidesHowFarAheadMaturitiesShow(window: Int, listed: Bool) throws {
+        let (app, _) = try background(today: "2026-12-15")
+        try app.updatePreferences { $0.maturityAlertDays = window }
+
+        let items = try app.upcomingIncome().filter { $0.kind == .maturity }
+
+        #expect(items.map(\.label).contains("Bond A matures in 53 days") == listed)
+    }
+
+    @Test func maturedSchemesCanBeLeftOutOfUpcomingIncome() throws {
+        let (app, _) = try background(today: "2027-03-01")
+        #expect(try app.upcomingIncome().contains { $0.kind == .matured })
+
+        try app.updatePreferences { $0.includeMaturedSchemes = false }
+
+        #expect(try !app.upcomingIncome().contains { $0.kind == .matured })
+    }
+}

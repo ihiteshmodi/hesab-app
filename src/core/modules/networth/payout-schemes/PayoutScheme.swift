@@ -268,11 +268,12 @@ struct SchemeBook {
             if let maturity = scheme.maturity {
                 let delta = today.days(until: maturity)
                 if delta < 0 {
+                    guard preferences.includeMaturedSchemes else { continue }
                     items.append(UpcomingIncomeItem(
                         kind: .matured, scheme: scheme, date: maturity,
                         label: "\(scheme.name) matured \(-delta) day\(delta == -1 ? "" : "s") ago"
                     ))
-                } else if delta <= 90 {
+                } else if delta <= preferences.maturityAlertDays {
                     items.append(UpcomingIncomeItem(
                         kind: .maturity, scheme: scheme, date: maturity,
                         label: delta == 0 ? "\(scheme.name) matures today"

@@ -217,6 +217,44 @@ struct UpcomingFiltersSheet: View {
     }
 }
 
+/// Opened from Activity > Upcoming Income: how far ahead payouts and maturities show.
+struct UpcomingIncomeFiltersSheet: View {
+    let model: BudgetViewModel
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            CardScreen {
+                CardGroup(header: "Show payouts due within") {
+                    ForEach([0, 1, 2, 3, 5, 7, 14, 30], id: \.self) { days in
+                        tickRow(days == 0 ? "On the day" : "\(days) day\(days == 1 ? "" : "s")", model.preferences.payoutAlertDays == days) {
+                            model.updatePreferences { $0.payoutAlertDays = days }
+                        }
+                        .accessibilityIdentifier("payoutWindow-\(days)")
+                    }
+                }
+                CardGroup(header: "Show maturities within") {
+                    ForEach([30, 60, 90, 180, 365], id: \.self) { days in
+                        tickRow("\(days) days", model.preferences.maturityAlertDays == days) {
+                            model.updatePreferences { $0.maturityAlertDays = days }
+                        }
+                        .accessibilityIdentifier("maturityWindow-\(days)")
+                    }
+                }
+                CardGroup {
+                    PreferenceToggle(model: model, title: "Show matured schemes", keyPath: \.includeMaturedSchemes)
+                }
+            }
+            .cardNavigation("Upcoming Income Filters")
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }.accessibilityIdentifier("doneIncomeFiltersButton")
+                }
+            }
+        }
+    }
+}
+
 /// A choice in a list with a tick on the chosen one.
 @MainActor
 func tickRow(_ title: String, _ chosen: Bool, choose: @escaping () -> Void) -> some View {

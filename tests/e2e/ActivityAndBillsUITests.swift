@@ -147,7 +147,14 @@ final class ActivityAndBillsUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Bond A"].exists)
         XCTAssertTrue(app.buttons["createIncomeButton"].exists)
         XCTAssertTrue(app.buttons["addSeveralIncomeButton"].exists)
-        XCTAssertTrue(app.buttons["editUpcomingFiltersButton"].exists)
+        XCTAssertTrue(app.buttons["editUpcomingIncomeFiltersButton"].exists)
+
+        app.buttons["editUpcomingIncomeFiltersButton"].tap()
+        let thirty = app.buttons["maturityWindow-30"]
+        XCTAssertTrue(thirty.waitForExistence(timeout: 20), "the income filter sheet is not the income one")
+        thirty.tap()
+        app.buttons["doneIncomeFiltersButton"].tap()
+        XCTAssertTrue(app.staticTexts["Matures today"].waitForExistence(timeout: 20), "a maturity today is gone with a 30 day window")
     }
 
     @MainActor
