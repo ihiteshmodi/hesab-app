@@ -20,3 +20,4 @@ extension CurrencyError: UserMessage {}
 extension TripError: UserMessage {}
 extension PortfolioError: UserMessage {}
 extension PayoutSchemeError: UserMessage {}
+extension CashError: UserMessage {}

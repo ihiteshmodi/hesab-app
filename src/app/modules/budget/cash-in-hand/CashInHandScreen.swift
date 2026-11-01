@@ -4,6 +4,7 @@ import SwiftUI
 struct CashInHandScreen: View {
     let model: BudgetViewModel
     @State private var setting = false
+    @State private var adding = false
 
     var body: some View {
         CardScreen {
@@ -32,6 +33,8 @@ struct CashInHandScreen: View {
                     }
                 }
             }
+            Button("Add Cash") { adding = true }.buttonStyle(PrimaryButtonStyle())
+                .accessibilityIdentifier("addCashButton")
         }
         .cardNavigation("Cash in Hand")
         .toolbar {
@@ -41,6 +44,43 @@ struct CashInHandScreen: View {
             }
         }
         .sheet(isPresented: $setting) { SetCashSheet(model: model) }
+        .sheet(isPresented: $adding) { AddCashSheet(model: model) }
+    }
+}
+
+private struct AddCashSheet: View {
+    let model: BudgetViewModel
+    @Environment(\.dismiss) private var dismiss
+    @State private var amountText = ""
+    @State private var title = ""
+    @State private var date = Date()
+    @State private var errorMessage: String?
+
+    var body: some View {
+        NavigationStack {
+            CardScreen {
+                CardGroup {
+                    TextField("Amount", text: $amountText).keyboardType(.decimalPad).rowPadding()
+                        .accessibilityIdentifier("addCashAmountField")
+                    TextField("Title", text: $title).rowPadding().accessibilityIdentifier("addCashTitleField")
+                    FieldRow("Date") { DatePicker("Date", selection: $date, displayedComponents: .date).labelsHidden() }
+                }
+                if let errorMessage {
+                    Text(errorMessage).foregroundStyle(Theme.red).padding(.horizontal, 18).accessibilityIdentifier("addCashError")
+                }
+            }
+            .cardNavigation("Add Cash")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") {
+                        errorMessage = model.addCash(amountText: amountText, title: title, date: CalendarDate(date))
+                        if errorMessage == nil { dismiss() }
+                    }
+                    .accessibilityIdentifier("saveAddCashButton")
+                }
+            }
+        }
     }
 }
 

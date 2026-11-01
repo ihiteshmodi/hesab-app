@@ -1,5 +1,5 @@
 public struct CashLine: Equatable, Sendable {
-    public enum Kind: Sendable { case withdrawalKept, adjustment, expense }
+    public enum Kind: Sendable { case withdrawalKept, adjustment, borrowed, repaid, expense }
 
     public let kind: Kind
     public let date: CalendarDate
@@ -14,7 +14,9 @@ public struct CashInHand: Equatable, Sendable {
     /// Oldest first, each with the balance after it.
     public let lines: [CashLine]
 
-    init(expenses: [Expense], adjustments: [CashAdjustment]) {
+    init(
+        expenses: [Expense], adjustments: [CashAdjustment], borrowings: [IncomeEntry] = [], repayments: [Repayment] = []
+    ) {
         struct Movement { let kind: CashLine.Kind; let date: CalendarDate; let description: String; let amount: Money; let id: Int64 }
         var movements: [Movement] = expenses.compactMap { expense in
             if expense.keptAsCash {
@@ -28,7 +30,21 @@ public struct CashInHand: Equatable, Sendable {
         movements += adjustments.map {
             Movement(kind: .adjustment, date: $0.date, description: $0.note, amount: $0.amount, id: $0.id)
         }
-        let rank: (CashLine.Kind) -> Int = { $0 == .withdrawalKept ? 0 : $0 == .adjustment ? 1 : 2 }
+        let cashLoans = borrowings.filter { $0.kind == .borrowed && $0.viaCash }
+        movements += cashLoans.map {
+            Movement(kind: .borrowed, date: $0.date, description: "Borrowed from \($0.note)", amount: $0.amount, id: $0.id)
+        }
+        movements += repayments.filter(\.fromCash).map { repayment in
+            let lender = borrowings.first { $0.id == repayment.borrowingID }?.note ?? ""
+            return Movement(kind: .repaid, date: repayment.date, description: "Repaid \(lender)", amount: .zero - repayment.amount, id: repayment.id)
+        }
+        let rank: (CashLine.Kind) -> Int = {
+            switch $0 {
+            case .withdrawalKept: 0
+            case .adjustment, .borrowed: 1
+            case .repaid, .expense: 2
+            }
+        }
         movements.sort { ($0.date, rank($0.kind), $0.id) < ($1.date, rank($1.kind), $1.id) }
 
         var running = Money.zero

@@ -1,7 +1,7 @@
 import HisaabCore
 import SwiftUI
 
-/// The Activity tab: one card with Spending, Upcoming and Savings, then a switch between the month's expenses, income and calendar.
+/// The Activity tab: one card with Spending, Upcoming Expenses and Upcoming Income, then a switch between the month's expenses, income and calendar.
 struct BudgetScreen: View {
     let model: BudgetViewModel
     @Binding var route: DrawerItem?
@@ -17,18 +17,17 @@ struct BudgetScreen: View {
     @State private var billToAdd: Int64?
     @State private var editingIncome: IncomeEntry?
     @State private var openingToSend = false
-    @State private var upcomingKind = UpcomingKind.expenses
+    @State private var openingCash = false
+    @State private var openingRepay = false
     @State private var openedExpense: Int64?
     @State private var reviewingAutoAdded = false
     @State private var errorMessage: String?
     @State private var pane = ActivityPane.spending
     @State private var view = ActivityView.expenses
     @State private var revealed = false
-    @State private var savingsRevealed = false
     @State private var authMessage: String?
 
     private var hidden: Bool { model.preferences.hideBalances && !revealed }
-    private var savingsShown: Bool { !model.preferences.hideBalances || savingsRevealed }
 
     private func shown(_ money: Money) -> String { hidden ? "₹ ••••" : IndianMoneyFormat.string(money) }
 
@@ -43,27 +42,27 @@ struct BudgetScreen: View {
                     if !model.notices.isEmpty { notice }
                     CardPanel {
                         PillSegments(selection: $pane, options: ActivityPane.allCases.map { ($0, $0.rawValue) },
-                                     badges: [.upcoming: model.upcoming.items.count + model.upcomingIncome.count])
+                                     badges: [.upcomingExpenses: model.upcoming.items.count, .upcomingIncome: model.upcomingIncome.count])
                             .padding(.bottom, 6)
                             .accessibilityIdentifier("activityPanePicker")
                         switch pane {
                         case .spending: spending(budget)
-                        case .upcoming: upcomingCard
-                        case .savings: savingsCard
+                        case .upcomingExpenses: upcomingExpensesCard
+                        case .upcomingIncome: UpcomingIncomeList(model: model)
                         }
                     }
                     switch pane {
                     case .spending: entries(budget)
-                    case .upcoming: upcomingActions
-                    case .savings: savingsRest(budget)
+                    case .upcomingExpenses: upcomingExpenseActions
+                    case .upcomingIncome: upcomingIncomeActions
                     }
                 }
             }
             .cardNavigation("Activity")
-            .onDisappear { revealed = false; savingsRevealed = false }
+            .onDisappear { revealed = false }
             .onChange(of: pane) { authMessage = nil }
             .onChange(of: scenePhase) {
-                if scenePhase != .active { revealed = false; savingsRevealed = false }
+                if scenePhase != .active { revealed = false }
             }
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
@@ -87,6 +86,8 @@ struct BudgetScreen: View {
             .navigationDestination(item: $route) { $0.screen(model) }
             .navigationDestination(isPresented: $reviewingAutoAdded) { AutoAddedScreen(model: model) }
             .navigationDestination(isPresented: $openingToSend) { ToSendScreen(model: model) }
+            .navigationDestination(isPresented: $openingCash) { CashInHandScreen(model: model) }
+            .navigationDestination(isPresented: $openingRepay) { AmountToRepayScreen(model: model) }
             .sheet(isPresented: $addingExpense) { NewExpenseSheet(model: model) }
             .sheet(isPresented: $addingIncome) { NewIncomeSheet(model: model) }
             .sheet(isPresented: $addingBill) { NewBillSheet(model: model) }
@@ -195,6 +196,25 @@ struct BudgetScreen: View {
             .buttonStyle(.plain)
             .accessibilityIdentifier("pendingToSendTile")
         }
+        let cash = model.cash
+        summaryTile(count: cash?.lines.count ?? 0, amount: cash?.balance ?? .zero, caption: "Cash in hand", id: "cashInHandTile") { openingCash = true }
+        let owed = model.amountToRepay
+        summaryTile(count: owed?.borrowings.filter { !$0.isRepaid }.count ?? 0, amount: owed?.total ?? .zero, caption: "Amount to repay", id: "amountToRepayTile") { openingRepay = true }
+    }
+
+    private func summaryTile(count: Int, amount: Money, caption: String, id: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack {
+                Text("\(count) · \(IndianMoneyFormat.string(amount))").font(.system(size: 17, weight: .bold)).monospacedDigit()
+                Text(caption).font(.system(size: 12.5)).foregroundStyle(Theme.secondary)
+                Spacer()
+                Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
+            }
+            .padding(.vertical, 10).padding(.horizontal, 12)
+            .background(Theme.tile, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier(id)
     }
 
     private func tile(_ value: String, _ caption: String, id: String) -> some View {
@@ -257,17 +277,6 @@ struct BudgetScreen: View {
 
     // MARK: Upcoming
 
-    private var upcomingCard: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            PillSegments(selection: $upcomingKind, options: UpcomingKind.allCases.map { ($0, $0.rawValue) })
-                .accessibilityIdentifier("upcomingKindPicker")
-            switch upcomingKind {
-            case .expenses: upcomingExpensesCard
-            case .income: UpcomingIncomeList(model: model)
-            }
-        }
-    }
-
     private var upcomingExpensesCard: some View {
         VStack(alignment: .leading, spacing: 0) {
             CardCaption("Bills you add yourself · \(UpcomingWindow.caption(model.preferences.upcomingWindowDays))")
@@ -297,10 +306,6 @@ struct BudgetScreen: View {
                 .accessibilityIdentifier("upcomingRow")
             }
         }
-    }
-
-    @ViewBuilder private var upcomingActions: some View {
-        if upcomingKind == .expenses { upcomingExpenseActions } else { upcomingIncomeActions }
     }
 
     private var upcomingIncomeActions: some View {
@@ -334,10 +339,9 @@ struct BudgetScreen: View {
         }
     }
 
-    // MARK: Savings
+    // MARK: Privacy
 
-    /// The savings bank balance stays hidden until Face ID says otherwise; the rest of this pane follows Hide Balances.
-    /// Hiding is instant; showing needs Face ID, like the Portfolio and Savings eyes.
+    /// Hiding is instant; showing needs Face ID, like the Portfolio eye.
     private func toggleRevealed() {
         guard !revealed else { revealed = false; return }
         Task {
@@ -349,86 +353,12 @@ struct BudgetScreen: View {
             }
         }
     }
-
-    @ViewBuilder private var savingsCard: some View {
-        HStack {
-            CardCaption("Savings bank balance")
-            Spacer()
-            if model.preferences.hideBalances {
-            Button(savingsShown ? "Hide" : "Show with Face ID", systemImage: savingsShown ? "eye.slash" : "eye") {
-                guard !savingsRevealed else { savingsRevealed = false; return }
-                Task {
-                    if await PrivacyGate.authenticate(reason: "Show your savings bank balance") {
-                        savingsRevealed = true
-                        authMessage = nil
-                    } else {
-                        authMessage = "Try Again"
-                    }
-                }
-            }
-            .labelStyle(.iconOnly).buttonStyle(.plain).foregroundStyle(Theme.secondary)
-            .accessibilityLabel(savingsShown ? "Hide savings balance" : "Show savings balance")
-            .accessibilityIdentifier("savingsEyeButton")
-            }
-        }
-        Text(savingsShown ? IndianMoneyFormat.string(model.portfolio?.bankBalance ?? .zero) : "₹ ••••••")
-            .font(.system(size: 42, weight: .bold)).monospacedDigit().minimumScaleFactor(0.5).lineLimit(1)
-            .accessibilityIdentifier("savingsBalance")
-        if let authMessage { Text(authMessage).foregroundStyle(Theme.red).accessibilityIdentifier("savingsAuthMessage") }
-        if savingsShown, let asOf = model.portfolio?.bankBalanceAsOf {
-            Text("Set by you · as of \(asOf.shortTitle)").font(.footnote).foregroundStyle(Theme.secondary)
-        }
-    }
-
-    @ViewBuilder private func savingsRest(_ budget: MonthBudget) -> some View {
-        CardGroup {
-            if savingsShown {
-                LinkRow(title: "Ledgers", subtitle: model.ledgers?.ledgers.map(\.ledger.name).joined(separator: ", "),
-                        value: IndianMoneyFormat.string(model.ledgers?.total ?? .zero)) { LedgersScreen(model: model) }
-                LinkRow(title: "Cash in hand", value: IndianMoneyFormat.string(model.cash?.balance ?? .zero)) {
-                    CashInHandScreen(model: model)
-                }
-                LinkRow(title: "Amount to repay", value: IndianMoneyFormat.string(model.amountToRepay?.total ?? .zero)) {
-                    AmountToRepayScreen(model: model)
-                }
-            } else {
-                // Locked until the eye is used: no figures and no way into the screens behind them.
-                ForEach(["Ledgers", "Cash in hand", "Amount to repay"], id: \.self) { title in
-                    CardRow(title: title) { Text("₹ ••••").foregroundStyle(Theme.secondary) }
-                        .accessibilityElement(children: .combine)
-                        .accessibilityIdentifier(title)
-                }
-            }
-        }
-        CardPanel {
-            HStack(alignment: .top) {
-                figure("Income", budget.incomeThisMonth, id: "savingsIncome")
-                figure("Expenses", budget.spentThisMonth, id: "savingsExpenses")
-                figure("Cash flow", budget.incomeThisMonth - budget.spentThisMonth, id: "savingsCashFlow", signed: true)
-            }
-        }
-    }
-
-    private func figure(_ title: String, _ money: Money, id: String, signed: Bool = false) -> some View {
-        VStack(spacing: 2) {
-            Text(savingsShown ? IndianMoneyFormat.string(money) : "₹ ••••")
-                .font(.system(size: 19, weight: .bold)).monospacedDigit().minimumScaleFactor(0.5).lineLimit(1)
-                .foregroundStyle(signed && savingsShown && money < .zero ? Theme.red : Color.primary)
-                .accessibilityIdentifier(id)
-            CardCaption(title)
-        }
-        .frame(maxWidth: .infinity)
-    }
-}
-
-enum UpcomingKind: String, CaseIterable {
-    case expenses = "Expenses", income = "Income"
 }
 
 enum ActivityPane: String, CaseIterable {
     case spending = "Spending"
-    case upcoming = "Upcoming"
-    case savings = "Savings"
+    case upcomingExpenses = "Upcoming Expenses"
+    case upcomingIncome = "Upcoming Income"
 }
 
 /// What the Spending pane lists below its summary card.

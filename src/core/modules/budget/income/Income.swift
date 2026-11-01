@@ -25,6 +25,17 @@ public struct IncomeEntry: Equatable, Sendable {
     public let kind: IncomeKind
     public let amount: Money
     public let note: String
+    /// Only for borrowed money: it arrived as cash rather than in the bank.
+    public let viaCash: Bool
+
+    public init(id: Int64, date: CalendarDate, kind: IncomeKind, amount: Money, note: String, viaCash: Bool = false) {
+        self.id = id
+        self.date = date
+        self.kind = kind
+        self.amount = amount
+        self.note = note
+        self.viaCash = viaCash
+    }
 }
 
 /// What the person typed; `kind` and `amount` are nil when left empty.
@@ -33,12 +44,14 @@ public struct NewIncome: Sendable {
     public var kind: IncomeKind?
     public var amount: Money?
     public var note: String
+    public var viaCash: Bool
 
-    public init(date: CalendarDate? = nil, kind: IncomeKind?, amount: Money?, note: String = "") {
+    public init(date: CalendarDate? = nil, kind: IncomeKind?, amount: Money?, note: String = "", viaCash: Bool = false) {
         self.date = date
         self.kind = kind
         self.amount = amount
         self.note = note
+        self.viaCash = viaCash
     }
 }
 

@@ -60,3 +60,10 @@ Feature: Cash in hand
   Scenario: Priya sees where her cash went
     When she opens Cash in Hand
     Then she sees each withdrawal kept, cash expense and adjustment with the running balance
+
+  Scenario: Priya adds cash with a title
+    When she chooses "Add Cash" and enters 2,000 with the title "Gift from Dad"
+    Then cash in hand rises by 2,000
+    And the list shows "Gift from Dad" on today's date with the new running balance
+    And "Left to spend" does not change
+

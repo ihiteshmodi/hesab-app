@@ -361,8 +361,16 @@ final class BudgetViewModel {
 
     func addCard(name: String) -> String? { run { try app.addCard(NewCard(name: name)) } }
 
-    func recordRepayment(_ borrowingID: Int64, amountText: String) -> String? {
-        run { try app.recordRepayment(borrowingID, MoneyInput.parse(amountText)) }
+    func recordRepayment(_ borrowingID: Int64, amountText: String, on date: CalendarDate? = nil, fromCash: Bool? = nil) -> String? {
+        run { try app.recordRepayment(borrowingID, MoneyInput.parse(amountText), on: date, fromCash: fromCash) }
+    }
+
+    func addBorrowing(lender: String, amountText: String, date: CalendarDate, viaCash: Bool) -> String? {
+        run { try app.addIncome(NewIncome(date: date, kind: .borrowed, amount: MoneyInput.parse(amountText), note: lender, viaCash: viaCash)) }
+    }
+
+    func addCash(amountText: String, title: String, date: CalendarDate) -> String? {
+        run { try app.addCash(MoneyInput.parse(amountText), note: title, on: date) }
     }
 
     /// Writes the export into the temporary folder; the screen hands it to the system file saver.

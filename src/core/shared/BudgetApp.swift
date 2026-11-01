@@ -16,6 +16,7 @@ public final class BudgetApp: Sendable {
     public let ledgers: GetLedgers
     public let cashInHand: GetCashInHand
     public let setCashInHand: SetCashInHand
+    public let addCash: AddCash
     public let updateIncome: UpdateIncome
     public let deleteIncome: DeleteIncome
     public let monthBudget: GetMonthBudget
@@ -139,8 +140,9 @@ public final class BudgetApp: Sendable {
         addLedgerEntry = AddLedgerEntry(ledgers: ledgerBook, expenses: expenses, clock: clock)
         deleteLedgerEntry = DeleteLedgerEntry(ledgers: ledgerBook)
         ledgers = GetLedgers(ledgers: ledgerBook, expenses: expenses)
-        cashInHand = GetCashInHand(expenses: expenses, adjustments: cash, trips: tripBook)
-        setCashInHand = SetCashInHand(expenses: expenses, adjustments: cash, trips: tripBook, clock: clock)
+        cashInHand = GetCashInHand(expenses: expenses, adjustments: cash, trips: tripBook, income: income, repayments: borrowingBook)
+        addCash = AddCash(adjustments: cash, clock: clock)
+        setCashInHand = SetCashInHand(expenses: expenses, adjustments: cash, trips: tripBook, income: income, repayments: borrowingBook, clock: clock)
         addExpense = AddExpense(expenses: expenses, clock: clock)
         updateExpense = UpdateExpense(expenses: expenses, clock: clock)
         deleteExpense = DeleteExpense(expenses: expenses)

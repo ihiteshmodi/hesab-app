@@ -9,6 +9,7 @@ struct NewIncomeSheet: View {
     @State private var kind: IncomeKind?
     @State private var note: String
     @State private var date: Date
+    @State private var viaCash: Bool
     @State private var errorMessage: String?
 
     init(model: BudgetViewModel, editing entry: IncomeEntry? = nil) {
@@ -18,6 +19,7 @@ struct NewIncomeSheet: View {
         _kind = State(initialValue: entry?.kind)
         _note = State(initialValue: entry?.note ?? "")
         _date = State(initialValue: entry?.date.instant() ?? Date())
+        _viaCash = State(initialValue: entry?.viaCash ?? false)
     }
 
     var body: some View {
@@ -40,6 +42,16 @@ struct NewIncomeSheet: View {
                     TextField(kind == .borrowed ? "Borrowed from" : "Note (optional)", text: $note)
                         .rowPadding()
                         .accessibilityIdentifier("incomeNoteField")
+                    if kind == .borrowed {
+                        FieldRow("Received as") {
+                            Picker("Received as", selection: $viaCash) {
+                                Text("Bank").tag(false)
+                                Text("Cash").tag(true)
+                            }
+                            .pickerStyle(.segmented)
+                            .accessibilityIdentifier("incomeBorrowedPocketPicker")
+                        }
+                    }
                     FieldRow("Date") {
                         DatePicker("Date", selection: $date, displayedComponents: .date).labelsHidden()
                     }
@@ -65,7 +77,7 @@ struct NewIncomeSheet: View {
     }
 
     private func save() {
-        let income = NewIncome(date: CalendarDate(date), kind: kind, amount: MoneyInput.parse(amountText), note: note)
+        let income = NewIncome(date: CalendarDate(date), kind: kind, amount: MoneyInput.parse(amountText), note: note, viaCash: viaCash)
         errorMessage = if let editing { model.updateIncome(editing.id, income) } else { model.addIncome(income) }
         if errorMessage == nil { dismiss() }
     }

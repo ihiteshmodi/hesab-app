@@ -7,21 +7,21 @@ final class IncomeRepository: Sendable {
         self.database = database
     }
 
-    func add(date: CalendarDate, kind: IncomeKind, amount: Money, note: String) throws -> IncomeEntry {
+    func add(date: CalendarDate, kind: IncomeKind, amount: Money, note: String, viaCash: Bool = false) throws -> IncomeEntry {
         try database.writer.write { db in
             var record = IncomeRecord(
-                id: nil, date: date.isoString, kind: kind.rawValue, amountPaise: amount.paise, note: note
+                id: nil, date: date.isoString, kind: kind.rawValue, amountPaise: amount.paise, note: note, viaCash: viaCash
             )
             try record.insert(db)
             return try record.entry()
         }
     }
 
-    func update(_ id: Int64, date: CalendarDate, kind: IncomeKind, amount: Money, note: String) throws {
+    func update(_ id: Int64, date: CalendarDate, kind: IncomeKind, amount: Money, note: String, viaCash: Bool = false) throws {
         try database.writer.write { db in
             try db.execute(
-                sql: "UPDATE income_entry SET date = ?, kind = ?, amount_paise = ?, note = ? WHERE id = ?",
-                arguments: [date.isoString, kind.rawValue, amount.paise, note, id]
+                sql: "UPDATE income_entry SET date = ?, kind = ?, amount_paise = ?, note = ?, via_cash = ? WHERE id = ?",
+                arguments: [date.isoString, kind.rawValue, amount.paise, note, viaCash, id]
             )
             guard db.changesCount > 0 else { throw IncomeNotFound(id: id) }
         }
@@ -50,11 +50,13 @@ private struct IncomeRecord: Codable, FetchableRecord, MutablePersistableRecord 
     var kind: String
     var amountPaise: Int
     var note: String
+    var viaCash: Bool
 
     func entry() throws -> IncomeEntry {
         IncomeEntry(
             id: id ?? 0, date: try CalendarDate(isoString: date),
-            kind: IncomeKind(rawValue: kind) ?? .moneyReceived, amount: Money(paise: amountPaise), note: note
+            kind: IncomeKind(rawValue: kind) ?? .moneyReceived, amount: Money(paise: amountPaise), note: note,
+            viaCash: viaCash
         )
     }
 

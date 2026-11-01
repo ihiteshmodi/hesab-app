@@ -3,6 +3,8 @@ public struct Repayment: Equatable, Sendable {
     public let borrowingID: Int64
     public let date: CalendarDate
     public let amount: Money
+    /// Paid back out of cash in hand rather than from the bank.
+    public let fromCash: Bool
 }
 
 /// One borrowing (an income entry of kind borrowed; its note says who lent it) with what has been paid back.

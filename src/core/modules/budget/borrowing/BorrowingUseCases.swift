@@ -4,7 +4,10 @@ public struct RecordRepayment: Sendable {
     let clock: any DayClock
 
     @discardableResult
-    public func callAsFunction(_ borrowingID: Int64, _ amount: Money?, on date: CalendarDate? = nil) throws -> Repayment {
+    /// `fromCash` defaults to however the money was borrowed.
+    public func callAsFunction(
+        _ borrowingID: Int64, _ amount: Money?, on date: CalendarDate? = nil, fromCash: Bool? = nil
+    ) throws -> Repayment {
         guard let amount, amount > .zero else { throw BorrowingError.amountMissingOrZero }
         guard let loan = try income.all().first(where: { $0.id == borrowingID }) else {
             throw BorrowingError.notFound(borrowingID)
@@ -12,7 +15,9 @@ public struct RecordRepayment: Sendable {
         guard loan.kind == .borrowed else { throw BorrowingError.notABorrowing }
         let owed = AmountToRepay(income: [loan], repayments: try borrowings.all()).total
         guard amount <= owed else { throw BorrowingError.moreThanOwed(owed) }
-        return try borrowings.add(borrowingID: borrowingID, date: date ?? clock.today(), amount: amount)
+        return try borrowings.add(
+            borrowingID: borrowingID, date: date ?? clock.today(), amount: amount, fromCash: fromCash ?? loan.viaCash
+        )
     }
 }
 

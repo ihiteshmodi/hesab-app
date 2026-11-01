@@ -78,6 +78,20 @@ Feature: What is left to spend, and what was spent this month
     Then she sees the month calendar but neither list
 
   # Hide Balances (Settings) decides what is masked. Off: every figure shows and there is no eye.
+  # The summary card has three panes: Spending, Upcoming Expenses and Upcoming Income, each of the last two with a
+  # red count of what is coming. There is no Savings pane.
+  Scenario: The summary card has Spending, Upcoming Expenses and Upcoming Income
+    When she opens Activity
+    Then she sees "Spending", "Upcoming Expenses" and "Upcoming Income"
+
+  # Cash in hand and Amount to repay sit under Left to spend like Pending refunds, and always show.
+  Scenario: Cash in hand and Amount to repay are tiles that open their screens
+    Given 2 cash entries making 3,000 and one borrowing of 6,000 still to repay
+    When she opens Activity
+    Then a tile reads "2 · ₹3,000.00 Cash in hand" and another reads "1 · ₹6,000.00 Amount to repay"
+    When she taps a tile
+    Then its screen opens
+
   Scenario: With Hide Balances off every figure shows
     Given Hide Balances is off and Priya recorded a salary of 1,50,000 this month
     When she opens Activity

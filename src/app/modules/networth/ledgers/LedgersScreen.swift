@@ -41,7 +41,7 @@ struct LedgersScreen: View {
     }
 }
 
-private struct NewLedgerSheet: View {
+struct NewLedgerSheet: View {
     let model: BudgetViewModel
     @Environment(\.dismiss) private var dismiss
     @State private var name = ""
@@ -77,6 +77,8 @@ private struct NewLedgerSheet: View {
 struct LedgerDetailScreen: View {
     let model: BudgetViewModel
     let ledgerID: Int64
+    /// Portfolio hides amounts until its eye is used; so does the ledger opened from it.
+    var hidden = false
     @Environment(\.dismiss) private var dismiss
     @State private var addingEntry = false
     @State private var confirmingDelete = false
@@ -86,19 +88,27 @@ struct LedgerDetailScreen: View {
         model.ledgers?.ledgers.first { $0.ledger.id == ledgerID }
     }
 
+    private func money(_ value: Money) -> String { hidden ? "••••••" : IndianMoneyFormat.string(value) }
+
     var body: some View {
         CardScreen {
             if let summary {
                 CardGroup {
                     CardRow(title: "Balance") {
-                        Text(IndianMoneyFormat.string(summary.balance)).monospacedDigit()
+                        Text(money(summary.balance)).monospacedDigit()
                             .accessibilityIdentifier("ledgerBalance")
                     }
+                    Toggle("Counts towards my net worth", isOn: Binding(
+                        get: { summary.ledger.countsTowardsNetWorth },
+                        set: { errorMessage = model.setLedgerCountsTowardsNetWorth(ledgerID, $0) }
+                    ))
+                    .rowPadding()
+                    .accessibilityIdentifier("ledgerCountedToggle")
                 }
                 CardGroup(header: "Entries", footer: summary.lines.isEmpty ? nil : "Touch and hold an entry to delete it.") {
                     ForEach(Array(summary.lines.enumerated()), id: \.offset) { _, line in
                         CardRow(title: line.description, subtitle: line.date.shortTitle) {
-                            Text(IndianMoneyFormat.string(line.amount)).monospacedDigit()
+                            Text(money(line.amount)).monospacedDigit()
                         }
                         .contextMenu {
                             if let entryID = line.entryID {

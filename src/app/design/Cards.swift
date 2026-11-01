@@ -228,7 +228,8 @@ struct PillSegments<Value: Hashable>: View {
         HStack(spacing: 0) {
             ForEach(options, id: \.value) { option in
                 Button { selection = option.value } label: {
-                    Text(option.title).font(.system(size: 15.5, weight: .semibold))
+                    Text(option.title).font(.system(size: 14.5, weight: .semibold)).multilineTextAlignment(.center)
+                        .lineLimit(2).minimumScaleFactor(0.8)
                         .overlay(alignment: .topTrailing) {
                             if let count = badges[option.value], count > 0 {
                                 Text("\(count)").font(.system(size: 11, weight: .bold)).foregroundStyle(.white)

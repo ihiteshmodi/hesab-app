@@ -7,9 +7,11 @@ final class BorrowingRepository: Sendable {
         self.database = database
     }
 
-    func add(borrowingID: Int64, date: CalendarDate, amount: Money) throws -> Repayment {
+    func add(borrowingID: Int64, date: CalendarDate, amount: Money, fromCash: Bool) throws -> Repayment {
         try database.writer.write { db in
-            var record = RepaymentRecord(id: nil, incomeId: borrowingID, date: date.isoString, amountPaise: amount.paise)
+            var record = RepaymentRecord(
+                id: nil, incomeId: borrowingID, date: date.isoString, amountPaise: amount.paise, fromCash: fromCash
+            )
             try record.insert(db)
             return try record.repayment()
         }
@@ -37,10 +39,12 @@ private struct RepaymentRecord: Codable, FetchableRecord, MutablePersistableReco
     var incomeId: Int64
     var date: String
     var amountPaise: Int
+    var fromCash: Bool
 
     func repayment() throws -> Repayment {
         Repayment(
-            id: id ?? 0, borrowingID: incomeId, date: try CalendarDate(isoString: date), amount: Money(paise: amountPaise)
+            id: id ?? 0, borrowingID: incomeId, date: try CalendarDate(isoString: date), amount: Money(paise: amountPaise),
+            fromCash: fromCash
         )
     }
 

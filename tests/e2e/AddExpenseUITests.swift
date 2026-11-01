@@ -126,7 +126,7 @@ final class AddExpenseUITests: XCTestCase {
         let description = app.textFields["descriptionField"]
         description.tap()
         description.typeText("ATM")
-        app.keyboards.buttons["Return"].tap()
+        dismissKeyboard(app)
         app.buttons["categoryPicker"].tap()
         app.buttons["Home & Utilities"].tap()
         app.buttons["paymentPicker"].tap()
@@ -164,7 +164,7 @@ final class AddExpenseUITests: XCTestCase {
         let description = app.textFields["descriptionField"]
         description.tap()
         description.typeText("Train ticket")
-        app.keyboards.buttons["Return"].tap()
+        dismissKeyboard(app)
         app.buttons["categoryPicker"].tap()
         app.buttons["Transport"].tap()
         app.buttons["paymentPicker"].tap()
@@ -214,7 +214,7 @@ final class AddExpenseUITests: XCTestCase {
         let lender = app.textFields["incomeNoteField"]
         lender.tap()
         lender.typeText("Savings")
-        app.keyboards.buttons["Return"].tap()
+        dismissKeyboard(app)
         app.buttons["saveIncomeButton"].tap()
 
         app.buttons["profileButton"].tap()
@@ -247,13 +247,13 @@ final class AddExpenseUITests: XCTestCase {
         let description = app.textFields["descriptionField"]
         description.tap()
         description.typeText("Gadget")
-        app.keyboards.buttons["Return"].tap()
+        dismissKeyboard(app)
         app.buttons["categoryPicker"].tap()
         app.buttons["Home & Utilities"].tap()
         let note = app.textFields["notesField"]
         focus(note, in: app)
         note.typeText("used coupon THANKYOU")
-        app.keyboards.buttons["Return"].tap()
+        dismissKeyboard(app)
         app.buttons["saveExpenseButton"].tap()
 
         let row = app.descendants(matching: .any)["expenseRow"]
@@ -267,7 +267,7 @@ final class AddExpenseUITests: XCTestCase {
         XCTAssertEqual(edited.value as? String, "used coupon THANKYOU")
         focus(edited, in: app)
         edited.typeText("twice")
-        app.keyboards.buttons["Return"].tap()
+        dismissKeyboard(app)
         app.buttons["saveExpenseButton"].tap()
         XCTAssertTrue(app.staticTexts["expenseNote"].waitForExistence(timeout: 20))
         let changed = app.staticTexts["expenseNote"].label
@@ -286,7 +286,7 @@ final class AddExpenseUITests: XCTestCase {
         let description = app.textFields["descriptionField"]
         description.tap()
         description.typeText("Milk")
-        app.keyboards.buttons["Return"].tap()
+        dismissKeyboard(app)
         app.buttons["categoryPicker"].tap()
         app.buttons["Home & Utilities"].tap()
         app.buttons["saveExpenseButton"].tap()
@@ -299,7 +299,7 @@ final class AddExpenseUITests: XCTestCase {
         XCTAssertTrue(editedDescription.waitForExistence(timeout: 20))
         editedDescription.tap()
         editedDescription.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 4) + "Oat milk")
-        app.keyboards.buttons["Return"].tap()
+        dismissKeyboard(app)
         app.buttons["saveExpenseButton"].tap()
         app.buttons["doneButton"].tap()
 
@@ -366,6 +366,57 @@ final class AddExpenseUITests: XCTestCase {
     }
 
     @MainActor
+    func testTheCashTileOpensTheCashListAndAddsCashWithATitle() {
+        let app = launchApp()
+        let tile = app.buttons["cashInHandTile"]
+        XCTAssertTrue(tile.waitForExistence(timeout: 20))
+        tile.tap()
+        app.buttons["addCashButton"].tap()
+        let amount = app.textFields["addCashAmountField"]
+        XCTAssertTrue(amount.waitForExistence(timeout: 20))
+        focus(amount, in: app)
+        amount.typeText("2000")
+        let title = app.textFields["addCashTitleField"]
+        title.tap()
+        title.typeText("Gift from Dad")
+        app.buttons["saveAddCashButton"].tap()
+
+        XCTAssertTrue(app.staticTexts["Gift from Dad"].waitForExistence(timeout: 20))
+        XCTAssertEqual(app.staticTexts["cashBalance"].label, "₹2,000.00")
+    }
+
+    @MainActor
+    func testABorrowingInCashRaisesCashAndMovesToRepaidOnceSettled() {
+        let app = launchApp()
+        let tile = app.buttons["amountToRepayTile"]
+        XCTAssertTrue(tile.waitForExistence(timeout: 20))
+        tile.tap()
+        app.buttons["addBorrowingButton"].tap()
+        let lender = app.textFields["borrowingLenderField"]
+        XCTAssertTrue(lender.waitForExistence(timeout: 20))
+        lender.tap()
+        lender.typeText("Ben")
+        let amount = app.textFields["borrowingAmountField"]
+        amount.tap()
+        amount.typeText("3000")
+        app.buttons["Cash"].tap()
+        app.buttons["saveBorrowingButton"].tap()
+
+        XCTAssertEqual(app.staticTexts["repayTotal"].label, "₹3,000.00")
+        app.buttons["borrowingRow"].tap()
+        let repay = app.textFields["repaymentAmountField"]
+        XCTAssertTrue(repay.waitForExistence(timeout: 20))
+        repay.tap()
+        repay.typeText("3000")
+        app.buttons["saveRepaymentButton"].tap()
+        XCTAssertEqual(app.staticTexts["repayTotal"].label, "₹0.00")
+        XCTAssertTrue(app.staticTexts["nothingOwed"].waitForExistence(timeout: 20))
+
+        app.buttons["Repaid"].tap()
+        XCTAssertTrue(app.buttons["borrowingRow"].waitForExistence(timeout: 20))
+    }
+
+    @MainActor
     func testAddingABillAndPuttingItIntoTheBudget() {
         let app = launchApp()
         selectTab(app, "Bills")
@@ -396,6 +447,13 @@ final class AddExpenseUITests: XCTestCase {
         let row = app.descendants(matching: .any)["expenseRow"]
         XCTAssertTrue(row.waitForExistence(timeout: 20))
         XCTAssertTrue(row.label.contains("Rent"))
+    }
+
+    /// Taps Return when the on-screen keyboard offers it; a connected hardware keyboard shows none.
+    @MainActor
+    private func dismissKeyboard(_ app: XCUIApplication) {
+        let key = app.keyboards.buttons["Return"]
+        if key.exists, key.isHittable { key.tap() }
     }
 
     /// Taps a field until the keyboard is up.
