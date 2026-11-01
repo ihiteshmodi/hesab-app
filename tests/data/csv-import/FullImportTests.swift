@@ -20,7 +20,7 @@ struct FullImportTests {
         return ImportBundle(
             expenses: ([Self.expenseHeader] + expenses).joined(separator: "\n") + "\n",
             income: file("date,amount,kind,note", income),
-            bills: file("name,amount,category,sub_category,entity,payment,next_due,repeat,ends,automatic,alert,notes", bills),
+            bills: file("name,amount,category,sub_category,entity,payment,next_due,repeat,ends,automatic,alert,notes,auto_debit", bills),
             planned: file("description,amount", planned),
             ledgers: file("name,counts_towards_net_worth", ledgers),
             ledgerEntries: file("ledger,date,description,amount", entries),
@@ -92,10 +92,21 @@ struct FullImportTests {
         }
     }
 
+    @Test func aBillIsPaidByHandUnlessTheFileSaysItDebitsByItself() throws {
+        let (_, app) = try imported(bundle(bills: [
+            "Premium,3000,Monthly Fixed Expenses,,,Bank,2026-11-05,monthly,,no,none,,yes",
+            "Light,900,Monthly Fixed Expenses,,,Bank,2026-11-06,monthly,,no,none,,",
+        ]))
+        let bills = try app.bills().map(\.bill)
+
+        #expect(bills.first { $0.name == "Premium" }?.autoDebit == true)
+        #expect(bills.first { $0.name == "Light" }?.autoDebit == false)
+    }
+
     @Test func billsStartOnTheGivenDateAndAnAutomaticOneAddsNothingOnTheFirstLaunch() throws {
         let (report, app) = try imported(bundle(bills: [
-            "Home cash,5000,Monthly Fixed Expenses,,,Cash Withdrawal,2026-11-01,monthly,,yes,none,",
-            "Society,7000,Monthly Fixed Expenses,,,NEFT (SBI),2026-08-12,every3Months,,no,dayBefore,quarterly",
+            "Home cash,5000,Monthly Fixed Expenses,,,Cash Withdrawal,2026-11-01,monthly,,yes,none,,",
+            "Society,7000,Monthly Fixed Expenses,,,NEFT (SBI),2026-08-12,every3Months,,no,dayBefore,quarterly,",
         ]))
         let bills = try app.bills()
 

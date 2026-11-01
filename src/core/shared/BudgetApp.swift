@@ -16,6 +16,7 @@ public final class BudgetApp: Sendable {
     public let ledgers: GetLedgers
     public let cashInHand: GetCashInHand
     public let setCashInHand: SetCashInHand
+    public let updateIncome: UpdateIncome
     public let deleteIncome: DeleteIncome
     public let monthBudget: GetMonthBudget
     public let addCard: AddCard
@@ -67,6 +68,9 @@ public final class BudgetApp: Sendable {
     public let runAutomaticBills: RunAutomaticBills
     public let autoAdded: GetAutoAdded
     public let markAutoAddedSeen: MarkAutoAddedSeen
+    public let billsToSend: GetBillsToSend
+    public let markBillSent: MarkBillSent
+    public let unmarkBillSent: UnmarkBillSent
     public let undoAutoAdded: UndoAutoAdded
     public let billsAttention: GetBillsAttention
     public let billsCalendar: GetBillsCalendar
@@ -146,6 +150,7 @@ public final class BudgetApp: Sendable {
         unmarkRefundable = UnmarkRefundable(expenses: expenses)
         pendingRefunds = GetPendingRefunds(expenses: expenses)
         addIncome = AddIncome(income: income, clock: clock)
+        updateIncome = UpdateIncome(income: income, clock: clock)
         deleteIncome = DeleteIncome(income: income)
         monthBudget = GetMonthBudget(expenses: expenses, income: income, repayments: borrowingBook, settings: settingsBook, clock: clock)
         let cardBook = CardRepository(database: database)
@@ -203,6 +208,9 @@ public final class BudgetApp: Sendable {
         runAutomaticBills = RunAutomaticBills(store: billStore, addExpense: addExpense)
         autoAdded = GetAutoAdded(store: billStore, expenses: expenses)
         markAutoAddedSeen = MarkAutoAddedSeen(bills: billBook)
+        billsToSend = GetBillsToSend(store: billStore, expenses: expenses)
+        markBillSent = MarkBillSent(store: billStore)
+        unmarkBillSent = UnmarkBillSent(store: billStore)
         undoAutoAdded = UndoAutoAdded(store: billStore, expenses: expenses)
         billsAttention = GetBillsAttention(store: billStore, schemes: schemeStore)
         billsCalendar = GetBillsCalendar(store: billStore, schemes: schemeStore, income: income)

@@ -234,6 +234,8 @@ struct BillsScreen: View {
                         Button("Add") { billToAdd = item.bill.id }.buttonStyle(AddPillStyle())
                             .accessibilityIdentifier("addDueBillButton")
                     }
+                    .contentShape(Rectangle())
+                    .onTapGesture { editingBill = item.bill.id }
                     .accessibilityElement(children: .contain)
                     .accessibilityIdentifier("dueBillRow")
                 }

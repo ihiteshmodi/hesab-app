@@ -62,6 +62,45 @@ final class ActivityAndBillsUITests: XCTestCase {
     }
 
     @MainActor
+    func testTappingAnUpcomingBillOpensItForEditing() {
+        let app = launchApp()
+        app.buttons["Upcoming"].tap()
+        app.buttons["createBillButton"].tap()
+        fillBill(app, "Internet", "800")
+
+        let row = app.descendants(matching: .any)["upcomingRow"]
+        XCTAssertTrue(row.waitForExistence(timeout: 20))
+        row.staticTexts["Internet"].tap()
+
+        XCTAssertTrue(app.textFields["billNameField"].waitForExistence(timeout: 20))
+        XCTAssertTrue(app.switches["billAutoDebitToggle"].exists)
+    }
+
+    @MainActor
+    func testABillYouPayYourselfStaysInToSendUntilTickedSentWithADate() {
+        let app = launchApp()
+        app.buttons["Upcoming"].tap()
+        app.buttons["createBillButton"].tap()
+        fillBill(app, "Rent", "20000")
+        XCTAssertTrue(app.descendants(matching: .any)["upcomingRow"].waitForExistence(timeout: 20))
+        app.buttons["addUpcomingBillButton"].tap()
+        let save = app.buttons["saveExpenseButton"]
+        XCTAssertTrue(save.waitForExistence(timeout: 20))
+        save.tap()
+
+        app.buttons["Spending"].tap()
+        let row = app.descendants(matching: .any)["toSendRow"]
+        XCTAssertTrue(row.waitForExistence(timeout: 20))
+        XCTAssertTrue(row.staticTexts["Rent"].exists)
+        app.buttons["markSentButton"].tap()
+        let saveSent = app.buttons["saveSentButton"]
+        XCTAssertTrue(saveSent.waitForExistence(timeout: 20))
+        saveSent.tap()
+
+        XCTAssertTrue(waitForAbsence(row), "the bill is still listed to send")
+    }
+
+    @MainActor
     func testANewBillWaitsToBeAddedAndNeverAddsItself() {
         let app = launchApp()
         app.buttons["Upcoming"].tap()

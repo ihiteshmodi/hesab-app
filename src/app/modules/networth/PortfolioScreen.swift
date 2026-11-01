@@ -59,9 +59,12 @@ struct PortfolioScreen: View {
                                 .accessibilityIdentifier("freeToAllocate")
                         }
                     }
-                    CardGroup(header: "Allocated", footer: portfolio.allocatedFunds.isEmpty ? nil : "Touch and hold an allocation to edit or delete it.") {
+                    CardGroup(header: "Allocated", footer: portfolio.allocatedFunds.isEmpty ? nil : "Tap an allocation to change it. Touch and hold to delete it.") {
                         ForEach(portfolio.allocatedFunds, id: \.id) { fund in
-                            CardRow(title: fund.name) { Text(money(fund.amount)).monospacedDigit() }
+                            Button { editingFund = fund } label: {
+                                CardRow(title: fund.name) { Text(money(fund.amount)).monospacedDigit() }
+                            }
+                                .buttonStyle(.plain)
                                 .contextMenu {
                                     Button("Edit", systemImage: "pencil") { editingFund = fund }
                                     Button("Delete", systemImage: "trash", role: .destructive) { errorMessage = model.deleteAllocatedFund(fund.id) }
@@ -69,12 +72,15 @@ struct PortfolioScreen: View {
                         }
                         addButton("Add Allocation", identifier: "addFundButton") { addingFund = true }
                     }
-                    CardGroup(header: "Investments", footer: portfolio.holdings.isEmpty ? nil : "Touch and hold an investment to edit or delete it.") {
+                    CardGroup(header: "Investments", footer: portfolio.holdings.isEmpty ? nil : "Tap an investment to change it. Touch and hold to delete it.") {
                         ForEach(portfolio.holdings, id: \.holding.id) { line in
-                            CardRow(title: line.holding.name,
-                                    subtitle: line.holding.currency.map { "\($0) \(IndianMoneyFormat.plain(line.holding.amount))" }) {
-                                Text(money(line.valueInHome)).monospacedDigit()
+                            Button { editingHolding = line.holding } label: {
+                                CardRow(title: line.holding.name,
+                                        subtitle: line.holding.currency.map { "\($0) \(IndianMoneyFormat.plain(line.holding.amount))" }) {
+                                    Text(money(line.valueInHome)).monospacedDigit()
+                                }
                             }
+                            .buttonStyle(.plain)
                             .contextMenu {
                                 Button("Edit", systemImage: "pencil") { editingHolding = line.holding }
                                 Button("Delete", systemImage: "trash", role: .destructive) { errorMessage = model.deleteHolding(line.holding.id) }

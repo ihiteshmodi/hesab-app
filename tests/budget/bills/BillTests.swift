@@ -15,11 +15,13 @@ struct BillTests {
 
     private func newBill(
         _ name: String, _ rupees: Int, due: String, repeats: BillRepeat = .monthly, ends: String? = nil,
-        automatic: Bool = false, alert: BillAlert = .none, entity: String = "", method: PaymentMethod = .upi
+        automatic: Bool = false, alert: BillAlert = .none, entity: String = "", method: PaymentMethod = .upi,
+        autoDebit: Bool = false
     ) -> NewBill {
         NewBill(
             name: name, amount: .rupees(rupees), category: "Home & Utilities", entity: entity, paymentMethod: method,
-            dueDate: day(due), repeats: repeats, endsOn: ends.map(day), addAutomatically: automatic, alert: alert
+            dueDate: day(due), repeats: repeats, endsOn: ends.map(day), addAutomatically: automatic, alert: alert,
+            autoDebit: autoDebit
         )
     }
 
@@ -507,7 +509,8 @@ struct BillTests {
 
     @Test func anAddedBillStopsCounting() throws {
         let app = try makeApp(today: "2026-11-01")
-        let rent = try app.addBill(newBill("Rent", 20_000, due: "2026-11-01", alert: .onDueDate))
+        // Auto-debit, so adding it leaves nothing to send and only the due alert is being tested.
+        let rent = try app.addBill(newBill("Rent", 20_000, due: "2026-11-01", alert: .onDueDate, autoDebit: true))
         _ = try addOccurrence(app, rent)
 
         #expect(try app.billsAttention().badge == 0)
@@ -520,5 +523,66 @@ struct BillTests {
         try app.addBill(newBill("Later", 1_500, due: "2026-11-09"))
 
         #expect(try app.billsAttention().menuCount == 2)
+    }
+
+    // MARK: to send
+
+    @Test func aBillSheMustPayHerselfWaitsToBeSentAfterItIsAdded() throws {
+        let s = try background()
+        let expense = try addOccurrence(s.app, s.rent)
+
+        let waiting = try s.app.billsToSend()
+
+        #expect(waiting.map(\.billName) == ["Rent"])
+        #expect(waiting.first?.amount == expense.amount)
+        #expect(waiting.first?.dueDate == day("2026-11-01"))
+        #expect(try s.app.billsAttention().badge == 1)
+    }
+
+    @Test func anAutoDebitBillNeverWaitsToBeSent() throws {
+        let app = try makeApp()
+        let premium = try app.addBill(newBill("Premium", 1_415, due: "2026-11-10", autoDebit: true))
+
+        _ = try addOccurrence(app, premium)
+
+        #expect(try app.billsToSend().isEmpty)
+        #expect(try app.billsAttention().badge == 0)
+    }
+
+    @Test func tickingABillAsSentTakesItOffTheListAndTheBadge() throws {
+        let s = try background()
+        _ = try addOccurrence(s.app, s.rent)
+        let waiting = try #require(try s.app.billsToSend().first)
+
+        try s.app.markBillSent(waiting.occurrenceID, on: day("2026-11-02"))
+
+        #expect(try s.app.billsToSend().isEmpty)
+        #expect(try s.app.billsAttention().badge == 0)
+    }
+
+    @Test func aSentTickCanBeTakenBack() throws {
+        let s = try background()
+        _ = try addOccurrence(s.app, s.rent)
+        let waiting = try #require(try s.app.billsToSend().first)
+        try s.app.markBillSent(waiting.occurrenceID, on: day("2026-11-02"))
+
+        try s.app.unmarkBillSent(waiting.occurrenceID)
+
+        #expect(try s.app.billsToSend().map(\.billName) == ["Rent"])
+    }
+
+    @Test func switchingABillToAutoDebitClearsWhatWaitsToBeSent() throws {
+        let s = try background()
+        _ = try addOccurrence(s.app, s.rent)
+
+        try s.app.updateBill(s.rent.id, newBill("Rent", 20_000, due: "2026-11-01", autoDebit: true))
+
+        #expect(try s.app.billsToSend().isEmpty)
+    }
+
+    @Test func aMarkOnSomethingThatIsNotWaitingIsRefused() throws {
+        let s = try background()
+
+        #expect(throws: BillError.occurrenceNotFound(999)) { try s.app.markBillSent(999, on: day("2026-11-02")) }
     }
 }

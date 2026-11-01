@@ -55,7 +55,17 @@ struct BillBook {
         return found.sorted { ($0.dueDate, $0.bill.name) < ($1.dueDate, $1.bill.name) }
     }
 
+    /// Occurrences of bills she pays herself whose money she has not marked as sent.
+    func waitingToSend() -> [BillOccurrence] {
+        occurrences.filter { occurrence in
+            guard !occurrence.automatic, occurrence.sentOn == nil,
+                  let bill = bills.first(where: { $0.id == occurrence.billID }) else { return false }
+            return !bill.autoDebit
+        }
+    }
+
     func attention() -> BillsAttention {
+        let toSend = waitingToSend().count
         let unseen = occurrences.filter { $0.automatic && !$0.seen }.count
         let alerts = bills.filter { bill in
             guard let due = nextDue(bill) else { return false }
@@ -66,7 +76,7 @@ struct BillBook {
             }
         }.count
         let dueNow = bills.filter { bill in nextDue(bill).map { $0 <= today } ?? false }.count
-        return BillsAttention(badge: alerts + unseen, autoAddedUnseen: unseen, menuCount: dueNow, dueBills: dueNow)
+        return BillsAttention(badge: alerts + unseen + toSend, autoAddedUnseen: unseen, menuCount: dueNow, dueBills: dueNow, toSend: toSend)
     }
 }
 
@@ -265,6 +275,46 @@ public struct GetAutoAdded: Sendable {
     }
 }
 
+public struct GetBillsToSend: Sendable {
+    let store: BillStore
+    let expenses: ExpenseRepository
+
+    /// Oldest due date first.
+    public func callAsFunction() throws -> [BillToSend] {
+        let book = try store.book()
+        let amounts = Dictionary(uniqueKeysWithValues: try expenses.all().compactMap { expense in expense.id.map { ($0, expense.amount) } })
+        return book.waitingToSend().sorted { ($0.dueDate, $0.id) < ($1.dueDate, $1.id) }.compactMap { occurrence in
+            guard let bill = book.bills.first(where: { $0.id == occurrence.billID }) else { return nil }
+            return BillToSend(
+                occurrenceID: occurrence.id, billName: bill.name, amount: amounts[occurrence.expenseID] ?? bill.amount,
+                dueDate: occurrence.dueDate
+            )
+        }
+    }
+}
+
+public struct MarkBillSent: Sendable {
+    let store: BillStore
+
+    public func callAsFunction(_ occurrenceID: Int64, on date: CalendarDate) throws {
+        guard try store.book().waitingToSend().contains(where: { $0.id == occurrenceID }) else {
+            throw BillError.occurrenceNotFound(occurrenceID)
+        }
+        try store.bills.setSent(occurrenceID: occurrenceID, date)
+    }
+}
+
+public struct UnmarkBillSent: Sendable {
+    let store: BillStore
+
+    public func callAsFunction(_ occurrenceID: Int64) throws {
+        guard try store.bills.occurrences().contains(where: { $0.id == occurrenceID && $0.sentOn != nil }) else {
+            throw BillError.occurrenceNotFound(occurrenceID)
+        }
+        try store.bills.setSent(occurrenceID: occurrenceID, nil)
+    }
+}
+
 public struct MarkAutoAddedSeen: Sendable {
     let bills: BillRepository
 
@@ -298,7 +348,7 @@ public struct GetBillsAttention: Sendable {
         let matured = items.filter { $0.kind == .matured }.count
         return BillsAttention(
             badge: bills.badge + payouts + matured, autoAddedUnseen: bills.autoAddedUnseen,
-            menuCount: bills.menuCount + payouts, dueBills: bills.dueBills, dueIncome: payouts
+            menuCount: bills.menuCount + payouts, dueBills: bills.dueBills, dueIncome: payouts, toSend: bills.toSend
         )
     }
 }

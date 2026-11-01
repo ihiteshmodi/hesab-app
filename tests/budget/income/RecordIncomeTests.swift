@@ -75,4 +75,30 @@ struct RecordIncomeTests {
         #expect(try app.monthBudget().leftToSpend == .zero)
         #expect(try app.monthBudget().incomeEntries.isEmpty)
     }
+
+    @Test func anIncomeEntryCanBeChanged() throws {
+        let app = try makeApp(today: "2026-10-30")
+        let salary = try app.addIncome(NewIncome(date: day("2026-10-30"), kind: .salary, amount: .rupees(150_000)))
+
+        try app.updateIncome(salary.id, NewIncome(date: day("2026-10-31"), kind: .moneyReceived, amount: .rupees(160_000), note: " bonus "))
+
+        let october = try app.monthBudget()
+        let entry = try #require(october.incomeEntries.first)
+        #expect(october.leftToSpend == .rupees(160_000))
+        #expect(entry.kind == .moneyReceived)
+        #expect(entry.note == "bonus")
+        #expect(entry.date == day("2026-10-31"))
+        #expect(october.incomeEntries.count == 1)
+    }
+
+    @Test func aChangedIncomeEntryIsCheckedLikeANewOneAndLeftAloneWhenRefused() throws {
+        let app = try makeApp()
+        let salary = try app.addIncome(NewIncome(kind: .salary, amount: .rupees(150_000)))
+
+        #expect(throws: IncomeValidationError.amountMissingOrZero) {
+            try app.updateIncome(salary.id, NewIncome(kind: .salary, amount: .zero))
+        }
+        #expect(try app.monthBudget().incomeEntries.first?.amount == .rupees(150_000))
+    }
 }
+

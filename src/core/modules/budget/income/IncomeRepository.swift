@@ -17,6 +17,16 @@ final class IncomeRepository: Sendable {
         }
     }
 
+    func update(_ id: Int64, date: CalendarDate, kind: IncomeKind, amount: Money, note: String) throws {
+        try database.writer.write { db in
+            try db.execute(
+                sql: "UPDATE income_entry SET date = ?, kind = ?, amount_paise = ?, note = ? WHERE id = ?",
+                arguments: [date.isoString, kind.rawValue, amount.paise, note, id]
+            )
+            guard db.changesCount > 0 else { throw IncomeNotFound(id: id) }
+        }
+    }
+
     func delete(_ id: Int64) throws {
         try database.writer.write { db in
             guard try IncomeRecord.deleteOne(db, key: id) else { throw IncomeNotFound(id: id) }

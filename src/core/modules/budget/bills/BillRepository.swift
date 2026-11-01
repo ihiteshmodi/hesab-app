@@ -11,8 +11,8 @@ final class BillRepository: Sendable {
         try database.writer.write { db in
             try db.execute(sql: """
                 INSERT INTO bill (name, amount_paise, category, sub_category, entity, payment_name, payment_source,
-                                  first_due, repeats, ends_on, automatic, alert, notes)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                  first_due, repeats, ends_on, automatic, alert, notes, auto_debit)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, arguments: Self.arguments(new, amount))
             return try Self.bill(db, db.lastInsertedRowID)
         }
@@ -23,7 +23,8 @@ final class BillRepository: Sendable {
             _ = try Self.bill(db, id)
             try db.execute(sql: """
                 UPDATE bill SET name = ?, amount_paise = ?, category = ?, sub_category = ?, entity = ?, payment_name = ?,
-                    payment_source = ?, first_due = ?, repeats = ?, ends_on = ?, automatic = ?, alert = ?, notes = ?
+                    payment_source = ?, first_due = ?, repeats = ?, ends_on = ?, automatic = ?, alert = ?, notes = ?,
+                    auto_debit = ?
                 WHERE id = ?
                 """, arguments: Self.arguments(new, amount) + [id])
             return try Self.bill(db, id)
@@ -52,7 +53,8 @@ final class BillRepository: Sendable {
             try Row.fetchAll(db, sql: "SELECT * FROM bill_occurrence ORDER BY id").map { row in
                 BillOccurrence(
                     id: row["id"], billID: row["bill_id"], dueDate: try CalendarDate(isoString: row["due_date"]),
-                    expenseID: row["expense_id"], automatic: row["automatic"], seen: row["seen"]
+                    expenseID: row["expense_id"], automatic: row["automatic"], seen: row["seen"],
+                    sentOn: try (row["sent_on"] as String?).map { try CalendarDate(isoString: $0) }
                 )
             }
         }
@@ -63,6 +65,12 @@ final class BillRepository: Sendable {
             try db.execute(sql: """
                 INSERT INTO bill_occurrence (bill_id, due_date, expense_id, automatic, seen) VALUES (?, ?, ?, ?, 0)
                 """, arguments: [billID, dueDate.isoString, expenseID, automatic])
+        }
+    }
+
+    func setSent(occurrenceID: Int64, _ date: CalendarDate?) throws {
+        try database.writer.write { db in
+            try db.execute(sql: "UPDATE bill_occurrence SET sent_on = ? WHERE id = ?", arguments: [date?.isoString, occurrenceID])
         }
     }
 
@@ -83,6 +91,7 @@ final class BillRepository: Sendable {
             new.name.trimmed, amount.paise, new.category, new.subCategory.trimmed, new.entity.trimmed,
             new.paymentMethod.name, new.paymentMethod.source.rawValue, new.dueDate.isoString, new.repeats.rawValue,
             new.endsOn?.isoString, new.repeats != .never && new.addAutomatically, new.alert.rawValue, new.notes.trimmed,
+            new.autoDebit,
         ]
     }
 
@@ -103,7 +112,8 @@ final class BillRepository: Sendable {
             firstDue: try CalendarDate(isoString: row["first_due"]),
             repeats: BillRepeat(rawValue: row["repeats"]) ?? .never,
             endsOn: try (row["ends_on"] as String?).map { try CalendarDate(isoString: $0) },
-            addAutomatically: row["automatic"], alert: BillAlert(rawValue: row["alert"]) ?? .none, notes: row["notes"],
+            addAutomatically: row["automatic"], autoDebit: row["auto_debit"],
+            alert: BillAlert(rawValue: row["alert"]) ?? .none, notes: row["notes"],
             autoSkipDue: try (row["auto_skip_due"] as String?).map { try CalendarDate(isoString: $0) }
         )
     }

@@ -3,12 +3,22 @@ import SwiftUI
 
 struct NewIncomeSheet: View {
     let model: BudgetViewModel
+    let editing: IncomeEntry?
     @Environment(\.dismiss) private var dismiss
-    @State private var amountText = ""
+    @State private var amountText: String
     @State private var kind: IncomeKind?
-    @State private var note = ""
-    @State private var date = Date()
+    @State private var note: String
+    @State private var date: Date
     @State private var errorMessage: String?
+
+    init(model: BudgetViewModel, editing entry: IncomeEntry? = nil) {
+        self.model = model
+        editing = entry
+        _amountText = State(initialValue: entry.map { IndianMoneyFormat.plain($0.amount) } ?? "")
+        _kind = State(initialValue: entry?.kind)
+        _note = State(initialValue: entry?.note ?? "")
+        _date = State(initialValue: entry?.date.instant() ?? Date())
+    }
 
     var body: some View {
         NavigationStack {
@@ -41,7 +51,7 @@ struct NewIncomeSheet: View {
                         .accessibilityIdentifier("incomeErrorMessage")
                 }
             }
-            .cardNavigation("New Income")
+            .cardNavigation(editing == nil ? "New Income" : "Edit Income")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
@@ -55,9 +65,8 @@ struct NewIncomeSheet: View {
     }
 
     private func save() {
-        errorMessage = model.addIncome(NewIncome(
-            date: CalendarDate(date), kind: kind, amount: MoneyInput.parse(amountText), note: note
-        ))
+        let income = NewIncome(date: CalendarDate(date), kind: kind, amount: MoneyInput.parse(amountText), note: note)
+        errorMessage = if let editing { model.updateIncome(editing.id, income) } else { model.addIncome(income) }
         if errorMessage == nil { dismiss() }
     }
 }

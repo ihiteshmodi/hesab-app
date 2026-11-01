@@ -62,6 +62,8 @@ public struct Bill: Equatable, Sendable {
     public let repeats: BillRepeat
     public let endsOn: CalendarDate?
     public let addAutomatically: Bool
+    /// The bank takes the money by itself, so adding the bill never leaves anything for her to send.
+    public let autoDebit: Bool
     public let alert: BillAlert
     public let notes: String
     /// The due date whose automatic add was undone; that one date waits for a manual add.
@@ -87,13 +89,14 @@ public struct NewBill: Sendable {
     public var repeats: BillRepeat
     public var endsOn: CalendarDate?
     public var addAutomatically: Bool
+    public var autoDebit: Bool
     public var alert: BillAlert
     public var notes: String
 
     public init(
         name: String, amount: Money?, category: String, subCategory: String = "", entity: String = "",
         paymentMethod: PaymentMethod = .upi, dueDate: CalendarDate, repeats: BillRepeat = .monthly,
-        endsOn: CalendarDate? = nil, addAutomatically: Bool = false, alert: BillAlert = .none, notes: String = ""
+        endsOn: CalendarDate? = nil, addAutomatically: Bool = false, alert: BillAlert = .none, notes: String = "", autoDebit: Bool = false
     ) {
         self.name = name
         self.amount = amount
@@ -105,6 +108,7 @@ public struct NewBill: Sendable {
         self.repeats = repeats
         self.endsOn = endsOn
         self.addAutomatically = addAutomatically
+        self.autoDebit = autoDebit
         self.alert = alert
         self.notes = notes
     }
@@ -118,6 +122,8 @@ struct BillOccurrence: Equatable, Sendable {
     let expenseID: Int64
     let automatic: Bool
     let seen: Bool
+    /// When she sent the money for a bill she pays herself; nil while it still waits.
+    let sentOn: CalendarDate?
 }
 
 public struct BillSummary: Equatable, Sendable {
@@ -159,6 +165,14 @@ public struct AutoAddedBill: Equatable, Sendable {
     public let seen: Bool
 }
 
+/// A bill she pays herself that is in the budget but whose money she has not sent yet.
+public struct BillToSend: Equatable, Sendable {
+    public let occurrenceID: Int64
+    public let billName: String
+    public let amount: Money
+    public let dueDate: CalendarDate
+}
+
 public struct BillsAttention: Equatable, Sendable {
     /// Bills whose alert has started and that are not added yet, plus automatic adds not seen yet.
     public let badge: Int
@@ -169,8 +183,11 @@ public struct BillsAttention: Equatable, Sendable {
     public let dueBills: Int
     /// The menu's "Upcoming Income" count: payouts inside their alert window.
     public let dueIncome: Int
+    /// Bills added to the budget whose money she has not sent yet.
+    public let toSend: Int
 
-    public init(badge: Int, autoAddedUnseen: Int, menuCount: Int, dueBills: Int = 0, dueIncome: Int = 0) {
+    public init(badge: Int, autoAddedUnseen: Int, menuCount: Int, dueBills: Int = 0, dueIncome: Int = 0, toSend: Int = 0) {
+        self.toSend = toSend
         self.badge = badge
         self.autoAddedUnseen = autoAddedUnseen
         self.menuCount = menuCount

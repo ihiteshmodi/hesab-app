@@ -112,7 +112,8 @@ struct ExtraPlan {
                 paymentMethod: Plan.payment(field("payment")),
                 dueDate: try Self.date(field("next_due"), line: line, file: "bills"), repeats: repeats,
                 endsOn: field("ends").isEmpty ? nil : try Self.date(field("ends"), line: line, file: "bills"),
-                addAutomatically: field("automatic").lowercased() == "yes", alert: alert, notes: field("notes")
+                addAutomatically: field("automatic").lowercased() == "yes", alert: alert, notes: field("notes"),
+                autoDebit: field("auto_debit").lowercased() == "yes"
             ))
         }
     }

@@ -340,6 +340,34 @@ final class AddExpenseUITests: XCTestCase {
     }
 
     @MainActor
+    func testTappingAnIncomeEntryChangesIt() {
+        let app = launchApp()
+        app.buttons["addMenu"].tap()
+        app.buttons["addIncomeButton"].tap()
+        let amount = app.textFields["incomeAmountField"]
+        XCTAssertTrue(amount.waitForExistence(timeout: 20))
+        focus(amount, in: app)
+        amount.typeText("5000")
+        app.buttons["incomeTypePicker"].tap()
+        app.buttons["Salary"].tap()
+        app.buttons["saveIncomeButton"].tap()
+
+        app.buttons["Income"].tap()
+        let row = app.descendants(matching: .any)["incomeRow"]
+        XCTAssertTrue(row.waitForExistence(timeout: 20))
+        row.tap()
+        let note = app.textFields["incomeNoteField"]
+        XCTAssertTrue(note.waitForExistence(timeout: 20))
+        focus(note, in: app)
+        note.typeText("bonus")
+        app.buttons["saveIncomeButton"].tap()
+
+        let changed = app.descendants(matching: .any)["incomeRow"]
+        XCTAssertTrue(changed.waitForExistence(timeout: 20))
+        XCTAssertTrue(changed.label.contains("bonus"), "the changed note is not shown: \(changed.label)")
+    }
+
+    @MainActor
     func testAddingABillAndPuttingItIntoTheBudget() {
         let app = launchApp()
         selectTab(app, "Bills")

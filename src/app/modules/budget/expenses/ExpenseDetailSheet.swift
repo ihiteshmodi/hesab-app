@@ -26,14 +26,14 @@ struct ExpenseDetailSheet: View {
                         if let entity = expense.entity { row("Shop or person", entity) }
                         if let spentFor = expense.spentFor { row("Spent for", spentFor) }
                         row("Paid with", expense.paymentMethod.name)
-                        if !expense.notes.isEmpty {
-                            VStack(alignment: .leading, spacing: 4) {
-                                CardCaption("Notes")
-                                Text(expense.notes).frame(maxWidth: .infinity, alignment: .leading)
-                                    .accessibilityIdentifier("expenseNote")
-                            }
-                            .rowPadding()
+                        VStack(alignment: .leading, spacing: 4) {
+                            CardCaption("Notes")
+                            Text(expense.notes.isEmpty ? "No note" : expense.notes)
+                                .foregroundStyle(expense.notes.isEmpty ? Theme.secondary : Color.primary)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .accessibilityIdentifier("expenseNote")
                         }
+                        .rowPadding()
                     }
                     refundSection(expense)
                     if let errorMessage {

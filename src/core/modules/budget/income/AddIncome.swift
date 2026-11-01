@@ -11,6 +11,18 @@ public struct AddIncome: Sendable {
     }
 }
 
+public struct UpdateIncome: Sendable {
+    let income: IncomeRepository
+    let clock: any DayClock
+
+    public func callAsFunction(_ id: Int64, _ new: NewIncome) throws {
+        guard let amount = new.amount, amount > .zero else { throw IncomeValidationError.amountMissingOrZero }
+        guard let kind = new.kind else { throw IncomeValidationError.typeMissing }
+        guard kind != .borrowed || !new.note.trimmed.isEmpty else { throw IncomeValidationError.lenderMissing }
+        try income.update(id, date: new.date ?? clock.today(), kind: kind, amount: amount, note: new.note.trimmed)
+    }
+}
+
 public struct DeleteIncome: Sendable {
     let income: IncomeRepository
 

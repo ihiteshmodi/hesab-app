@@ -27,6 +27,24 @@ final class PortfolioUITests: XCTestCase {
     }
 
     @MainActor
+    func testTappingAnInvestmentOpensItForEditing() {
+        let app = launchApp()
+        selectTab(app, "Portfolio")
+        app.buttons["addHoldingButton"].tap()
+        type(app.textFields["holdingNameField"], "Stocks")
+        type(app.textFields["holdingAmountField"], "12000")
+        app.buttons["saveHoldingButton"].tap()
+
+        let row = app.buttons.matching(NSPredicate(format: "label CONTAINS 'Stocks'")).firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 20))
+        row.tap()
+
+        let name = app.textFields["holdingNameField"]
+        XCTAssertTrue(name.waitForExistence(timeout: 20))
+        XCTAssertEqual(name.value as? String, "Stocks")
+    }
+
+    @MainActor
     func testAddingAPayoutSchemeListsItWithItsMonthlyPayout() {
         let app = launchApp()
         selectTab(app, "Portfolio")
