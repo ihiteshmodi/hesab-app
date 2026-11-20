@@ -128,3 +128,10 @@ Feature: Track refunds and reimbursements
     When it no longer exists
     Then the screen closes by itself
 
+  Scenario: The Pending refunds tile carries a red counter of how many refunds are still to come
+    Given two orders are marked refundable and not yet received
+    When she opens Activity
+    Then the "Pending refunds" tile shows a red 2 in its top corner
+    When she records one as received
+    Then the red counter reads 1
+

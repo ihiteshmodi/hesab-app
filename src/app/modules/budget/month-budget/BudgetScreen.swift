@@ -202,7 +202,7 @@ struct BudgetScreen: View {
         let sendTotal = model.billsToSend.reduce(Money.zero) { $0 + $1.amount }
         var tiles: [SummaryTile] = []
         if pending.count > 0 {
-            tiles.append(SummaryTile(id: "pendingRefundsTile", amount: pending.stillToCome, caption: "Pending refunds") { route = .pendingRefunds })
+            tiles.append(SummaryTile(id: "pendingRefundsTile", amount: pending.stillToCome, caption: "Pending refunds", badge: pending.count) { route = .pendingRefunds })
         }
         if !model.billsToSend.isEmpty {
             tiles.append(SummaryTile(id: "pendingToSendTile", amount: sendTotal, caption: "Pending to send", badge: model.billsToSend.count) { openingToSend = true })

@@ -67,6 +67,7 @@ final class NewFeaturesUITests: XCTestCase {
         app.buttons["markRefundableButton"].tap()
         app.buttons["doneButton"].tap()
 
+        XCTAssertEqual(app.staticTexts["pendingRefundsTileBadge"].label, "1", "no red count on the Pending refunds tile")
         app.buttons["pendingRefundsTile"].tap()
         let pending = app.buttons.matching(NSPredicate(format: "label CONTAINS 'Jacket'")).firstMatch
         XCTAssertTrue(pending.waitForExistence(timeout: 20))
