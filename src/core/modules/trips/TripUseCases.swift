@@ -9,7 +9,7 @@ struct TripStore: Sendable {
         TripBook(
             trip: try trips.trip(tripID), people: try trips.people(of: tripID), groups: try trips.groups(of: tripID),
             expenses: try trips.expenses(of: tripID), settlements: try trips.settlements(of: tripID),
-            cashAdjustments: try trips.cashAdjustments(of: tripID)
+            cashAdjustments: try trips.cashAdjustments(of: tripID), planItems: try trips.planItems(of: tripID)
         )
     }
 
@@ -387,5 +387,87 @@ public struct SetTripCash: Sendable {
         let difference = target - book.cash.balance
         guard difference != .zero else { return }
         try store.trips.addCashAdjustment(tripID: tripID, date: store.clock.today(), amount: difference)
+    }
+}
+
+// MARK: trip planner
+
+public struct StartTrip: Sendable {
+    let trips: TripRepository
+
+    /// Ends planning: from now on the plan's items can be ticked as paid.
+    public func callAsFunction(_ tripID: Int64) throws {
+        try trips.startTrip(tripID)
+    }
+}
+
+private func validated(_ item: NewTripPlanItem) throws -> Money {
+    guard !item.description.trimmed.isEmpty else { throw TripError.descriptionMissing }
+    guard let amount = item.amount, amount > .zero else { throw TripError.amountMissingOrZero }
+    return amount
+}
+
+public struct AddTripPlanItem: Sendable {
+    let trips: TripRepository
+
+    @discardableResult
+    public func callAsFunction(_ tripID: Int64, _ new: NewTripPlanItem) throws -> TripPlanItem {
+        _ = try trips.trip(tripID)
+        let amount = try validated(new)
+        let tag = new.tag.trimmed
+        if !tag.isEmpty { try AddTripTag(trips: trips)(tag) }
+        try trips.addPlanItem(tripID: tripID, description: new.description.trimmed, amount: amount, tag: tag)
+        return try trips.planItems(of: tripID).last!
+    }
+}
+
+public struct UpdateTripPlanItem: Sendable {
+    let trips: TripRepository
+
+    public func callAsFunction(_ id: Int64, _ new: NewTripPlanItem) throws {
+        let amount = try validated(new)
+        let tag = new.tag.trimmed
+        if !tag.isEmpty { try AddTripTag(trips: trips)(tag) }
+        try trips.updatePlanItem(id, description: new.description.trimmed, amount: amount, tag: tag)
+    }
+}
+
+public struct DeleteTripPlanItem: Sendable {
+    let trips: TripRepository
+
+    /// A paid item's expense stays; only the plan line goes.
+    public func callAsFunction(_ id: Int64) throws {
+        try trips.deletePlanItem(id)
+    }
+}
+
+public struct MarkTripPlanItemPaid: Sendable {
+    let store: TripStore
+    let saver: SaveTripExpense
+
+    /// Makes the item a real trip expense that only I share, so it reaches the main ledger like any other.
+    @discardableResult
+    public func callAsFunction(_ id: Int64, _ payment: PlanItemPayment = PlanItemPayment()) throws -> TripExpense {
+        let item = try store.trips.planItem(id)
+        guard !(try store.trips.trip(item.tripID)).isPlanning else { throw TripError.tripNotStarted }
+        guard !item.isPaid else { throw TripError.alreadyPaid(item.description) }
+        let expense = try saver.save(id: nil, tripID: item.tripID, NewTripExpense(
+            description: item.description, date: payment.date, amount: payment.amount ?? item.amount, paidWith: payment.paidWith,
+            split: .equal([.me]), paidInHome: payment.paidInHome, tag: item.tag
+        ))
+        try store.trips.setPlanItemExpense(id, expense.id)
+        return expense
+    }
+}
+
+public struct UnmarkTripPlanItemPaid: Sendable {
+    let store: TripStore
+
+    /// Takes the expense back out, so the item is "still to pay" again.
+    public func callAsFunction(_ id: Int64) throws {
+        let item = try store.trips.planItem(id)
+        guard let expenseID = item.paidExpenseID else { throw TripError.notPaidYet(item.description) }
+        try store.trips.deleteExpense(expenseID)
+        try store.syncMainLedger(item.tripID)
     }
 }

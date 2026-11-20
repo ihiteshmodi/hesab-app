@@ -4,6 +4,7 @@ import SwiftUI
 private enum TripPane: String, CaseIterable {
     case expenses = "Expenses"
     case balances = "Balances"
+    case plan = "Plan"
 }
 
 private enum TripEntry: Identifiable {
@@ -22,6 +23,7 @@ struct TripDetailScreen: View {
     let model: BudgetViewModel
     let tripID: Int64
     @State private var pane = TripPane.expenses
+    @State private var planEntry: PlanEntry?
     @State private var entry: TripEntry?
     @State private var editingTrip = false
     @State private var errorMessage: String?
@@ -29,19 +31,25 @@ struct TripDetailScreen: View {
     var body: some View {
         Group {
             if let summary = model.tripSummary(tripID) {
+                // A trip still being planned has only its plan; the other panes arrive when it starts.
+                let shown = summary.trip.isPlanning ? TripPane.plan : pane
                 CardScreen {
-                    Picker("View", selection: $pane) {
-                        ForEach(TripPane.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+                    if !summary.trip.isPlanning {
+                        Picker("View", selection: $pane) {
+                            ForEach(TripPane.allCases, id: \.self) { Text($0.rawValue).tag($0) }
+                        }
+                        .pickerStyle(.segmented)
+                        .accessibilityIdentifier("tripPanePicker")
                     }
-                    .pickerStyle(.segmented)
-                    .accessibilityIdentifier("tripPanePicker")
                     if let errorMessage { Text(errorMessage).foregroundStyle(Theme.red) }
-                    switch pane {
+                    switch shown {
                     case .expenses: expenses(summary)
                     case .balances: balances(summary)
+                    case .plan: TripPlanPane(model: model, summary: summary, entry: $planEntry, errorMessage: $errorMessage)
                     }
                 }
                 .cardNavigation(summary.trip.name)
+                .onChange(of: summary.trip.isPlanning) { _, planning in if !planning { pane = .plan } }
                 .toolbar {
                     ToolbarItemGroup(placement: .primaryAction) {
                         NavigationLink {
@@ -69,9 +77,16 @@ struct TripDetailScreen: View {
                     }
                 }
                 .sheet(isPresented: $editingTrip) { NewTripSheet(model: model, editing: summary.trip) }
+                .sheet(item: $planEntry) { planEntry in
+                    switch planEntry {
+                    case .newItem: TripPlanItemSheet(model: model, tripID: tripID, editing: nil)
+                    case .editItem(let item): TripPlanItemSheet(model: model, tripID: tripID, editing: item)
+                    case .pay(let item): TripPlanPaySheet(model: model, trip: summary.trip, item: item)
+                    }
+                }
                 .overlay(alignment: .bottomTrailing) {
-                    if pane == .expenses {
-                        Button { entry = .expense(nil) } label: {
+                    if shown == .expenses || shown == .plan {
+                        Button { if shown == .plan { planEntry = .newItem } else { entry = .expense(nil) } } label: {
                             Image(systemName: "plus").font(.title2.bold()).foregroundStyle(.white)
                                 .frame(width: 56, height: 56).background(Circle().fill(Theme.blue))
                         }
@@ -79,7 +94,7 @@ struct TripDetailScreen: View {
                         .padding(.trailing, 20)
                         .padding(.bottom, 96)
                         .accessibilityLabel("Add")
-                        .accessibilityIdentifier("addTripEntryButton")
+                        .accessibilityIdentifier(shown == .plan ? "addPlanItemButton" : "addTripEntryButton")
                     }
                 }
             } else {

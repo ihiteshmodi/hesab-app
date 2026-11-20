@@ -132,6 +132,12 @@ public final class BudgetApp: Sendable {
     public let updateTripSettlement: UpdateTripSettlement
     public let deleteTripSettlement: DeleteTripSettlement
     public let setTripCash: SetTripCash
+    public let startTrip: StartTrip
+    public let addTripPlanItem: AddTripPlanItem
+    public let updateTripPlanItem: UpdateTripPlanItem
+    public let deleteTripPlanItem: DeleteTripPlanItem
+    public let markTripPlanItemPaid: MarkTripPlanItemPaid
+    public let unmarkTripPlanItemPaid: UnmarkTripPlanItemPaid
 
     public init(database: AppDatabase, clock: any DayClock) {
         let expenses = ExpenseRepository(database: database)
@@ -285,5 +291,11 @@ public final class BudgetApp: Sendable {
         updateTripSettlement = UpdateTripSettlement(store: tripStore, record: recordTripSettlement)
         deleteTripSettlement = DeleteTripSettlement(store: tripStore)
         setTripCash = SetTripCash(store: tripStore)
+        startTrip = StartTrip(trips: tripBook)
+        addTripPlanItem = AddTripPlanItem(trips: tripBook)
+        updateTripPlanItem = UpdateTripPlanItem(trips: tripBook)
+        deleteTripPlanItem = DeleteTripPlanItem(trips: tripBook)
+        markTripPlanItemPaid = MarkTripPlanItemPaid(store: tripStore, saver: tripSaver)
+        unmarkTripPlanItemPaid = UnmarkTripPlanItemPaid(store: tripStore)
     }
 }

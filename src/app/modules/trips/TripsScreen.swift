@@ -40,10 +40,16 @@ struct TripsScreen: View {
                 HStack {
                     Text(summary.trip.name).font(.headline)
                     if summary.trip.isSettled { StatusPill(text: "Settled", tone: .green) }
+                    if summary.trip.isPlanning { StatusPill(text: "Planning") }
                     Spacer()
                     VStack(alignment: .trailing) {
-                        Text(IndianMoneyFormat.string(summary.netCost)).monospacedDigit()
-                        Text("net cost so far").font(.caption).foregroundStyle(Theme.secondary)
+                        if summary.trip.isPlanning {
+                            Text(model.tripText(summary.plan.plannedTotal, summary.trip)).monospacedDigit()
+                            Text("planned").font(.caption).foregroundStyle(Theme.secondary)
+                        } else {
+                            Text(IndianMoneyFormat.string(summary.netCost)).monospacedDigit()
+                            Text("net cost so far").font(.caption).foregroundStyle(Theme.secondary)
+                        }
                     }
                 }
                 Text((summary.trip.currency ?? "₹") + " · " + (summary.members.isEmpty ? "no people yet" : summary.members.map(\.name).joined(separator: ", ")))
@@ -85,6 +91,7 @@ struct NewTripSheet: View {
     @State private var payment = PaymentChoice.all[0]
     @State private var hasEnd = false
     @State private var endDate = Date()
+    @State private var planOnly = false
     @State private var errorMessage: String?
     @State private var confirmingDelete = false
 
@@ -122,6 +129,10 @@ struct NewTripSheet: View {
             CardScreen {
                 CardGroup(footer: currency.isEmpty ? nil : "Used for expenses without a card charge, and for the amounts shown beside balances.") {
                     TextField("Trip name", text: $name).accessibilityIdentifier("tripNameField").rowPadding()
+                    if editing == nil {
+                        Toggle("Just planning for now", isOn: $planOnly).rowPadding()
+                            .accessibilityIdentifier("tripPlanOnlyToggle")
+                    }
                     CurrencyField(model: model, selection: $currency, identifier: "tripCurrencyPicker")
                         .onChange(of: currency) {
                             if !currency.isEmpty, rateText.isEmpty, let last = model.lastRate(for: currency) { rateText = "\(last)" }
@@ -188,7 +199,7 @@ struct NewTripSheet: View {
             name: name, currency: currency.isEmpty ? nil : currency,
             rate: currency.isEmpty ? nil : Decimal(string: rateText.trimmingCharacters(in: .whitespaces)),
             ledgerName: ledgerName, category: category, subCategory: subCategory, paymentMethod: payment.method,
-            endDate: hasEnd ? CalendarDate(endDate) : nil
+            endDate: hasEnd ? CalendarDate(endDate) : nil, isPlanning: planOnly
         )
         errorMessage = editing.map { model.updateTrip($0.id, trip) } ?? model.createTrip(trip)
         if errorMessage == nil { dismiss() }

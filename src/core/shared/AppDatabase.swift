@@ -373,6 +373,21 @@ public final class AppDatabase: Sendable {
             }
         }
 
+        migrator.registerMigration("v20-trip-planner") { db in
+            try db.alter(table: "trip") { table in
+                table.add(column: "planning", .boolean).notNull().defaults(to: false)
+            }
+            try db.create(table: "trip_plan_item") { table in
+                table.autoIncrementedPrimaryKey("id")
+                table.column("trip_id", .integer).notNull().references("trip", onDelete: .cascade)
+                table.column("description", .text).notNull()
+                table.column("amount_paise", .integer).notNull()
+                table.column("tag", .text).notNull().defaults(to: "")
+                // Set once the item is ticked as paid; deleting that trip expense puts the item back to "still to pay".
+                table.column("trip_expense_id", .integer).references("trip_expense", onDelete: .setNull)
+            }
+        }
+
         return migrator
     }
 }

@@ -28,6 +28,7 @@ let testExclusions = [
     "networth/payout-schemes/payout-schemes.feature",
     "networth/portfolio/portfolio.feature",
     "trips/trips/trips.feature",
+    "trips/trips/trip-planner.feature",
 ]
 
 let package = Package(

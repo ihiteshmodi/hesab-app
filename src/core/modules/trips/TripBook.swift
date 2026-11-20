@@ -8,6 +8,7 @@ struct TripBook {
     let expenses: [TripExpense]
     let settlements: [TripSettlement]
     let cashAdjustments: [CashAdjustment]
+    let planItems: [TripPlanItem]
 
     private var isForeign: Bool { trip.currency != nil }
 
@@ -138,6 +139,20 @@ struct TripBook {
         return PersonStatement(person: person, owesMe: owes, owesMeHome: homeValue(owes), lines: lines)
     }
 
+    func plan() -> TripPlan {
+        let pending = planItems.filter { !$0.isPaid }.reduce(Money.zero) { $0 + $1.amount }
+        let planned = planItems.reduce(Money.zero) { $0 + $1.amount }
+        let paid = planItems.compactMap(\.paidExpenseID).compactMap { id in expenses.first { $0.id == id }?.amount }
+            .reduce(Money.zero) { $0 + $1 }
+        var byTag: [String: Money] = [:]
+        for item in planItems { byTag[item.tag, default: .zero] = byTag[item.tag, default: .zero] + item.amount }
+        return TripPlan(
+            items: planItems, plannedTotal: planned, plannedTotalHome: homeValue(planned), pendingTotal: pending,
+            pendingTotalHome: homeValue(pending), paidTotal: paid,
+            byTag: byTag.map { TagSpend(tag: $0.key, amount: $0.value) }.sorted { ($1.amount, $0.tag) < ($0.amount, $1.tag) }
+        )
+    }
+
     func summary() -> TripSummary {
         let members = people.sorted { $0.name.lowercased() < $1.name.lowercased() }
         let balances = members.map { person -> PersonBalance in
@@ -174,7 +189,7 @@ struct TripBook {
             myShare: expenses.reduce(.zero) { $0 + ($1.shares[.me] ?? .zero) }, totalSpentHome: expenses.reduce(.zero) { $0 + home(of: $1) },
             myShareHome: expenses.reduce(.zero) { $0 + homeShare(of: $1, .me) }, ledgerAmount: ledgerAmount, netCost: netCost,
             receivedBankHome: bank, receivedCashHome: cashHome, receivedCashTrip: cashTrip, writtenOffHome: homeValue(cost),
-            extraReceivedHome: homeValue(gain), cash: cash, spendByTag: spendByTag, totals: totals
+            extraReceivedHome: homeValue(gain), cash: cash, spendByTag: spendByTag, totals: totals, plan: plan()
         )
     }
 }

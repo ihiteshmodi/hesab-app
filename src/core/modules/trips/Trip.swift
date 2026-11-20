@@ -89,6 +89,8 @@ public struct Trip: Equatable, Sendable {
     public let paymentMethod: PaymentMethod
     public let endDate: CalendarDate?
     public let isSettled: Bool
+    /// A trip still being worked out: its plan is a price list, and nothing in it has been paid yet.
+    public let isPlanning: Bool
 }
 
 public struct NewTrip: Sendable {
@@ -101,10 +103,12 @@ public struct NewTrip: Sendable {
     public var subCategory: String
     public var paymentMethod: PaymentMethod
     public var endDate: CalendarDate?
+    /// Only read when the trip is created; `startTrip` is what ends planning.
+    public var isPlanning: Bool
 
     public init(
         name: String, currency: String? = nil, rate: Decimal? = nil, ledgerName: String = "", category: String,
-        subCategory: String = "", paymentMethod: PaymentMethod = .upi, endDate: CalendarDate? = nil
+        subCategory: String = "", paymentMethod: PaymentMethod = .upi, endDate: CalendarDate? = nil, isPlanning: Bool = false
     ) {
         self.name = name
         self.currency = currency
@@ -114,6 +118,7 @@ public struct NewTrip: Sendable {
         self.subCategory = subCategory
         self.paymentMethod = paymentMethod
         self.endDate = endDate
+        self.isPlanning = isPlanning
     }
 }
 
@@ -162,6 +167,63 @@ public struct TripExpense: Equatable, Sendable {
     public let tag: String
     public let note: String
     public let hasReceipt: Bool
+}
+
+/// One thing in a trip's plan, with what it is expected to cost in the trip currency.
+public struct TripPlanItem: Equatable, Sendable {
+    public let id: Int64
+    public let tripID: Int64
+    public let description: String
+    public let amount: Money
+    public let tag: String
+    /// The trip expense made when the item was ticked as paid.
+    public let paidExpenseID: Int64?
+
+    public var isPaid: Bool { paidExpenseID != nil }
+}
+
+public struct NewTripPlanItem: Sendable {
+    public var description: String
+    public var amount: Money?
+    public var tag: String
+
+    public init(description: String, amount: Money?, tag: String = "") {
+        self.description = description
+        self.amount = amount
+        self.tag = tag
+    }
+}
+
+/// What is really paid when an item is ticked; anything left out is taken from the plan or from today.
+public struct PlanItemPayment: Sendable {
+    public var amount: Money?
+    public var date: CalendarDate?
+    public var paidWith: ExpensePayment
+    /// What the card charged in the home currency, as on any trip expense.
+    public var paidInHome: Money?
+
+    public init(amount: Money? = nil, date: CalendarDate? = nil, paidWith: ExpensePayment = .bank, paidInHome: Money? = nil) {
+        self.amount = amount
+        self.date = date
+        self.paidWith = paidWith
+        self.paidInHome = paidInHome
+    }
+}
+
+/// The plan of a trip: what it is expected to cost, what is paid and what is still to pay.
+public struct TripPlan: Equatable, Sendable {
+    /// Oldest first.
+    public let items: [TripPlanItem]
+    /// Every item at its estimate, in the trip currency.
+    public let plannedTotal: Money
+    public let plannedTotalHome: Money
+    /// Estimates of the items not paid yet.
+    public let pendingTotal: Money
+    public let pendingTotalHome: Money
+    /// What the paid items really cost.
+    public let paidTotal: Money
+    /// Estimates by tag, largest first.
+    public let byTag: [TagSpend]
 }
 
 public struct TripSettlement: Equatable, Sendable {
@@ -244,6 +306,7 @@ public struct TripSummary: Equatable, Sendable {
     public let cash: TripCash
     public let spendByTag: [TagSpend]
     public let totals: [ParticipantTotal]
+    public let plan: TripPlan
 }
 
 public struct StatementLine: Equatable, Sendable {
@@ -298,6 +361,10 @@ public enum TripError: Error, Equatable, Sendable {
     case noTripCash
     case tagMissing
     case tagIsDefault(String)
+    case planItemNotFound(Int64)
+    case tripNotStarted
+    case alreadyPaid(String)
+    case notPaidYet(String)
 
     public var message: String {
         switch self {
@@ -323,6 +390,10 @@ public enum TripError: Error, Equatable, Sendable {
         case .noTripCash: "This trip is in your home currency, so it uses your main Cash in Hand."
         case .tagMissing: "Enter a tag"
         case .tagIsDefault(let name): "\(name) is a default tag and stays"
+        case .planItemNotFound: "That plan item no longer exists."
+        case .tripNotStarted: "Start the trip before ticking things as paid."
+        case .alreadyPaid(let name): "\(name) is already paid."
+        case .notPaidYet(let name): "\(name) is not paid yet."
         }
     }
 }

@@ -222,6 +222,32 @@ final class BudgetViewModel {
     func deleteTripExpense(_ id: Int64) -> String? { run { try app.deleteTripExpense(id) } }
     func setTripReceipt(_ expenseID: Int64, _ image: Data?) -> String? { run { try app.setTripReceipt(expenseID, image) } }
     func deleteTripSettlement(_ id: Int64) -> String? { run { try app.deleteTripSettlement(id) } }
+
+    // MARK: trip planner
+
+    func startTrip(_ id: Int64) -> String? { run { try app.startTrip(id) } }
+    func deleteTripPlanItem(_ id: Int64) -> String? { run { try app.deleteTripPlanItem(id) } }
+    func unmarkTripPlanItemPaid(_ id: Int64) -> String? { run { try app.unmarkTripPlanItemPaid(id) } }
+
+    func addTripPlanItem(_ tripID: Int64, description: String, amountText: String, tag: String) -> String? {
+        run { try app.addTripPlanItem(tripID, NewTripPlanItem(description: description, amount: MoneyInput.parse(amountText), tag: tag)) }
+    }
+
+    func updateTripPlanItem(_ id: Int64, description: String, amountText: String, tag: String) -> String? {
+        run { try app.updateTripPlanItem(id, NewTripPlanItem(description: description, amount: MoneyInput.parse(amountText), tag: tag)) }
+    }
+
+    func markTripPlanItemPaid(
+        _ id: Int64, amountText: String, date: CalendarDate, paidWith: ExpensePayment, chargeText: String
+    ) -> String? {
+        guard let amount = MoneyInput.parse(amountText) else { return TripError.amountMissingOrZero.message }
+        return run {
+            try app.markTripPlanItemPaid(id, PlanItemPayment(
+                amount: amount, date: date, paidWith: paidWith,
+                paidInHome: chargeText.trimmingCharacters(in: .whitespaces).isEmpty ? nil : MoneyInput.parse(chargeText)
+            ))
+        }
+    }
     func setTripCash(_ tripID: Int64, text: String) -> String? { run { try app.setTripCash(tripID, to: MoneyInput.parse(text)) } }
 
     func updateTripSettlement(

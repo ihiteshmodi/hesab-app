@@ -101,7 +101,8 @@ final class TripRepository: Sendable {
             paymentMethod: PaymentMethod(
                 name: row["payment_name"], source: PaymentMethod.Source(rawValue: row["payment_source"]) ?? .bank
             ),
-            endDate: try (row["end_date"] as String?).map { try CalendarDate(isoString: $0) }, isSettled: row["settled"]
+            endDate: try (row["end_date"] as String?).map { try CalendarDate(isoString: $0) }, isSettled: row["settled"],
+            isPlanning: row["planning"]
         )
     }
 
@@ -114,11 +115,11 @@ final class TripRepository: Sendable {
     func insert(_ new: NewTrip, name: String, ledgerName: String) throws -> Trip {
         let id = try database.writer.write { db -> Int64 in
             try db.execute(sql: """
-                INSERT INTO trip (name, currency, rate, ledger_name, category, sub_category, payment_name, payment_source, end_date)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO trip (name, currency, rate, ledger_name, category, sub_category, payment_name, payment_source, end_date, planning)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, arguments: [
                     name, new.currency, new.rate.map { "\($0)" }, ledgerName, new.category, new.subCategory,
-                    new.paymentMethod.name, new.paymentMethod.source.rawValue, new.endDate?.isoString,
+                    new.paymentMethod.name, new.paymentMethod.source.rawValue, new.endDate?.isoString, new.isPlanning,
                 ])
             return db.lastInsertedRowID
         }
@@ -134,6 +135,64 @@ final class TripRepository: Sendable {
                     name, new.currency, new.rate.map { "\($0)" }, ledgerName, new.category, new.subCategory,
                     new.paymentMethod.name, new.paymentMethod.source.rawValue, new.endDate?.isoString, id,
                 ])
+        }
+    }
+
+    func startTrip(_ id: Int64) throws {
+        try database.writer.write { db in
+            try db.execute(sql: "UPDATE trip SET planning = 0 WHERE id = ?", arguments: [id])
+            guard db.changesCount > 0 else { throw TripError.notFound(id) }
+        }
+    }
+
+    // MARK: plan
+
+    func planItems(of tripID: Int64) throws -> [TripPlanItem] {
+        try database.writer.read { db in
+            try Row.fetchAll(db, sql: "SELECT * FROM trip_plan_item WHERE trip_id = ? ORDER BY id", arguments: [tripID]).map(Self.planItem)
+        }
+    }
+
+    func planItem(_ id: Int64) throws -> TripPlanItem {
+        let row = try database.writer.read { db in try Row.fetchOne(db, sql: "SELECT * FROM trip_plan_item WHERE id = ?", arguments: [id]) }
+        guard let row else { throw TripError.planItemNotFound(id) }
+        return Self.planItem(row)
+    }
+
+    private static func planItem(_ row: Row) -> TripPlanItem {
+        TripPlanItem(
+            id: row["id"], tripID: row["trip_id"], description: row["description"], amount: Money(paise: row["amount_paise"]),
+            tag: row["tag"], paidExpenseID: row["trip_expense_id"]
+        )
+    }
+
+    func addPlanItem(tripID: Int64, description: String, amount: Money, tag: String) throws {
+        try database.writer.write { db in
+            try db.execute(sql: """
+                INSERT INTO trip_plan_item (trip_id, description, amount_paise, tag) VALUES (?, ?, ?, ?)
+                """, arguments: [tripID, description, amount.paise, tag])
+        }
+    }
+
+    func updatePlanItem(_ id: Int64, description: String, amount: Money, tag: String) throws {
+        try database.writer.write { db in
+            try db.execute(sql: """
+                UPDATE trip_plan_item SET description = ?, amount_paise = ?, tag = ? WHERE id = ?
+                """, arguments: [description, amount.paise, tag, id])
+            guard db.changesCount > 0 else { throw TripError.planItemNotFound(id) }
+        }
+    }
+
+    func deletePlanItem(_ id: Int64) throws {
+        try database.writer.write { db in
+            try db.execute(sql: "DELETE FROM trip_plan_item WHERE id = ?", arguments: [id])
+            guard db.changesCount > 0 else { throw TripError.planItemNotFound(id) }
+        }
+    }
+
+    func setPlanItemExpense(_ id: Int64, _ expenseID: Int64?) throws {
+        try database.writer.write { db in
+            try db.execute(sql: "UPDATE trip_plan_item SET trip_expense_id = ? WHERE id = ?", arguments: [expenseID, id])
         }
     }
 
