@@ -25,5 +25,10 @@ DerivedData/
 .env
 .env.*
 .DS_Store
+# Local agent guidelines (kept on disk, never committed)
+.agents/
+AGENTS.md
+CLAUDE.md
+
 # Added by code-review-graph
 .code-review-graph/
