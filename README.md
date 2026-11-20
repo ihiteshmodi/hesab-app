@@ -6,7 +6,7 @@
 
 > Track what is left to spend, where your money went and what you own, in one native app that never goes online. Your data lives in a single SQLite file on your phone.
 
-**Status: in daily use.** Every screen in the approved mockups is built: Activity (Spending, Upcoming, Savings and a month calendar of daily spending), Bills (a calendar of bills and expected payouts with a filter menu, or a list), Portfolio, Reports, Trips and Search, plus a menu drawer for everything else. New requirements are specified in [`tests/`](tests) as Gherkin scenarios first (see [Roadmap](#roadmap)).
+**Status: in daily use.** Every screen in the approved mockups is built: Activity (Spending, Upcoming, Savings and a month calendar of daily spending), Bills (a calendar of bills and expected payouts with a filter menu, or a list), Portfolio, Reports, Trips (with a planner: price a trip first, start it, tick items as paid) and Search (expenses and income together, also a small search field on Activity), plus a menu drawer for everything else. New requirements are specified in [`tests/`](tests) as Gherkin scenarios first (see [Roadmap](#roadmap)).
 
 ## Why it exists
 
@@ -26,7 +26,7 @@ swift test                # runs the core tests, no simulator needed
 Expected output:
 
 ```text
-✔ Test run with 410 tests in 33 suites passed after 1.5 seconds.
+✔ Test run with 516 tests in 36 suites passed after 1.5 seconds.
 ...
 Built build/Hisaab.ipa
 ```
@@ -82,7 +82,7 @@ MoneyInput.parse("12.345")          // nil: more than two decimals
 
 ### Back up and restore
 
-In the app, open the menu (the round button on Activity) and choose **Export Data** or **Import Data**: Export saves `budget-<date>.sqlite`, and Import replaces the current data with a file exported from the app (a copy of the previous data is kept first as `before-import-<date>.sqlite`). The same from code:
+In the app, open the menu (the round button on Activity) and choose **Export Data** or **Import Data**: Export opens the iOS share sheet at once with `budget-<date>.sqlite` (AirDrop, Save to Files, Google Drive), and Import replaces the current data with a file exported from the app (a copy of the previous data is kept first as `before-import-<date>.sqlite`). The same from code:
 
 ```swift
 let file = try app.exportData(into: folderURL)                  // budget-2026-10-30.sqlite

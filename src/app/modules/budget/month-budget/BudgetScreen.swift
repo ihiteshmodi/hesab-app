@@ -228,7 +228,6 @@ struct BudgetScreen: View {
 
     private var searching: Bool { !searchText.trimmingCharacters(in: .whitespaces).isEmpty }
 
-    /// A slim field under the summary card; it looks through every month's expenses and income.
     private var searchField: some View {
         HStack(spacing: 8) {
             Image(systemName: "magnifyingglass").foregroundStyle(Theme.secondary)
