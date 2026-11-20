@@ -34,6 +34,12 @@ final class BudgetViewModel {
     private(set) var reportGrouping = BreakdownGrouping.category
     private(set) var reportMonth = CalendarDate(Date()).yearMonth
     private(set) var reportAllTime = false
+    private(set) var spendingPace: SpendingPace?
+    private(set) var monthlyTrend: [MonthTrend] = []
+    private(set) var vsNormal = SpendingVsNormal(changes: [], hasHistory: false)
+    private(set) var categoryTrends: [CategoryTrend] = []
+    private(set) var forecast: CashForecast?
+    private(set) var netWorthHistory = NetWorthHistory(points: [])
     /// Shown on Activity until dismissed, for example "Added automatically: Internet 800".
     private(set) var notices: [String] = []
     private(set) var loadError: String?
@@ -71,6 +77,14 @@ final class BudgetViewModel {
             payouts = try app.payoutSchemes()
             upcomingIncome = try app.upcomingIncome()
             report = try app.spendingBreakdown(reportAllTime ? .allTime : .month(reportMonth), by: reportGrouping)
+            spendingPace = try app.spendingPace(for: reportMonth)
+            monthlyTrend = try app.monthlyTrend(endingAt: reportMonth)
+            vsNormal = try app.spendingVsNormal(for: reportMonth)
+            categoryTrends = try app.categoryTrends(endingAt: reportMonth)
+            forecast = try app.cashForecast()
+            // A failed snapshot must never stop the screens from loading.
+            try? app.recordNetWorth()
+            netWorthHistory = try app.netWorthHistory()
             runSearch()
             loadError = nil
         } catch {
@@ -300,22 +314,29 @@ final class BudgetViewModel {
         return run { try app.setBankBalance(amount) }
     }
 
-    func addHolding(name: String, amountText: String, currency: String?, rateText: String) -> String? {
+    func addHolding(name: String, amountText: String, investedText: String, currency: String?, rateText: String) -> String? {
         run {
-            try app.addHolding(NewHolding(
-                name: name, amount: MoneyInput.parse(amountText), currency: currency,
-                rate: Decimal(string: rateText.trimmingCharacters(in: .whitespaces))
-            ))
+            try app.addHolding(newHolding(name, amountText, investedText, currency, rateText))
         }
     }
 
-    func updateHolding(_ id: Int64, name: String, amountText: String, currency: String?, rateText: String) -> String? {
+    func updateHolding(_ id: Int64, name: String, amountText: String, investedText: String, currency: String?, rateText: String) -> String? {
         run {
-            try app.updateHolding(id, NewHolding(
-                name: name, amount: MoneyInput.parse(amountText), currency: currency,
-                rate: Decimal(string: rateText.trimmingCharacters(in: .whitespaces))
-            ))
+            try app.updateHolding(id, newHolding(name, amountText, investedText, currency, rateText))
         }
+    }
+
+    func addToHolding(_ id: Int64, amountText: String) -> String? { run { try app.addToHolding(id, amount: MoneyInput.parse(amountText)) } }
+    func holdingHistory(_ id: Int64) -> [HoldingPoint] { _ = portfolio; return (try? app.holdingHistory(id)) ?? [] }
+
+    /// An empty "amount invested" box means she does not track what she paid; text that is not a number is passed on as
+    /// a negative amount so the core refuses it with its usual message.
+    private func newHolding(_ name: String, _ amountText: String, _ investedText: String, _ currency: String?, _ rateText: String) -> NewHolding {
+        NewHolding(
+            name: name, amount: MoneyInput.parse(amountText), currency: currency,
+            rate: Decimal(string: rateText.trimmingCharacters(in: .whitespaces)),
+            invested: investedText.trimmingCharacters(in: .whitespaces).isEmpty ? nil : MoneyInput.parse(investedText) ?? Money(paise: -1)
+        )
     }
 
     func deleteHolding(_ id: Int64) -> String? { run { try app.deleteHolding(id) } }

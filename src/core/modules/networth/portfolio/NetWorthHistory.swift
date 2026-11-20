@@ -14,6 +14,10 @@ public struct NetWorthHistory: Equatable, Sendable {
     /// Oldest first, one per day at most.
     public let points: [NetWorthPoint]
 
+    public init(points: [NetWorthPoint]) {
+        self.points = points
+    }
+
     /// How far net worth has moved from the first point to the last; nil until there are two points.
     public var change: Money? {
         guard let first = points.first, let last = points.last, points.count > 1 else { return nil }

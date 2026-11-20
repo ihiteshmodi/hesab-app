@@ -91,6 +91,17 @@ struct TripPlanPane: View {
                 .accessibilityIdentifier("planItemRow")
             }
         }
+        if !plan.categoryProgress.isEmpty, !trip.isPlanning {
+            CardPanel {
+                CardCaption("Planned and spent, by category")
+                ForEach(plan.categoryProgress, id: \.category) { progress in
+                    ProgressRow(
+                        name: progress.category.isEmpty ? "No category" : progress.category, planned: progress.planned,
+                        spent: progress.spent, text: { model.tripText($0, trip) }
+                    )
+                }
+            }
+        }
         if !plan.byCategory.isEmpty {
             CardGroup(header: "Planned by category") {
                 ForEach(plan.byCategory, id: \.category) { spend in
@@ -265,5 +276,36 @@ struct TripPlanPaySheet: View {
                 }
             }
         }
+    }
+}
+
+/// One category: a grey bar for what was planned and a bar over it for what has been spent, red when spent is over plan.
+private struct ProgressRow: View {
+    let name: String
+    let planned: Money
+    let spent: Money
+    let text: (Money) -> String
+
+    private var over: Bool { spent > planned }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                Text(name)
+                Spacer()
+                Text("\(text(spent)) of \(text(planned))").font(.footnote).monospacedDigit().foregroundStyle(over ? Theme.red : Theme.secondary)
+            }
+            GeometryReader { geometry in
+                let scale = CGFloat(max(planned.paise, spent.paise, 1))
+                ZStack(alignment: .leading) {
+                    Capsule().fill(Color.gray.opacity(0.25)).frame(width: geometry.size.width * CGFloat(planned.paise) / scale)
+                    Capsule().fill(over ? Theme.red : Theme.blue).frame(width: geometry.size.width * CGFloat(spent.paise) / scale)
+                }
+            }
+            .frame(height: 8)
+        }
+        .padding(.vertical, 4)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("planProgressRow")
     }
 }

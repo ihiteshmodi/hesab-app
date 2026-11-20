@@ -118,6 +118,11 @@ public struct SpendingVsNormal: Equatable, Sendable {
     public let changes: [CategoryChange]
     /// Needs her first expense to be at least 3 months before the month shown.
     public let hasHistory: Bool
+
+    public init(changes: [CategoryChange], hasHistory: Bool) {
+        self.changes = changes
+        self.hasHistory = hasHistory
+    }
 }
 
 /// Every category's spending this month against the average of the same days in the 3 months before.

@@ -1,3 +1,4 @@
+import Charts
 import HisaabCore
 import SwiftUI
 
@@ -11,6 +12,7 @@ struct PortfolioScreen: View {
     @State private var addingFund = false
     @State private var addingLedger = false
     @State private var editingHolding: Holding?
+    @State private var addingMoneyTo: Holding?
     @State private var editingFund: AllocatedFund?
     @State private var errorMessage: String?
 
@@ -34,6 +36,7 @@ struct PortfolioScreen: View {
                         if let warning = portfolio.warning, !hidden {
                             Text(warning).font(.footnote).foregroundStyle(Theme.orange).accessibilityIdentifier("portfolioWarning")
                         }
+                        NetWorthChart(history: model.netWorthHistory, hidden: hidden)
                     }
                     CardGroup {
                         Button { settingBank = true } label: {
@@ -71,15 +74,36 @@ struct PortfolioScreen: View {
                         addButton("Add Allocation", identifier: "addFundButton") { addingFund = true }
                     }
                     CardGroup(header: "Investments", footer: portfolio.holdings.isEmpty ? nil : "Tap an investment to change it. Touch and hold to delete it.") {
+                        if let performance = portfolio.performance {
+                            CardRow(title: "Up or down", subtitle: "Holdings with an amount invested") {
+                                VStack(alignment: .trailing, spacing: 1) {
+                                    Text(hidden ? "••••••" : signed(performance.gain)).monospacedDigit().fontWeight(.semibold)
+                                    if let tenths = performance.gainPercentTenths { Text(percentText(tenths: tenths)).font(.footnote) }
+                                }
+                                .foregroundStyle(gainColour(performance.gain))
+                            }
+                            .accessibilityElement(children: .combine)
+                            .accessibilityIdentifier("investmentPerformance")
+                        }
                         ForEach(portfolio.holdings, id: \.holding.id) { line in
                             Button { editingHolding = line.holding } label: {
-                                CardRow(title: line.holding.name,
-                                        subtitle: line.holding.currency.map { "\($0) \(IndianMoneyFormat.plain(line.holding.amount))" }) {
-                                    Text(money(line.valueInHome)).monospacedDigit()
+                                CardRow(title: line.holding.name, subtitle: holdingSubtitle(line)) {
+                                    VStack(alignment: .trailing, spacing: 1) {
+                                        Text(money(line.valueInHome)).monospacedDigit()
+                                        if let gain = line.gainInHome, let tenths = line.holding.gainPercentTenths {
+                                            Text("\(hidden ? "" : signed(gain) + " · ")\(percentText(tenths: tenths))").font(.footnote)
+                                                .foregroundStyle(gainColour(gain)).monospacedDigit()
+                                        }
+                                    }
                                 }
                             }
                             .buttonStyle(.plain)
+                            .accessibilityElement(children: .combine)
+                            .accessibilityIdentifier("holdingRow")
                             .contextMenu {
+                                if line.holding.invested != nil {
+                                    Button("Add Money", systemImage: "plus.circle") { addingMoneyTo = line.holding }
+                                }
                                 Button("Edit", systemImage: "pencil") { editingHolding = line.holding }
                                 Button("Delete", systemImage: "trash", role: .destructive) { errorMessage = model.deleteHolding(line.holding.id) }
                             }
@@ -114,11 +138,24 @@ struct PortfolioScreen: View {
             .sheet(isPresented: $addingFund) { FundSheet(model: model) }
             .sheet(isPresented: $addingLedger) { NewLedgerSheet(model: model) }
             .sheet(item: $editingHolding) { HoldingSheet(model: model, editing: $0) }
+            .sheet(item: $addingMoneyTo) { AddMoneySheet(model: model, holding: $0) }
             .sheet(item: $editingFund) { FundSheet(model: model, editing: $0) }
         }
         // On the stack, not the root: pushing Payout Schemes must not hide the amounts again.
         .onDisappear { revealed = false }
         .onChange(of: scenePhase) { if scenePhase != .active { revealed = false } }
+    }
+
+    private func signed(_ money: Money) -> String { (money > .zero ? "+" : "") + IndianMoneyFormat.string(money) }
+
+    private func holdingSubtitle(_ line: HoldingLine) -> String? {
+        let holding = line.holding
+        var parts: [String] = []
+        if let code = holding.currency { parts.append("\(code) \(IndianMoneyFormat.plain(holding.amount))") }
+        if let invested = holding.invested, !hidden {
+            parts.append("paid \(holding.currency.map { "\($0) " } ?? "")\(IndianMoneyFormat.plain(invested))")
+        }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 
     private func addButton(_ title: String, identifier: String, action: @escaping () -> Void) -> some View {
@@ -216,6 +253,7 @@ private struct HoldingSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var name = ""
     @State private var amountText = ""
+    @State private var investedText = ""
     @State private var currency = ""
     @State private var rateText = ""
     @State private var errorMessage: String?
@@ -223,9 +261,11 @@ private struct HoldingSheet: View {
     var body: some View {
         NavigationStack {
             CardScreen {
-                CardGroup {
+                CardGroup(footer: "Fill in what you paid to see whether it is up or down. Update what it is worth whenever you like.") {
                     TextField("Name", text: $name).rowPadding().accessibilityIdentifier("holdingNameField")
-                    TextField("Amount", text: $amountText).keyboardType(.decimalPad).rowPadding().accessibilityIdentifier("holdingAmountField")
+                    TextField("Worth today", text: $amountText).keyboardType(.decimalPad).rowPadding().accessibilityIdentifier("holdingAmountField")
+                    TextField("Amount invested (what you paid, optional)", text: $investedText).keyboardType(.decimalPad).rowPadding()
+                        .accessibilityIdentifier("holdingInvestedField")
                     CurrencyField(model: model, selection: $currency, identifier: "holdingCurrencyPicker")
                     if !currency.isEmpty {
                         TextField("Rate (\(model.preferences.homeCurrency) per 1 \(currency))", text: $rateText).keyboardType(.decimalPad)
@@ -234,12 +274,14 @@ private struct HoldingSheet: View {
                     }
                     if let errorMessage { Text(errorMessage).foregroundStyle(Theme.red).rowPadding() }
                 }
+                if let editing { HoldingHistoryChart(points: model.holdingHistory(editing.id)) }
             }
             .cardNavigation(editing == nil ? "Add Investment" : "Edit Investment")
             .onAppear {
                 guard let editing, name.isEmpty else { return }
                 name = editing.name
                 amountText = IndianMoneyFormat.plain(editing.amount)
+                investedText = editing.invested.map { IndianMoneyFormat.plain($0) } ?? ""
                 currency = editing.currency ?? ""
             }
             .toolbar {
@@ -248,12 +290,106 @@ private struct HoldingSheet: View {
                     Button("Save") {
                         let chosen = currency.isEmpty ? nil : currency
                         errorMessage = editing.map {
-                            model.updateHolding($0.id, name: name, amountText: amountText, currency: chosen, rateText: rateText)
-                        } ?? model.addHolding(name: name, amountText: amountText, currency: chosen, rateText: rateText)
+                            model.updateHolding(
+                                $0.id, name: name, amountText: amountText, investedText: investedText, currency: chosen, rateText: rateText
+                            )
+                        } ?? model.addHolding(
+                            name: name, amountText: amountText, investedText: investedText, currency: chosen, rateText: rateText
+                        )
                         if errorMessage == nil { dismiss() }
                     }
                     .accessibilityIdentifier("saveHoldingButton")
                 }
+            }
+        }
+    }
+}
+
+/// A SIP instalment or a top-up: what was paid and what it is worth both go up.
+private struct AddMoneySheet: View {
+    let model: BudgetViewModel
+    let holding: Holding
+    @Environment(\.dismiss) private var dismiss
+    @State private var amountText = ""
+    @State private var errorMessage: String?
+
+    var body: some View {
+        NavigationStack {
+            CardScreen {
+                CardGroup(footer: "Adds to what you paid and to what it is worth. Update the worth afterwards if it has moved.") {
+                    CardRow(title: holding.name) { Text(IndianMoneyFormat.plain(holding.amount)).foregroundStyle(Theme.secondary) }
+                    TextField("Amount added", text: $amountText).keyboardType(.decimalPad).rowPadding()
+                        .accessibilityIdentifier("addMoneyField")
+                    if let errorMessage { Text(errorMessage).foregroundStyle(Theme.red).rowPadding() }
+                }
+            }
+            .cardNavigation("Add Money")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Add") {
+                        errorMessage = model.addToHolding(holding.id, amountText: amountText)
+                        if errorMessage == nil { dismiss() }
+                    }
+                    .accessibilityIdentifier("confirmAddMoneyButton")
+                }
+            }
+        }
+    }
+}
+
+/// The values she has noted for one holding, against what she paid.
+private struct HoldingHistoryChart: View {
+    let points: [HoldingPoint]
+
+    var body: some View {
+        if points.count > 1 {
+            CardPanel {
+                CardCaption("Worth over time")
+                Chart {
+                    ForEach(points, id: \.date) { point in
+                        LineMark(x: .value("Date", point.date.instant()), y: .value("Worth", chartValue(point.value)), series: .value("Line", "Worth"))
+                            .foregroundStyle(Theme.blue)
+                        if let invested = point.invested {
+                            LineMark(x: .value("Date", point.date.instant()), y: .value("Paid", chartValue(invested)), series: .value("Line", "Paid"))
+                                .foregroundStyle(.gray).lineStyle(StrokeStyle(lineWidth: 1.5, dash: [4, 3]))
+                        }
+                    }
+                }
+                .moneyYAxis()
+                .frame(height: 130)
+                .accessibilityIdentifier("holdingHistoryChart")
+                HStack(spacing: 14) {
+                    Label("Worth", systemImage: "circle.fill").foregroundStyle(Theme.blue)
+                    Label("Paid", systemImage: "circle.fill").foregroundStyle(.gray)
+                }
+                .font(.caption).labelStyle(.titleAndIcon)
+            }
+        }
+    }
+}
+
+/// The line of net worth since the app began remembering it; it needs two points before it says anything.
+private struct NetWorthChart: View {
+    let history: NetWorthHistory
+    let hidden: Bool
+
+    var body: some View {
+        if history.points.count > 1, let change = history.change, let first = history.points.first {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(hidden ? "Since \(first.date.shortTitle)" : "\(change >= .zero ? "+" : "")\(IndianMoneyFormat.string(change)) since \(first.date.shortTitle)")
+                    .font(.footnote).foregroundStyle(hidden ? Theme.secondary : gainColour(change))
+                    .accessibilityIdentifier("netWorthChange")
+                Chart(history.points, id: \.date) { point in
+                    LineMark(x: .value("Date", point.date.instant()), y: .value("Net worth", chartValue(point.amount)))
+                        .foregroundStyle(Theme.blue).interpolationMethod(.monotone)
+                    AreaMark(x: .value("Date", point.date.instant()), y: .value("Net worth", chartValue(point.amount)))
+                        .foregroundStyle(Theme.blue.opacity(0.08)).interpolationMethod(.monotone)
+                }
+                .chartYScale(domain: .automatic(includesZero: false))
+                .moneyYAxis(hidden: hidden)
+                .frame(height: 120)
+                .accessibilityIdentifier("netWorthChart")
             }
         }
     }

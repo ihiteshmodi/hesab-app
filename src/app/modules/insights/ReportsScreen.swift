@@ -2,92 +2,126 @@ import Charts
 import HisaabCore
 import SwiftUI
 
+private enum ReportPane: String, CaseIterable {
+    case breakdown = "Breakdown"
+    case trends = "Trends"
+}
+
 struct ReportsScreen: View {
     let model: BudgetViewModel
     /// Keep only the rows (and, inside a row, the expenses) that make up this share of the spending.
     @State private var topPercent = 100.0
+    @State private var pane = ReportPane.breakdown
 
     var body: some View {
         NavigationStack {
             let report = model.report
             let top = report.top(percent: Int(topPercent))
             CardScreen {
-                CardPanel {
-                    FieldRow("Group by") {
-                        Picker("Group by", selection: Binding(
-                            get: { model.reportGrouping },
-                            set: { model.showReport(grouping: $0, month: model.reportMonth, allTime: model.reportAllTime) }
-                        )) {
-                            ForEach(BreakdownGrouping.allCases, id: \.self) { Text($0.title).tag($0) }
-                        }
-                        .labelsHidden()
-                    }
-                    .accessibilityIdentifier("groupingPicker")
-                    HStack {
-                        Button("Previous Month", systemImage: "chevron.left") { move(-1) }
-                            .labelStyle(.iconOnly).disabled(model.reportAllTime)
-                            .accessibilityIdentifier("previousReportMonth")
-                        Spacer()
-                        Text(model.reportAllTime ? "All Time" : model.reportMonth.title).font(.headline)
-                        Spacer()
-                        Button("Next Month", systemImage: "chevron.right") { move(1) }
-                            .labelStyle(.iconOnly).disabled(model.reportAllTime)
-                            .accessibilityIdentifier("nextReportMonth")
-                    }
-                    .buttonStyle(.borderless)
-                    .padding(.vertical, 6)
-                    Toggle("All Time", isOn: Binding(
-                        get: { model.reportAllTime },
-                        set: { model.showReport(grouping: model.reportGrouping, month: model.reportMonth, allTime: $0) }
-                    ))
-                    .accessibilityIdentifier("allTimeToggle")
-                    if report.isEmpty {
-                        Text("No spending in \(model.reportAllTime ? "this period" : monthName).")
-                            .foregroundStyle(Theme.secondary)
-                            .padding(.top, 6)
-                            .accessibilityIdentifier("noSpending")
-                    } else {
-                        // The list below names every slice, so the chart carries no legend of its own.
-                        Chart(top.rows, id: \.name) { row in
-                            SectorMark(angle: .value("Amount", Double(row.amount.paise) / 100), innerRadius: .ratio(0.6))
-                                .foregroundStyle(by: .value("Name", row.name))
-                        }
-                        .chartLegend(.hidden)
-                        .frame(height: 200)
-                        .padding(.vertical, 8)
-                        TopShareSlider(percent: $topPercent)
-                        HStack {
-                            VStack(alignment: .leading, spacing: 1) {
-                                Text(topPercent >= 100 ? "Total spent" : "Top \(Int(topPercent))% of spending").fontWeight(.semibold)
-                                Text(topPercent >= 100 ? "Expenses after refunds. Income is not included."
-                                     : "Out of \(IndianMoneyFormat.string(report.total)) spent")
-                                    .font(.footnote).foregroundStyle(Theme.secondary)
+                PillSegments(selection: $pane, options: ReportPane.allCases.map { ($0, $0.rawValue) })
+                    .accessibilityIdentifier("reportPanePicker")
+                if pane == .trends {
+                    trendsHeader
+                    TrendsPane(model: model)
+                } else {
+                    CardPanel {
+                        FieldRow("Group by") {
+                            Picker("Group by", selection: Binding(
+                                get: { model.reportGrouping },
+                                set: { model.showReport(grouping: $0, month: model.reportMonth, allTime: model.reportAllTime) }
+                            )) {
+                                ForEach(BreakdownGrouping.allCases, id: \.self) { Text($0.title).tag($0) }
                             }
+                            .labelsHidden()
+                        }
+                        .accessibilityIdentifier("groupingPicker")
+                        HStack {
+                            Button("Previous Month", systemImage: "chevron.left") { move(-1) }
+                                .labelStyle(.iconOnly).disabled(model.reportAllTime)
+                                .accessibilityIdentifier("previousReportMonth")
                             Spacer()
-                            Text(IndianMoneyFormat.string(report.shownTotal(percent: Int(topPercent)))).monospacedDigit().fontWeight(.semibold)
-                                .accessibilityIdentifier("reportTotal")
+                            Text(model.reportAllTime ? "All Time" : model.reportMonth.title).font(.headline)
+                            Spacer()
+                            Button("Next Month", systemImage: "chevron.right") { move(1) }
+                                .labelStyle(.iconOnly).disabled(model.reportAllTime)
+                                .accessibilityIdentifier("nextReportMonth")
+                        }
+                        .buttonStyle(.borderless)
+                        .padding(.vertical, 6)
+                        Toggle("All Time", isOn: Binding(
+                            get: { model.reportAllTime },
+                            set: { model.showReport(grouping: model.reportGrouping, month: model.reportMonth, allTime: $0) }
+                        ))
+                        .accessibilityIdentifier("allTimeToggle")
+                        if report.isEmpty {
+                            Text("No spending in \(model.reportAllTime ? "this period" : monthName).")
+                                .foregroundStyle(Theme.secondary)
+                                .padding(.top, 6)
+                                .accessibilityIdentifier("noSpending")
+                        } else {
+                            // The list below names every slice, so the chart carries no legend of its own.
+                            Chart(top.rows, id: \.name) { row in
+                                SectorMark(angle: .value("Amount", Double(row.amount.paise) / 100), innerRadius: .ratio(0.6))
+                                    .foregroundStyle(by: .value("Name", row.name))
+                            }
+                            .chartLegend(.hidden)
+                            .frame(height: 200)
+                            .padding(.vertical, 8)
+                            TopShareSlider(percent: $topPercent)
+                            HStack {
+                                VStack(alignment: .leading, spacing: 1) {
+                                    Text(topPercent >= 100 ? "Total spent" : "Top \(Int(topPercent))% of spending").fontWeight(.semibold)
+                                    Text(topPercent >= 100 ? "Expenses after refunds. Income is not included."
+                                         : "Out of \(IndianMoneyFormat.string(report.total)) spent")
+                                        .font(.footnote).foregroundStyle(Theme.secondary)
+                                }
+                                Spacer()
+                                Text(IndianMoneyFormat.string(report.shownTotal(percent: Int(topPercent)))).monospacedDigit().fontWeight(.semibold)
+                                    .accessibilityIdentifier("reportTotal")
+                            }
                         }
                     }
-                }
-                if !report.isEmpty {
-                    CardGroup(footer: model.reportGrouping == .tag
-                              ? "An expense with two tags is counted under both, so the rows can add up to more than the total." : nil) {
-                        ForEach(top.rows, id: \.name) { row in
-                            NavigationLink {
-                                GroupReportScreen(model: model, grouping: model.reportGrouping, name: row.name, topPercent: $topPercent)
-                            } label: { ReportLine(name: row.name, share: row.sharePercent, amount: row.amount, chevron: true) }
-                            .buttonStyle(.plain)
-                            .accessibilityIdentifier("reportRow")
-                        }
-                        if top.rest > .zero {
-                            ReportLine(name: "Everything else", share: nil, amount: top.rest, chevron: false)
-                                .foregroundStyle(Theme.secondary)
-                                .accessibilityIdentifier("reportRestRow")
+                    if !report.isEmpty {
+                        CardGroup(footer: model.reportGrouping == .tag
+                                  ? "An expense with two tags is counted under both, so the rows can add up to more than the total." : nil) {
+                            ForEach(top.rows, id: \.name) { row in
+                                NavigationLink {
+                                    GroupReportScreen(model: model, grouping: model.reportGrouping, name: row.name, topPercent: $topPercent)
+                                } label: {
+                                    ReportLine(
+                                        name: row.name, share: row.sharePercent, amount: row.amount, chevron: true,
+                                        trend: model.reportGrouping == .category && !model.reportAllTime
+                                            ? model.categoryTrends.first { $0.category == row.name } : nil
+                                    )
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityIdentifier("reportRow")
+                            }
+                            if top.rest > .zero {
+                                ReportLine(name: "Everything else", share: nil, amount: top.rest, chevron: false)
+                                    .foregroundStyle(Theme.secondary)
+                                    .accessibilityIdentifier("reportRestRow")
+                            }
                         }
                     }
                 }
             }
             .cardNavigation("Reports")
+        }
+    }
+
+    private var trendsHeader: some View {
+        CardPanel {
+            HStack {
+                Button("Previous Month", systemImage: "chevron.left") { move(-1) }
+                    .accessibilityIdentifier("previousTrendMonth")
+                Spacer()
+                Text(model.reportMonth.title).font(.headline)
+                Spacer()
+                Button("Next Month", systemImage: "chevron.right") { move(1) }
+                    .accessibilityIdentifier("nextTrendMonth")
+            }
+            .labelStyle(.iconOnly).buttonStyle(.borderless)
         }
     }
 
@@ -118,9 +152,11 @@ private struct ReportLine: View {
     let share: Int?
     let amount: Money
     let chevron: Bool
+    var trend: CategoryTrend?
 
     var body: some View {
         CardRow(title: name) {
+            if let trend { SparkLine(trend: trend) }
             if let share { Text("\(share)%").foregroundStyle(Theme.secondary) }
             Text(IndianMoneyFormat.string(amount)).monospacedDigit()
             if chevron { Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary) }
