@@ -12,6 +12,8 @@ struct ReportsScreen: View {
     /// Keep only the rows (and, inside a row, the expenses) that make up this share of the spending.
     @State private var topPercent = 100.0
     @State private var pane = ReportPane.breakdown
+    /// How the expenses inside an opened row are ordered; kept while she moves between rows.
+    @State private var sort = ExpenseSort.newestFirst
 
     var body: some View {
         NavigationStack {
@@ -86,7 +88,7 @@ struct ReportsScreen: View {
                                   ? "An expense with two tags is counted under both, so the rows can add up to more than the total." : nil) {
                             ForEach(top.rows, id: \.name) { row in
                                 NavigationLink {
-                                    GroupReportScreen(model: model, grouping: model.reportGrouping, name: row.name, topPercent: $topPercent)
+                                    GroupReportScreen(model: model, grouping: model.reportGrouping, name: row.name, topPercent: $topPercent, sort: $sort)
                                 } label: {
                                     ReportLine(
                                         name: row.name, share: row.sharePercent, amount: row.amount, chevron: true,
@@ -171,6 +173,7 @@ struct GroupReportScreen: View {
     let grouping: BreakdownGrouping
     let name: String
     @Binding var topPercent: Double
+    @Binding var sort: ExpenseSort
     @State private var openedExpense: Int64?
     @State private var chosen: Set<String> = []
 
@@ -219,10 +222,10 @@ struct GroupReportScreen: View {
                             .accessibilityIdentifier("clearGroupFilterButton")
                     }
                 }
-                let shown = detail.topExpenses(percent: percent)
-                CardGroup(header: percent >= 100 ? "Expenses, newest first" : "Biggest expenses making up \(percent)%",
+                let shown = detail.topExpenses(percent: percent, sortedBy: sort)
+                CardGroup(header: (percent >= 100 ? "Expenses" : "Biggest expenses making up \(percent)%") + ", " + sort.title.lowercased(),
                           footer: "Tap an expense to see or change it.") {
-                    ForEach(shown.sorted { ($0.date, $0.id ?? 0) > ($1.date, $1.id ?? 0) }, id: \.id) { expense in
+                    ForEach(shown, id: \.id) { expense in
                         Button { openedExpense = expense.id } label: {
                             CardRow(title: expense.description, subtitle: subtitle(expense)) {
                                 Text(IndianMoneyFormat.string(expense.netAmount)).monospacedDigit()
@@ -236,6 +239,18 @@ struct GroupReportScreen: View {
             }
         }
         .cardNavigation(name)
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Menu {
+                    Picker("Sort by", selection: $sort) {
+                        ForEach(ExpenseSort.allCases, id: \.self) { Text($0.title).tag($0) }
+                    }
+                } label: {
+                    Label("Sort", systemImage: "line.3.horizontal.decrease")
+                }
+                .accessibilityIdentifier("reportSortMenu")
+            }
+        }
         .sheet(item: $openedExpense) { id in ExpenseDetailSheet(model: model, expenseID: id) }
     }
 

@@ -239,4 +239,47 @@ struct SpendingBreakdownTests {
 
         #expect(detail.total == .rupees(200))
     }
+
+    private func sortable() throws -> Breakdown {
+        let app = try makeApp()
+        for (rupees, date) in [(100, "2026-10-03"), (600, "2026-10-20"), (300, "2026-10-11")] {
+            try app.addExpense(NewExpense(date: day(date), description: "Item", amount: .rupees(rupees), category: "Food & Dining"))
+        }
+        return try app.groupBreakdown(.category, "Food & Dining", .month(october))
+    }
+
+    @Test(arguments: [
+        (ExpenseSort.newestFirst, [600, 300, 100]),
+        (.oldestFirst, [100, 300, 600]),
+        (.highestFirst, [600, 300, 100]),
+        (.lowestFirst, [100, 300, 600]),
+    ])
+    func theExpensesInARowCanBeSortedByDateOrAmount(sort: ExpenseSort, expected: [Int]) throws {
+        let listed = try sortable().topExpenses(percent: 100, sortedBy: sort)
+
+        #expect(listed.map(\.amount) == expected.map { .rupees($0) })
+    }
+
+    @Test func sortingByDateAndByAmountReallyDiffer() throws {
+        let breakdown = try sortable()
+
+        #expect(breakdown.topExpenses(percent: 100, sortedBy: .newestFirst) != breakdown.topExpenses(percent: 100, sortedBy: .highestFirst).reversed())
+        #expect(breakdown.topExpenses(percent: 100, sortedBy: .highestFirst).map(\.amount) == [.rupees(600), .rupees(300), .rupees(100)])
+    }
+
+    @Test func theSliderStillChoosesWhichExpensesAndTheSortOnlyOrdersThem() throws {
+        let listed = try sortable().topExpenses(percent: 80, sortedBy: .lowestFirst)
+
+        #expect(listed.map(\.amount) == [.rupees(300), .rupees(600)])
+    }
+
+    @Test func expensesOfTheSameAmountKeepTheNewestFirst() throws {
+        let app = try makeApp()
+        for date in ["2026-10-03", "2026-10-09"] {
+            try app.addExpense(NewExpense(date: day(date), description: "Item", amount: .rupees(100), category: "Food & Dining"))
+        }
+        let breakdown = try app.groupBreakdown(.category, "Food & Dining", .month(october))
+
+        #expect(breakdown.topExpenses(percent: 100, sortedBy: .highestFirst).map(\.date) == [day("2026-10-09"), day("2026-10-03")])
+    }
 }

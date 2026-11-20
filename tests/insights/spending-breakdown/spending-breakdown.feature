@@ -108,3 +108,24 @@ Feature: Where the money went
     When she taps "Clear filter"
     Then every expense of the category is listed again
 
+  # The three-line button on an opened row sorts its expenses.
+  Scenario Outline: Priya sorts the expenses inside a row
+    Given expenses of 100 on 2026-10-03, 600 on 2026-10-20 and 300 on 2026-10-11 under Food & Dining
+    When she opens it and chooses "<sort>"
+    Then the amounts are listed <order>
+
+    Examples:
+      | sort           | order         |
+      | Newest first   | 600, 300, 100 |
+      | Oldest first   | 100, 300, 600 |
+      | Highest first  | 600, 300, 100 |
+      | Lowest first   | 100, 300, 600 |
+
+  Scenario: Sorting works together with the top-share slider
+    Given the slider is at 80% and she sorts by Lowest first
+    Then only the expenses making up 80% are listed, smallest first
+
+  Scenario: The choice is kept while she moves between rows
+    When she opens another row
+    Then the same sort is used
+

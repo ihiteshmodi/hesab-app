@@ -141,6 +141,37 @@ final class NewFeaturesUITests: XCTestCase {
         XCTAssertTrue(app.descendants(matching: .any)["normalNoHistory"].exists, "no not-enough-history note")
     }
 
+    @MainActor
+    func testTheThreeLineMenuSortsTheExpensesInsideAReportRow() {
+        let app = launchApp()
+        for (amount, name) in [("100", "Small purchase"), ("900", "Big purchase")] {
+            app.buttons["addMenu"].tap()
+            app.buttons["addExpenseButton"].tap()
+            type(app.textFields["amountField"], amount)
+            type(app.textFields["descriptionField"], name)
+            app.buttons["categoryPicker"].tap()
+            app.buttons["Home & Utilities"].tap()
+            app.buttons["saveExpenseButton"].tap()
+            XCTAssertTrue(app.descendants(matching: .any)["expenseRow"].waitForExistence(timeout: 20))
+        }
+        selectTab(app, "Reports")
+        let row = app.descendants(matching: .any)["reportRow"].firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 20))
+        row.tap()
+
+        let first = app.descendants(matching: .any).matching(identifier: "reportExpenseRow").firstMatch
+        XCTAssertTrue(first.waitForExistence(timeout: 20))
+        XCTAssertTrue(first.label.contains("Big purchase"), "newest first should start with the later one: \(first.label)")
+
+        app.buttons["reportSortMenu"].tap()
+        app.buttons["Lowest first"].tap()
+        XCTAssertTrue(first.label.contains("Small purchase"), "lowest first should start with the small one: \(first.label)")
+
+        app.buttons["reportSortMenu"].tap()
+        app.buttons["Highest first"].tap()
+        XCTAssertTrue(first.label.contains("Big purchase"), "highest first should start with the big one: \(first.label)")
+    }
+
     // MARK: trips
 
     @MainActor

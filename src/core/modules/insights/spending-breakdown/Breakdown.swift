@@ -79,6 +79,11 @@ public struct Breakdown: Equatable, Sendable {
         Self.prefix(expenses.sorted { $0.netAmount > $1.netAmount }, reaching: percent, of: total, amount: \.netAmount)
     }
 
+    /// The expenses kept by `topExpenses(percent:)`, put in the order she chose.
+    public func topExpenses(percent: Int, sortedBy sort: ExpenseSort) -> [Expense] {
+        topExpenses(percent: percent).sorted(by: sort.areInIncreasingOrder)
+    }
+
     /// What the rows kept by `top(percent:)` add up to; this is the "Total spent" to show while the slider is below 100.
     public func shownTotal(percent: Int) -> Money {
         total - top(percent: percent).rest
@@ -98,6 +103,31 @@ public struct Breakdown: Equatable, Sendable {
             sum = sum + amount(item)
         }
         return kept
+    }
+}
+
+/// How the expenses inside an opened report row are ordered.
+public enum ExpenseSort: String, CaseIterable, Sendable {
+    case newestFirst, oldestFirst, highestFirst, lowestFirst
+
+    public var title: String {
+        switch self {
+        case .newestFirst: "Newest first"
+        case .oldestFirst: "Oldest first"
+        case .highestFirst: "Highest first"
+        case .lowestFirst: "Lowest first"
+        }
+    }
+
+    /// By date or by what the expense really cost; ties fall back to the newest, so the list never shuffles.
+    func areInIncreasingOrder(_ a: Expense, _ b: Expense) -> Bool {
+        let newer = (a.date, a.id ?? 0) > (b.date, b.id ?? 0)
+        switch self {
+        case .newestFirst: return newer
+        case .oldestFirst: return (a.date, a.id ?? 0) < (b.date, b.id ?? 0)
+        case .highestFirst: return a.netAmount != b.netAmount ? a.netAmount > b.netAmount : newer
+        case .lowestFirst: return a.netAmount != b.netAmount ? a.netAmount < b.netAmount : newer
+        }
     }
 }
 
