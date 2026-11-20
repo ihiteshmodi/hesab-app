@@ -194,7 +194,14 @@ struct TripPlanPane: View {
 
     private func itemRow(_ item: TripPlanItem) -> some View {
         HStack(spacing: 12) {
-            if !trip.isPlanning, item.payments.isEmpty { tick(isPaid: item.isPaid) { tap(item) } }
+            if !trip.isPlanning {
+                if item.payments.isEmpty {
+                    tick(isPaid: item.isPaid) { tap(item) }
+                } else {
+                    // Each part has its own tick; this keeps the item's name lined up with the other rows.
+                    Image(systemName: "circle").font(.title3).hidden().accessibilityHidden(true)
+                }
+            }
             Button { entry = .editItem(item) } label: {
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {

@@ -103,7 +103,18 @@ final class NewScreensTourUITests: XCTestCase {
             bali.tap()
             app.buttons["Plan"].tap()
             shot("bali-plan")
-            app.swipeUp(); shot("bali-plan-lower"); app.swipeDown()
+            app.swipeUp(); shot("bali-plan-lower"); app.swipeUp(); shot("bali-plan-travel"); app.swipeDown(); app.swipeDown()
+            let leg = app.descendants(matching: .any)["itineraryLeg"].firstMatch
+            app.swipeUp()
+            if leg.waitForExistence(timeout: 5) { leg.tap(); shot("leg-form"); close(app) }
+            app.swipeDown()
+            let villa = app.buttons.matching(NSPredicate(format: "label CONTAINS 'Villa'")).firstMatch
+            if villa.waitForExistence(timeout: 5) {
+                villa.tap(); shot("item-with-parts"); app.swipeUp(); shot("item-with-parts-lower")
+                let cancel = app.buttons["Close"]
+                if cancel.exists { cancel.tap() }
+                Thread.sleep(forTimeInterval: 0.5)
+            }
             app.buttons["Expenses"].tap(); shot("bali-expenses")
             let insights = app.buttons["tripInsightsButton"]
             if insights.exists { insights.tap(); shot("bali-insights"); back(app) }

@@ -124,21 +124,42 @@ extension DemoData {
 
         at(0)
         if let bali = try? app.createTrip(NewTrip(
-            name: "Bali trip", currency: "IDR", rate: Decimal(string: "0.0053"), category: "Lifestyle", subCategory: "Vacation"
+            name: "Bali trip", currency: "IDR", rate: Decimal(string: "0.0053"), category: "Lifestyle", subCategory: "Vacation",
+            endDate: today.adding(days: 40), startDate: today.adding(days: 32)
         )) {
-            let plan: [(String, Int, String, String)] = [
-                ("Flights", 6_500_000, "Transport", "Flight tickets"), ("Villa, 4 nights", 8_000_000, "Lifestyle", "Vacation"),
-                ("Dinners", 2_000_000, "Food & Dining", "Restaurant"), ("Scooter hire", 900_000, "Transport", "Ride share"),
-                ("Shirts and gifts", 1_000_000, "Shopping - Wants", ""),
-            ]
             var ids: [Int64] = []
-            for (name, idr, category, sub) in plan {
-                if let item = try? app.addTripPlanItem(bali.id, NewTripPlanItem(description: name, amount: .rupees(idr), category: category, subCategory: sub)) {
-                    ids.append(item.id)
-                }
+            if let flights = try? app.addTripPlanItem(bali.id, NewTripPlanItem(
+                description: "Flights", amount: .rupees(6_500_000), category: "Transport", subCategory: "Flight tickets",
+                note: "Window seats, 2 checked bags", dueDate: today.adding(days: 3),
+                legs: [
+                    NewTripLeg(mode: .train, from: "Dehradun", to: "Delhi", carrier: "Shatabdi", number: "12018",
+                               departure: today.adding(days: 31), departureMinutes: 17 * 60 + 20, isBooked: true),
+                    NewTripLeg(from: "Delhi", to: "Denpasar", carrier: "IndiGo", number: "6E 1175", departure: today.adding(days: 32),
+                               departureMinutes: 6 * 60 + 40, arrivalDate: today.adding(days: 32), arrivalMinutes: 15 * 60 + 5),
+                    NewTripLeg(from: "Denpasar", to: "Delhi", carrier: "IndiGo", number: "6E 1176", departure: today.adding(days: 40),
+                               departureMinutes: 21 * 60 + 10),
+                ]
+            )) { ids.append(flights.id) }
+            if let villa = try? app.addTripPlanItem(bali.id, NewTripPlanItem(
+                description: "Villa, 4 nights", amount: nil, category: "Lifestyle", subCategory: "Vacation",
+                note: "Advance holds the booking; balance on arrival",
+                payments: [
+                    NewTripPlanPayment(label: "Advance", amount: .rupees(2_500_000), dueDate: today.adding(days: -2)),
+                    NewTripPlanPayment(label: "Balance", amount: .rupees(5_500_000), dueDate: today.adding(days: 30)),
+                ]
+            )) { ids.append(villa.id) }
+            for (name, idr, category, sub, due) in [
+                ("Dinners", 2_000_000, "Food & Dining", "Restaurant", Optional<Int>.none), ("Scooter hire", 900_000, "Transport", "Ride share", nil),
+                ("Visa on arrival", 700_000, "Lifestyle", "Vacation", 2),
+            ] {
+                if let item = try? app.addTripPlanItem(bali.id, NewTripPlanItem(
+                    description: name, amount: .rupees(idr), category: category, subCategory: sub, dueDate: due.map { today.adding(days: $0) }
+                )) { ids.append(item.id) }
             }
             try? app.startTrip(bali.id)
-            for id in ids.prefix(2) { try? app.markTripPlanItemPaid(id, PlanItemPayment(date: today.adding(days: -3))) }
+            if let advance = ((try? app.tripSummary(bali.id))?.plan.items.first { $0.description.hasPrefix("Villa") })?.payments.first {
+                try? app.markTripPlanPaymentPaid(advance.id, PlanItemPayment(date: today.adding(days: -2)))
+            }
             try? app.addTripExpense(bali.id, NewTripExpense(
                 description: "Seafood dinner", date: today.adding(days: -2), amount: .rupees(2_400_000), split: .equal([.me]),
                 category: "Food & Dining", subCategory: "Restaurant"
