@@ -27,7 +27,7 @@ final class PortfolioUITests: XCTestCase {
     }
 
     @MainActor
-    func testTappingAnInvestmentOpensItForEditing() {
+    func testTappingAnInvestmentOpensItsPageAndEditChangesIt() {
         let app = launchApp()
         selectTab(app, "Portfolio")
         app.buttons["addHoldingButton"].tap()
@@ -38,6 +38,8 @@ final class PortfolioUITests: XCTestCase {
         let row = app.buttons.matching(NSPredicate(format: "label CONTAINS 'Stocks'")).firstMatch
         XCTAssertTrue(row.waitForExistence(timeout: 20))
         row.tap()
+        XCTAssertTrue(app.staticTexts["holdingWorth"].waitForExistence(timeout: 20), "the investment's page never opened")
+        app.buttons["holdingEditButton"].tap()
 
         let name = app.textFields["holdingNameField"]
         XCTAssertTrue(name.waitForExistence(timeout: 20))
