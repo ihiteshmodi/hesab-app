@@ -429,6 +429,14 @@ public final class AppDatabase: Sendable {
             }
         }
 
+        migrator.registerMigration("v25-holding-modes") { db in
+            try db.alter(table: "holding") { table in
+                table.add(column: "kind", .text).notNull().defaults(to: "other")
+                table.add(column: "sip_amount_paise", .integer)
+                table.add(column: "sip_day", .integer)
+            }
+        }
+
         return migrator
     }
 }

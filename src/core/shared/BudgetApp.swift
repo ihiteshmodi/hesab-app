@@ -105,6 +105,7 @@ public final class BudgetApp: Sendable {
     public let updateHolding: UpdateHolding
     public let deleteHolding: DeleteHolding
     public let addToHolding: AddToHolding
+    public let updateHoldingWorth: UpdateHoldingWorth
     public let holdingHistory: GetHoldingHistory
     public let holdingDetail: GetHoldingDetail
     public let addAllocatedFund: AddAllocatedFund
@@ -271,6 +272,7 @@ public final class BudgetApp: Sendable {
         setExchangeRate = SetExchangeRate(portfolio: portfolioBook, clock: clock)
         addHolding = AddHolding(portfolio: portfolioBook, setRate: setExchangeRate, clock: clock)
         addToHolding = AddToHolding(portfolio: portfolioBook, clock: clock)
+        updateHoldingWorth = UpdateHoldingWorth(portfolio: portfolioBook, clock: clock)
         holdingHistory = GetHoldingHistory(portfolio: portfolioBook)
         holdingDetail = GetHoldingDetail(portfolio: portfolio, repository: portfolioBook, clock: clock)
         updateHolding = UpdateHolding(portfolio: portfolioBook, setRate: setExchangeRate, clock: clock)

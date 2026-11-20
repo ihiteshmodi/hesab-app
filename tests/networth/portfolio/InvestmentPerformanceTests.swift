@@ -234,6 +234,145 @@ struct HoldingDetailTests {
     }
 }
 
+struct HoldingModeTests {
+    private func sip(
+        _ app: BudgetApp, amount: Int? = 2_000, day sipDay: Int? = 5, bought: String? = "2026-01-10"
+    ) throws -> Int64 {
+        try app.addHolding(NewHolding(
+            name: "Index fund", amount: .rupees(12_000), invested: .rupees(10_000), investedOn: bought.map(day),
+            kind: .sip, sipAmount: amount.map { .rupees($0) }, sipDay: sipDay
+        ))
+        return try #require(try app.portfolio().holdings.first).holding.id
+    }
+
+    @Test func aHoldingHasAModeAndASIPKeepsItsInstalmentAndDay() throws {
+        let app = try makeApp()
+        let id = try sip(app)
+
+        let holding = try app.holdingDetail(id).holding
+
+        #expect(holding.kind == .sip)
+        #expect(holding.sipAmount == .rupees(2_000))
+        #expect(holding.sipDay == 5)
+    }
+
+    @Test func aHoldingWithoutAModeIsOther() throws {
+        let app = try makeApp()
+        try app.addHolding(NewHolding(name: "Gold", amount: .rupees(100)))
+
+        #expect(try app.portfolio().holdings.first?.holding.kind == .other)
+    }
+
+    @Test func aStockKeepsNoInstalmentDetails() throws {
+        let app = try makeApp()
+        try app.addHolding(NewHolding(
+            name: "Stock", amount: .rupees(100), invested: .rupees(90), kind: .stock, sipAmount: .rupees(500), sipDay: 5
+        ))
+
+        let holding = try #require(try app.portfolio().holdings.first).holding
+
+        #expect(holding.kind == .stock)
+        #expect(holding.sipAmount == nil)
+        #expect(holding.sipDay == nil)
+    }
+
+    @Test func aSIPAmountNeedsADay() throws {
+        let app = try makeApp()
+
+        let error = #expect(throws: PortfolioError.self) { _ = try sip(app, day: nil) }
+
+        #expect(error?.message == "Pick the day of the month the instalment goes out.")
+    }
+
+    @Test func aSIPAmountMustBeAboveZero() throws {
+        let app = try makeApp()
+
+        let error = #expect(throws: PortfolioError.self) { _ = try sip(app, amount: 0) }
+
+        #expect(error?.message == "Enter an amount above 0")
+    }
+
+    @Test func theInstalmentIsDueOnceItsDayHasPassedAndNothingWasAddedThisMonth() throws {
+        let app = try makeApp(today: "2026-11-20")
+        let id = try sip(app)
+
+        let detail = try app.holdingDetail(id)
+
+        #expect(detail.instalmentDue)
+        #expect(detail.nextInstalment == day("2026-11-05"))
+    }
+
+    @Test func beforeItsDayTheNextInstalmentIsShownAndNothingIsDue() throws {
+        let app = try makeApp(today: "2026-11-03")
+        let id = try sip(app)
+
+        let detail = try app.holdingDetail(id)
+
+        #expect(!detail.instalmentDue)
+        #expect(detail.nextInstalment == day("2026-11-05"))
+    }
+
+    @Test func addingTheInstalmentMovesTheNextOneToNextMonth() throws {
+        let app = try makeApp(today: "2026-11-20")
+        let id = try sip(app)
+
+        try app.addToHolding(id, amount: .rupees(2_000), on: day("2026-11-05"))
+
+        let detail = try app.holdingDetail(id)
+        #expect(!detail.instalmentDue)
+        #expect(detail.nextInstalment == day("2026-12-05"))
+    }
+
+    @Test func aShortMonthUsesItsLastDay() throws {
+        let app = try makeApp(today: "2026-11-30")
+        let id = try sip(app, day: 31)
+
+        let detail = try app.holdingDetail(id)
+
+        #expect(detail.instalmentDue)
+        #expect(detail.nextInstalment == day("2026-11-30"))
+    }
+
+    @Test func buyingInTheMonthCountsAsThatMonthsInstalment() throws {
+        let app = try makeApp(today: "2026-11-20")
+        let id = try sip(app, bought: "2026-11-02")
+
+        #expect(try app.holdingDetail(id).instalmentDue == false)
+    }
+
+    @Test func aStockHasNoInstalment() throws {
+        let app = try makeApp()
+        try app.addHolding(NewHolding(name: "Stock", amount: .rupees(100), invested: .rupees(90), kind: .stock))
+        let id = try #require(try app.portfolio().holdings.first).holding.id
+
+        let detail = try app.holdingDetail(id)
+
+        #expect(!detail.instalmentDue)
+        #expect(detail.nextInstalment == nil)
+    }
+
+    @Test func updatingOnlyTheWorthKeepsEverythingElseAndAddsAPoint() throws {
+        let app = try makeApp(today: "2026-11-20")
+        let id = try sip(app)
+
+        try app.updateHoldingWorth(id, .rupees(13_000))
+
+        let detail = try app.holdingDetail(id)
+        #expect(detail.holding.amount == .rupees(13_000))
+        #expect(detail.holding.invested == .rupees(10_000))
+        #expect(detail.holding.kind == .sip)
+        #expect(detail.holding.sipDay == 5)
+        #expect(detail.history.last?.value == .rupees(13_000))
+    }
+
+    @Test func theNewWorthCannotBeNegative() throws {
+        let app = try makeApp()
+        let id = try sip(app)
+
+        #expect(throws: PortfolioError.self) { try app.updateHoldingWorth(id, nil) }
+    }
+}
+
 final class SteppingClock: DayClock, @unchecked Sendable {
     var date: CalendarDate
     init(_ iso: String) { date = day(iso) }

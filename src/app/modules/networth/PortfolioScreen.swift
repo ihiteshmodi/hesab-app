@@ -154,6 +154,7 @@ struct PortfolioScreen: View {
     private func holdingSubtitle(_ line: HoldingLine) -> String? {
         let holding = line.holding
         var parts: [String] = []
+        if holding.kind != .other { parts.append(holding.kind.title) }
         if let code = holding.currency { parts.append("\(code) \(IndianMoneyFormat.plain(holding.amount))") }
         if let invested = holding.invested, !hidden {
             parts.append("paid \(holding.currency.map { "\($0) " } ?? "")\(IndianMoneyFormat.plain(invested))")
@@ -257,6 +258,9 @@ struct HoldingSheet: View {
     @State private var name = ""
     @State private var amountText = ""
     @State private var investedText = ""
+    @State private var kind = HoldingKind.other
+    @State private var sipAmountText = ""
+    @State private var sipDay = 1
     @State private var hasBoughtOn = false
     @State private var boughtOn = Date()
     @State private var currency = ""
@@ -268,9 +272,25 @@ struct HoldingSheet: View {
             CardScreen {
                 CardGroup(footer: "Fill in what you paid to see whether it is up or down. Update what it is worth whenever you like.") {
                     TextField("Name", text: $name).rowPadding().accessibilityIdentifier("holdingNameField")
+                    Picker("Kind", selection: $kind) {
+                        ForEach(HoldingKind.allCases, id: \.self) { Text($0.title).tag($0) }
+                    }
+                    .pickerStyle(.segmented).rowPadding().accessibilityIdentifier("holdingKindPicker")
                     TextField("Worth today", text: $amountText).keyboardType(.decimalPad).rowPadding().accessibilityIdentifier("holdingAmountField")
                     TextField("Amount invested (what you paid, optional)", text: $investedText).keyboardType(.decimalPad).rowPadding()
                         .accessibilityIdentifier("holdingInvestedField")
+                    if kind == .sip {
+                        TextField("Usual monthly instalment (optional)", text: $sipAmountText).keyboardType(.decimalPad).rowPadding()
+                            .accessibilityIdentifier("holdingSipAmountField")
+                        if !sipAmountText.trimmingCharacters(in: .whitespaces).isEmpty {
+                            FieldRow("Goes out on day") {
+                                Picker("Day", selection: $sipDay) {
+                                    ForEach(1...31, id: \.self) { Text("\($0)").tag($0) }
+                                }
+                                .labelsHidden().accessibilityIdentifier("holdingSipDayPicker")
+                            }
+                        }
+                    }
                     Toggle("I know the day I bought it", isOn: $hasBoughtOn).rowPadding().accessibilityIdentifier("holdingDateToggle")
                     if hasBoughtOn {
                         FieldRow("Bought on") {
@@ -293,6 +313,9 @@ struct HoldingSheet: View {
                 name = editing.name
                 amountText = IndianMoneyFormat.plain(editing.amount)
                 investedText = editing.invested.map { IndianMoneyFormat.plain($0) } ?? ""
+                kind = editing.kind
+                sipAmountText = editing.sipAmount.map { IndianMoneyFormat.plain($0) } ?? ""
+                sipDay = editing.sipDay ?? 1
                 hasBoughtOn = editing.investedOn != nil
                 boughtOn = editing.investedOn?.instant() ?? Date()
                 currency = editing.currency ?? ""
@@ -302,15 +325,12 @@ struct HoldingSheet: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
                         let chosen = currency.isEmpty ? nil : currency
-                        errorMessage = editing.map {
-                            model.updateHolding(
-                                $0.id, name: name, amountText: amountText, investedText: investedText,
-                                investedOn: hasBoughtOn ? CalendarDate(boughtOn) : nil, currency: chosen, rateText: rateText
-                            )
-                        } ?? model.addHolding(
+                        let form = HoldingForm(
                             name: name, amountText: amountText, investedText: investedText,
-                            investedOn: hasBoughtOn ? CalendarDate(boughtOn) : nil, currency: chosen, rateText: rateText
+                            investedOn: hasBoughtOn ? CalendarDate(boughtOn) : nil, currency: chosen, rateText: rateText, kind: kind,
+                            sipAmountText: sipAmountText, sipDay: sipDay
                         )
+                        errorMessage = editing.map { model.updateHolding($0.id, form) } ?? model.addHolding(form)
                         if errorMessage == nil { dismiss() }
                     }
                     .accessibilityIdentifier("saveHoldingButton")
@@ -360,27 +380,31 @@ struct HoldingHistoryChart: View {
     let points: [HoldingPoint]
 
     var body: some View {
-        if points.count > 1 {
-            CardPanel {
-                CardCaption("Worth over time")
-                Chart {
-                    ForEach(points, id: \.date) { point in
-                        LineMark(x: .value("Date", point.date.instant()), y: .value("Worth", chartValue(point.value)), series: .value("Line", "Worth"))
-                            .foregroundStyle(Theme.blue)
-                        if let invested = point.invested {
-                            LineMark(x: .value("Date", point.date.instant()), y: .value("Paid", chartValue(invested)), series: .value("Line", "Paid"))
-                                .foregroundStyle(.gray).lineStyle(StrokeStyle(lineWidth: 1.5, dash: [4, 3]))
-                        }
+        CardPanel {
+            CardCaption("Worth over time")
+            Chart {
+                ForEach(points, id: \.date) { point in
+                    LineMark(x: .value("Date", point.date.instant()), y: .value("Worth", chartValue(point.value)), series: .value("Line", "Worth"))
+                        .foregroundStyle(Theme.blue)
+                    PointMark(x: .value("Date", point.date.instant()), y: .value("Worth", chartValue(point.value)))
+                        .foregroundStyle(Theme.blue).symbolSize(points.count > 12 ? 0 : 30)
+                    if let invested = point.invested {
+                        LineMark(x: .value("Date", point.date.instant()), y: .value("Paid", chartValue(invested)), series: .value("Line", "Paid"))
+                            .foregroundStyle(.gray).lineStyle(StrokeStyle(lineWidth: 1.5, dash: [4, 3]))
                     }
                 }
-                .moneyYAxis()
-                .frame(height: 130)
-                .accessibilityIdentifier("holdingHistoryChart")
-                HStack(spacing: 14) {
-                    Label("Worth", systemImage: "circle.fill").foregroundStyle(Theme.blue)
-                    Label("Paid", systemImage: "circle.fill").foregroundStyle(.gray)
-                }
-                .font(.caption).labelStyle(.titleAndIcon)
+            }
+            .chartYScale(domain: .automatic(includesZero: false))
+            .moneyYAxis()
+            .frame(height: 130)
+            .accessibilityIdentifier("holdingHistoryChart")
+            HStack(spacing: 14) {
+                Label("Worth", systemImage: "circle.fill").foregroundStyle(Theme.blue)
+                Label("Paid", systemImage: "circle.fill").foregroundStyle(.gray)
+            }
+            .font(.caption).labelStyle(.titleAndIcon)
+            if points.count < 2 {
+                Text("Update the worth now and then and this line fills in.").font(.footnote).foregroundStyle(Theme.secondary)
             }
         }
     }

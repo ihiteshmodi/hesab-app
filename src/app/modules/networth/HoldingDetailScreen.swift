@@ -8,17 +8,22 @@ struct HoldingDetailScreen: View {
     let hidden: Bool
     @State private var editing: Holding?
     @State private var addingMoney: Holding?
+    @State private var updatingWorth: Holding?
+    @State private var errorMessage: String?
 
     var body: some View {
         Group {
             if let detail = model.holdingDetail(holdingID) {
                 CardScreen {
                     summary(detail)
+                    instalment(detail)
                     facts(detail)
                     HoldingHistoryChart(points: detail.history)
                     additions(detail)
+                    Button("Update Worth") { updatingWorth = detail.holding }
+                        .buttonStyle(GreyButtonStyle()).accessibilityIdentifier("holdingUpdateWorthButton")
                     if detail.holding.invested != nil {
-                        Button("Add Money") { addingMoney = detail.holding }
+                        Button(detail.holding.kind == .sip ? "Add Instalment" : "Add Money") { addingMoney = detail.holding }
                             .buttonStyle(GreyButtonStyle()).accessibilityIdentifier("holdingAddMoneyButton")
                     }
                 }
@@ -30,6 +35,7 @@ struct HoldingDetailScreen: View {
                 }
                 .sheet(item: $editing) { HoldingSheet(model: model, editing: $0) }
                 .sheet(item: $addingMoney) { AddMoneySheet(model: model, holding: $0) }
+                .sheet(item: $updatingWorth) { UpdateWorthSheet(model: model, holding: $0) }
             } else {
                 Text("That investment no longer exists.").foregroundStyle(Theme.secondary)
             }
@@ -71,6 +77,31 @@ struct HoldingDetailScreen: View {
                 Text("Fill in what you paid (Edit) to see whether it is up or down.").font(.footnote).foregroundStyle(Theme.secondary)
             }
         }
+    }
+
+    /// For a SIP: what goes out and when, and a one-tap add once this month's instalment is due.
+    @ViewBuilder private func instalment(_ detail: HoldingDetail) -> some View {
+        let holding = detail.holding
+        if holding.kind == .sip, let instalment = holding.sipAmount, let day = holding.sipDay, let next = detail.nextInstalment {
+            CardGroup(header: "SIP") {
+                CardRow(title: "Monthly instalment", subtitle: "goes out on the \(day)\(Self.ordinal(day))") {
+                    Text(amount(instalment, holding)).monospacedDigit()
+                }
+                if detail.instalmentDue {
+                    Button { errorMessage = model.addToHolding(holding.id, amountText: IndianMoneyFormat.plain(instalment), on: next) } label: {
+                        Text("Add \(amount(instalment, holding)) for \(next.monthName)").foregroundStyle(Theme.blue).rowPadding()
+                    }
+                    .buttonStyle(.plain).accessibilityIdentifier("addInstalmentButton")
+                    if let errorMessage { Text(errorMessage).foregroundStyle(Theme.red).rowPadding() }
+                } else {
+                    CardRow(title: "Next instalment") { Text(next.shortTitleWithYear).foregroundStyle(Theme.secondary) }
+                }
+            }
+        }
+    }
+
+    static func ordinal(_ day: Int) -> String {
+        (11...13).contains(day % 100) ? "th" : ["th", "st", "nd", "rd"][day % 10 < 4 ? day % 10 : 0]
     }
 
     @ViewBuilder private func facts(_ detail: HoldingDetail) -> some View {
@@ -115,7 +146,46 @@ struct HoldingDetailScreen: View {
     }
 }
 
+/// The quick update: type what it is worth today.
+struct UpdateWorthSheet: View {
+    let model: BudgetViewModel
+    let holding: Holding
+    @Environment(\.dismiss) private var dismiss
+    @State private var amountText = ""
+    @State private var errorMessage: String?
+
+    var body: some View {
+        NavigationStack {
+            CardScreen {
+                CardGroup(footer: "Only what it is worth changes. The new value is added to the line on the page.") {
+                    CardRow(title: holding.name) { Text(IndianMoneyFormat.plain(holding.amount)).foregroundStyle(Theme.secondary) }
+                    TextField("Worth today", text: $amountText).keyboardType(.decimalPad).rowPadding()
+                        .accessibilityIdentifier("updateWorthField")
+                    if let errorMessage { Text(errorMessage).foregroundStyle(Theme.red).rowPadding() }
+                }
+            }
+            .cardNavigation("Update Worth")
+            .onAppear { if amountText.isEmpty { amountText = IndianMoneyFormat.plain(holding.amount) } }
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") {
+                        errorMessage = model.updateHoldingWorth(holding.id, amountText: amountText)
+                        if errorMessage == nil { dismiss() }
+                    }
+                    .accessibilityIdentifier("saveWorthButton")
+                }
+            }
+        }
+    }
+}
+
 extension CalendarDate {
+    /// "November".
+    var monthName: String {
+        ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"][month - 1]
+    }
+
     /// "20 Nov 2025".
     var shortTitleWithYear: String { "\(shortTitle) \(year)" }
 }

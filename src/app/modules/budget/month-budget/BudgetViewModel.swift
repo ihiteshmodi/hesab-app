@@ -314,16 +314,10 @@ final class BudgetViewModel {
         return run { try app.setBankBalance(amount) }
     }
 
-    func addHolding(
-        name: String, amountText: String, investedText: String, investedOn: CalendarDate?, currency: String?, rateText: String
-    ) -> String? {
-        run { try app.addHolding(newHolding(name, amountText, investedText, investedOn, currency, rateText)) }
-    }
-
-    func updateHolding(
-        _ id: Int64, name: String, amountText: String, investedText: String, investedOn: CalendarDate?, currency: String?, rateText: String
-    ) -> String? {
-        run { try app.updateHolding(id, newHolding(name, amountText, investedText, investedOn, currency, rateText)) }
+    func addHolding(_ form: HoldingForm) -> String? { run { try app.addHolding(newHolding(form)) } }
+    func updateHolding(_ id: Int64, _ form: HoldingForm) -> String? { run { try app.updateHolding(id, newHolding(form)) } }
+    func updateHoldingWorth(_ id: Int64, amountText: String) -> String? {
+        run { try app.updateHoldingWorth(id, MoneyInput.parse(amountText)) }
     }
 
     func addToHolding(_ id: Int64, amountText: String, on date: CalendarDate) -> String? {
@@ -336,14 +330,15 @@ final class BudgetViewModel {
 
     /// An empty "amount invested" box means she does not track what she paid; text that is not a number is passed on as
     /// a negative amount so the core refuses it with its usual message.
-    private func newHolding(
-        _ name: String, _ amountText: String, _ investedText: String, _ investedOn: CalendarDate?, _ currency: String?, _ rateText: String
-    ) -> NewHolding {
-        NewHolding(
-            name: name, amount: MoneyInput.parse(amountText), currency: currency,
-            rate: Decimal(string: rateText.trimmingCharacters(in: .whitespaces)),
-            invested: investedText.trimmingCharacters(in: .whitespaces).isEmpty ? nil : MoneyInput.parse(investedText) ?? Money(paise: -1),
-            investedOn: investedOn
+    private func newHolding(_ form: HoldingForm) -> NewHolding {
+        func optionalMoney(_ text: String, unreadable: Money) -> Money? {
+            text.trimmingCharacters(in: .whitespaces).isEmpty ? nil : MoneyInput.parse(text) ?? unreadable
+        }
+        return NewHolding(
+            name: form.name, amount: MoneyInput.parse(form.amountText), currency: form.currency,
+            rate: Decimal(string: form.rateText.trimmingCharacters(in: .whitespaces)),
+            invested: optionalMoney(form.investedText, unreadable: Money(paise: -1)), investedOn: form.investedOn, kind: form.kind,
+            sipAmount: optionalMoney(form.sipAmountText, unreadable: .zero), sipDay: form.sipDay
         )
     }
 
@@ -512,4 +507,17 @@ final class BudgetViewModel {
             return "Could not do that. Try again."
         }
     }
+}
+
+/// What the Add or Edit Investment form holds.
+struct HoldingForm {
+    var name = ""
+    var amountText = ""
+    var investedText = ""
+    var investedOn: CalendarDate?
+    var currency: String?
+    var rateText = ""
+    var kind = HoldingKind.other
+    var sipAmountText = ""
+    var sipDay: Int?
 }

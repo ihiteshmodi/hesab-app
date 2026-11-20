@@ -94,3 +94,47 @@ Feature: Is this investment up or down?
     Given "Gold" has no date and no amount invested
     Then the page shows its worth and offers to fill in what she paid
 
+  # Feedback on the mock-up: every investment draws its worth over time, and each one has a mode.
+  Scenario: Every investment draws worth over time, stock or SIP
+    Given "Groww Stocks" has had its worth noted twice
+    Then its page shows the worth-over-time line, just as a SIP's does
+
+  Scenario: A holding with one noted value still shows the chart area
+    Given "Groww Stocks" has had its worth noted once
+    Then its page shows the single point and says to update the worth now and then
+
+  Scenario: Updating the worth is one quick step
+    When she taps "Update Worth" on a page and types 11,500
+    Then only the worth changes and a new point is drawn
+
+  Scenario: An investment is a Stock, a SIP or Other
+    When she adds "Index fund" as a SIP with 2,000 on the 5th
+    Then it is listed as a SIP and its page says "2,000 on the 5th"
+    And a Stock or Other has no instalment fields
+
+  Scenario: A SIP amount needs a day
+    When she saves a SIP of 2,000 with no day
+    Then she sees "Pick the day of the month the instalment goes out."
+
+  Scenario: A SIP amount must be above zero
+    When she saves a SIP of 0
+    Then she sees "Enter an amount above 0"
+
+  Scenario: The page says when this month's instalment is due
+    Given a SIP of 2,000 on the 5th and today is the 20th with nothing added this month
+    Then the page says the instalment is due and offers "Add 2,000 for November"
+    When she adds it
+    Then the page shows the next instalment on 5 December
+
+  Scenario: Before the day, the page shows the next instalment
+    Given today is the 3rd
+    Then the next instalment is on the 5th and nothing is due
+
+  Scenario: A short month uses its last day
+    Given a SIP on the 31st and today is 30 November with nothing added
+    Then the instalment is due as of 30 November
+
+  Scenario: Buying in the month counts as that month's instalment
+    Given the SIP was first bought this month
+    Then nothing is due this month
+
