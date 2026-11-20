@@ -162,23 +162,25 @@ final class TripRepository: Sendable {
     private static func planItem(_ row: Row) -> TripPlanItem {
         TripPlanItem(
             id: row["id"], tripID: row["trip_id"], description: row["description"], amount: Money(paise: row["amount_paise"]),
-            tag: row["tag"], paidExpenseID: row["trip_expense_id"]
+            tag: row["tag"], category: row["category"], subCategory: row["sub_category"], paidExpenseID: row["trip_expense_id"]
         )
     }
 
-    func addPlanItem(tripID: Int64, description: String, amount: Money, tag: String) throws {
+    func addPlanItem(tripID: Int64, description: String, amount: Money, tag: String, category: String, subCategory: String) throws {
         try database.writer.write { db in
+            let sub = try CategoryRepository.canonicalSub(db, category: category, subCategory) ?? ""
             try db.execute(sql: """
-                INSERT INTO trip_plan_item (trip_id, description, amount_paise, tag) VALUES (?, ?, ?, ?)
-                """, arguments: [tripID, description, amount.paise, tag])
+                INSERT INTO trip_plan_item (trip_id, description, amount_paise, tag, category, sub_category) VALUES (?, ?, ?, ?, ?, ?)
+                """, arguments: [tripID, description, amount.paise, tag, category, sub])
         }
     }
 
-    func updatePlanItem(_ id: Int64, description: String, amount: Money, tag: String) throws {
+    func updatePlanItem(_ id: Int64, description: String, amount: Money, tag: String, category: String, subCategory: String) throws {
         try database.writer.write { db in
+            let sub = try CategoryRepository.canonicalSub(db, category: category, subCategory) ?? ""
             try db.execute(sql: """
-                UPDATE trip_plan_item SET description = ?, amount_paise = ?, tag = ? WHERE id = ?
-                """, arguments: [description, amount.paise, tag, id])
+                UPDATE trip_plan_item SET description = ?, amount_paise = ?, tag = ?, category = ?, sub_category = ? WHERE id = ?
+                """, arguments: [description, amount.paise, tag, category, sub, id])
             guard db.changesCount > 0 else { throw TripError.planItemNotFound(id) }
         }
     }
@@ -241,7 +243,8 @@ final class TripRepository: Sendable {
                     amount: Money(paise: row["amount_paise"]), paidBy: Participant(stored: row["paid_by"]),
                     paidWith: ExpensePayment(rawValue: row["paid_with"]) ?? .bank, shares: mine,
                     paidInHome: (row["paid_in_home_paise"] as Int?).map { Money(paise: $0) },
-                    tag: row["tag"], note: row["note"], hasReceipt: withReceipt.contains(id)
+                    tag: row["tag"], category: row["category"], subCategory: row["sub_category"], note: row["note"],
+                    hasReceipt: withReceipt.contains(id)
                 )
             }
         }
@@ -258,25 +261,30 @@ final class TripRepository: Sendable {
 
     func saveExpense(
         id: Int64?, tripID: Int64, description: String, date: CalendarDate, amount: Money, paidBy: Participant,
-        paidWith: ExpensePayment, shares: [Participant: Money], paidInHome: Money?, tag: String, note: String
+        paidWith: ExpensePayment, shares: [Participant: Money], paidInHome: Money?, tag: String, category: String,
+        subCategory: String, note: String
     ) throws -> TripExpense {
         let savedID = try database.writer.write { db -> Int64 in
+            let subCategory = try CategoryRepository.canonicalSub(db, category: category, subCategory) ?? ""
             let savedID: Int64
             if let id {
                 try db.execute(sql: """
                     UPDATE trip_expense SET description = ?, date = ?, amount_paise = ?, paid_by = ?, paid_in_home_paise = ?,
-                        paid_with = ?, tag = ?, note = ? WHERE id = ?
+                        paid_with = ?, tag = ?, category = ?, sub_category = ?, note = ? WHERE id = ?
                     """, arguments: [
-                        description, date.isoString, amount.paise, paidBy.storedID, paidInHome?.paise, paidWith.rawValue, tag, note, id,
+                        description, date.isoString, amount.paise, paidBy.storedID, paidInHome?.paise, paidWith.rawValue, tag,
+                        category, subCategory, note, id,
                     ])
                 try db.execute(sql: "DELETE FROM trip_share WHERE trip_expense_id = ?", arguments: [id])
                 savedID = id
             } else {
                 try db.execute(sql: """
-                    INSERT INTO trip_expense (trip_id, description, date, amount_paise, paid_by, paid_in_home_paise, paid_with, tag, note)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    INSERT INTO trip_expense (
+                        trip_id, description, date, amount_paise, paid_by, paid_in_home_paise, paid_with, tag, category, sub_category, note
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """, arguments: [
-                        tripID, description, date.isoString, amount.paise, paidBy.storedID, paidInHome?.paise, paidWith.rawValue, tag, note,
+                        tripID, description, date.isoString, amount.paise, paidBy.storedID, paidInHome?.paise, paidWith.rawValue, tag,
+                        category, subCategory, note,
                     ])
                 savedID = db.lastInsertedRowID
             }

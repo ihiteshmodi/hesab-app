@@ -84,3 +84,14 @@ Feature: Trip planner
   Scenario: Deleting the trip removes its plan
     When I delete the trip
     Then its plan is gone
+
+  Scenario: Plan items use the app's categories and sub-categories
+    When I plan "Flights" for IDR 6,000,000 under "Transport" > "Flight"
+    Then the plan shows its total by category as well as by tag
+
+  Scenario: Ticking an item as paid keeps its category and sub-category
+    Given the trip has started and "Flights" is planned under "Transport" > "Flight"
+    When I tick "Flights" as paid
+    Then the trip expense "Flights" is under "Transport" > "Flight"
+    And the main ledger still holds one entry for the trip
+

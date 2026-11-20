@@ -44,8 +44,11 @@ struct TripExpenseDetailScreen: View {
                         }
                     }
                 }
-                if !expense.tag.isEmpty || !expense.note.isEmpty {
+                if expense.categoryText != nil || !expense.tag.isEmpty || !expense.note.isEmpty {
                     CardGroup(header: "Details") {
+                        if let category = expense.categoryText {
+                            CardRow(title: "Category") { Text(category).foregroundStyle(Theme.secondary) }
+                        }
                         if !expense.tag.isEmpty {
                             CardRow(title: "Tag") { Text(expense.tag).foregroundStyle(Theme.secondary) }
                         }
@@ -275,6 +278,14 @@ struct TripInsightsScreen: View {
                     .padding(18)
                     ForEach(owed) { item in
                         CardRow(title: item.name) { Text(model.tripText(Money(paise: item.paise), trip)).monospacedDigit() }
+                    }
+                }
+                CardGroup(header: "Spend by category") {
+                    if summary.spendByCategory.isEmpty { Text("No expenses yet.").foregroundStyle(Theme.secondary).rowPadding() }
+                    ForEach(summary.spendByCategory, id: \.category) { item in
+                        CardRow(title: item.category.isEmpty ? "No category" : item.category) {
+                            Text(model.tripText(item.amount, trip)).monospacedDigit()
+                        }
                     }
                 }
                 CardGroup(header: "Spend by tag") {

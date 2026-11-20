@@ -133,13 +133,16 @@ public struct NewTripExpense: Sendable {
     /// What the card actually charged in the home currency for the whole expense; otherwise the trip rate is used.
     public var paidInHome: Money?
     public var tag: String
+    /// From the main category list; blank for none. A new sub-category typed here joins that list.
+    public var category: String
+    public var subCategory: String
     public var note: String
     public var receipt: Data?
 
     public init(
         description: String, date: CalendarDate? = nil, amount: Money?, paidBy: Participant = .me,
         paidWith: ExpensePayment = .bank, split: SplitMethod, paidInHome: Money? = nil, tag: String = "",
-        note: String = "", receipt: Data? = nil
+        category: String = "", subCategory: String = "", note: String = "", receipt: Data? = nil
     ) {
         self.description = description
         self.date = date
@@ -149,6 +152,8 @@ public struct NewTripExpense: Sendable {
         self.split = split
         self.paidInHome = paidInHome
         self.tag = tag
+        self.category = category
+        self.subCategory = subCategory
         self.note = note
         self.receipt = receipt
     }
@@ -165,6 +170,8 @@ public struct TripExpense: Equatable, Sendable {
     public let shares: [Participant: Money]
     public let paidInHome: Money?
     public let tag: String
+    public let category: String
+    public let subCategory: String
     public let note: String
     public let hasReceipt: Bool
 }
@@ -176,6 +183,8 @@ public struct TripPlanItem: Equatable, Sendable {
     public let description: String
     public let amount: Money
     public let tag: String
+    public let category: String
+    public let subCategory: String
     /// The trip expense made when the item was ticked as paid.
     public let paidExpenseID: Int64?
 
@@ -186,11 +195,15 @@ public struct NewTripPlanItem: Sendable {
     public var description: String
     public var amount: Money?
     public var tag: String
+    public var category: String
+    public var subCategory: String
 
-    public init(description: String, amount: Money?, tag: String = "") {
+    public init(description: String, amount: Money?, tag: String = "", category: String = "", subCategory: String = "") {
         self.description = description
         self.amount = amount
         self.tag = tag
+        self.category = category
+        self.subCategory = subCategory
     }
 }
 
@@ -224,6 +237,8 @@ public struct TripPlan: Equatable, Sendable {
     public let paidTotal: Money
     /// Estimates by tag, largest first.
     public let byTag: [TagSpend]
+    /// Estimates by main category, largest first; items with none are together under a blank name.
+    public let byCategory: [CategorySpend]
 }
 
 public struct TripSettlement: Equatable, Sendable {
@@ -272,6 +287,12 @@ public struct TagSpend: Equatable, Sendable {
     public let amount: Money
 }
 
+public struct CategorySpend: Equatable, Sendable {
+    /// Blank for spending with no category.
+    public let category: String
+    public let amount: Money
+}
+
 public struct ParticipantTotal: Equatable, Sendable {
     public let participant: Participant
     public let paid: Money
@@ -305,6 +326,7 @@ public struct TripSummary: Equatable, Sendable {
     public let extraReceivedHome: Money
     public let cash: TripCash
     public let spendByTag: [TagSpend]
+    public let spendByCategory: [CategorySpend]
     public let totals: [ParticipantTotal]
     public let plan: TripPlan
 }

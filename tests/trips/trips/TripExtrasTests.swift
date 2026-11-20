@@ -274,4 +274,52 @@ struct TripExtrasTests {
 
         #expect(throws: TripError.notFound(7)) { try app.updateTrip(7, NewTrip(name: "x", category: "Lifestyle")) }
     }
+
+    // MARK: the app's categories inside a trip
+
+    @Test func aTripExpenseKeepsItsMainCategoryAndSubCategoryAndTheLedgerStaysOneEntry() throws {
+        let b = try bali()
+
+        try b.app.addTripExpense(b.trip.id, NewTripExpense(
+            description: "Dinner", amount: .rupees(400_000), split: .equal([.me]), category: "Food & Dining", subCategory: "Restaurant"
+        ))
+        try b.app.addTripExpense(b.trip.id, NewTripExpense(
+            description: "Taxi", amount: .rupees(100_000), split: .equal([.me]), category: "Transport"
+        ))
+
+        let expense = try #require(try b.summary().expenses.first { $0.description == "Dinner" })
+        #expect(expense.category == "Food & Dining")
+        #expect(expense.subCategory == "Restaurant")
+        let ledger = try b.app.monthBudget(for: .init(year: 2026, month: 10)).expenses
+        #expect(ledger.map(\.description) == ["Bali trip expenses"])
+        #expect(ledger.first?.category == "Lifestyle")
+    }
+
+    @Test func aSubCategoryTypedInATripJoinsTheMainList() throws {
+        let b = try bali()
+
+        try b.app.addTripExpense(b.trip.id, NewTripExpense(
+            description: "Ferry", amount: .rupees(100_000), split: .equal([.me]), category: "Transport", subCategory: "Ferry"
+        ))
+
+        let transport = try #require(try b.app.categories().first { $0.name == "Transport" })
+        #expect(transport.subCategories.map(\.name).contains("Ferry"))
+    }
+
+    @Test func spendByCategoryAddsUpPerCategoryBiggestFirstWithBlankOnesTogether() throws {
+        let b = try bali()
+        for (name, idr, category) in [("Dinner", 400_000, "Food & Dining"), ("Lunch", 100_000, "Food & Dining"), ("Scooter", 300_000, "Transport"), ("Gift", 50_000, "")] {
+            try b.app.addTripExpense(b.trip.id, NewTripExpense(
+                description: name, amount: .rupees(idr), split: .equal([.me]), category: category
+            ))
+        }
+
+        let spend = try b.summary().spendByCategory
+
+        #expect(spend == [
+            CategorySpend(category: "Food & Dining", amount: .rupees(500_000)),
+            CategorySpend(category: "Transport", amount: .rupees(300_000)),
+            CategorySpend(category: "", amount: .rupees(50_000)),
+        ])
+    }
 }

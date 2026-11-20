@@ -229,12 +229,20 @@ final class BudgetViewModel {
     func deleteTripPlanItem(_ id: Int64) -> String? { run { try app.deleteTripPlanItem(id) } }
     func unmarkTripPlanItemPaid(_ id: Int64) -> String? { run { try app.unmarkTripPlanItemPaid(id) } }
 
-    func addTripPlanItem(_ tripID: Int64, description: String, amountText: String, tag: String) -> String? {
-        run { try app.addTripPlanItem(tripID, NewTripPlanItem(description: description, amount: MoneyInput.parse(amountText), tag: tag)) }
+    func addTripPlanItem(_ tripID: Int64, description: String, amountText: String, tag: String, category: String, subCategory: String) -> String? {
+        run {
+            try app.addTripPlanItem(tripID, NewTripPlanItem(
+                description: description, amount: MoneyInput.parse(amountText), tag: tag, category: category, subCategory: subCategory
+            ))
+        }
     }
 
-    func updateTripPlanItem(_ id: Int64, description: String, amountText: String, tag: String) -> String? {
-        run { try app.updateTripPlanItem(id, NewTripPlanItem(description: description, amount: MoneyInput.parse(amountText), tag: tag)) }
+    func updateTripPlanItem(_ id: Int64, description: String, amountText: String, tag: String, category: String, subCategory: String) -> String? {
+        run {
+            try app.updateTripPlanItem(id, NewTripPlanItem(
+                description: description, amount: MoneyInput.parse(amountText), tag: tag, category: category, subCategory: subCategory
+            ))
+        }
     }
 
     func markTripPlanItemPaid(

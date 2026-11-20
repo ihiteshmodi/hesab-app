@@ -235,4 +235,49 @@ struct TripPlannerTests {
 
         #expect(throws: TripError.self) { try p.app.tripSummary(p.trip.id) }
     }
+
+    // MARK: the app's categories in the plan
+
+    @Test func planItemsKeepTheirCategoryAndTotalByCategory() throws {
+        let p = try planning()
+        try p.app.addTripPlanItem(p.trip.id, NewTripPlanItem(
+            description: "Flights", amount: .rupees(6_000_000), category: "Transport", subCategory: "Flight"
+        ))
+        try p.app.addTripPlanItem(p.trip.id, NewTripPlanItem(description: "Ferry", amount: .rupees(500_000), category: "Transport"))
+        try p.app.addTripPlanItem(p.trip.id, NewTripPlanItem(description: "Dinners", amount: .rupees(2_000_000), category: "Food & Dining"))
+
+        let plan = try p.summary().plan
+
+        #expect(plan.items.first?.category == "Transport")
+        #expect(plan.items.first?.subCategory == "Flight")
+        #expect(plan.byCategory == [
+            CategorySpend(category: "Transport", amount: .rupees(6_500_000)),
+            CategorySpend(category: "Food & Dining", amount: .rupees(2_000_000)),
+        ])
+    }
+
+    @Test func tickingAPlanItemKeepsItsCategoryOnTheExpenseAndTheLedgerStaysOneEntry() throws {
+        let p = try planning(started: true)
+        let flights = try p.app.addTripPlanItem(p.trip.id, NewTripPlanItem(
+            description: "Flights", amount: .rupees(6_000_000), category: "Transport", subCategory: "Flight"
+        ))
+
+        try p.app.markTripPlanItemPaid(flights.id, PlanItemPayment(date: day("2026-10-12")))
+
+        let expense = try #require(try p.expense(named: "Flights"))
+        #expect(expense.category == "Transport")
+        #expect(expense.subCategory == "Flight")
+        #expect(try p.app.monthBudget(for: october).expenses.count == 1)
+    }
+
+    @Test func aSubCategoryTypedInThePlanJoinsTheMainList() throws {
+        let p = try planning()
+
+        try p.app.addTripPlanItem(p.trip.id, NewTripPlanItem(
+            description: "Scuba", amount: .rupees(900_000), category: "Lifestyle", subCategory: "Diving"
+        ))
+
+        let lifestyle = try #require(try p.app.categories().first { $0.name == "Lifestyle" })
+        #expect(lifestyle.subCategories.map(\.name).contains("Diving"))
+    }
 }

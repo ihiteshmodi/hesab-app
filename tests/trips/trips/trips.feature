@@ -155,3 +155,20 @@ Feature: Trips and shared expenses
 
   Scenario: Insights show spend by tag and who paid versus who used
     Then I see spend by tag and each person's paid and share
+
+  # Line items inside a trip use the same categories and sub-categories as the rest of the app.
+  # The main ledger still gets one entry for the whole trip, under the trip's own category.
+  Scenario: A trip expense can have a category and sub-category from the main list
+    When I add a trip expense "Dinner" with category "Food & Dining" and sub-category "Restaurant"
+    Then the expense shows "Food & Dining > Restaurant"
+    And the main ledger still has one entry for the trip, under the trip's category
+
+  Scenario: A new sub-category typed in a trip is added to the main list
+    When I add a trip expense under "Transport" with the new sub-category "Ferry"
+    Then "Ferry" is offered under "Transport" everywhere in the app
+
+  Scenario: Insights show spend by category
+    Given trip expenses of 400,000 in Food & Dining, 100,000 in Food & Dining and 300,000 in Transport
+    Then Insights list Food & Dining 500,000 first, then Transport 300,000
+    And expenses with no category are listed as "No category"
+

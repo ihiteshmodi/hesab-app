@@ -172,6 +172,7 @@ struct TripDetailScreen: View {
         case .person(let id): payer = "Paid by \(summary.members.first { $0.id == id }?.name ?? "someone")"
         }
         var parts = [expense.date.shortTitle, payer, "\(expense.shares.count) people"]
+        if let category = expense.categoryText { parts.append(category) }
         if !expense.tag.isEmpty { parts.append(expense.tag) }
         return parts.joined(separator: " · ")
     }

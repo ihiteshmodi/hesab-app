@@ -76,7 +76,8 @@ struct TripPlanPane: View {
                         HStack {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(item.description)
-                                Text(item.isPaid ? "Paid" : item.tag.isEmpty ? "Still to pay" : "\(item.tag) · still to pay")
+                                Text(([item.categoryText, item.tag.isEmpty ? nil : item.tag].compactMap { $0 } + [item.isPaid ? "Paid" : "Still to pay"])
+                                    .joined(separator: " · "))
                                     .font(.footnote).foregroundStyle(item.isPaid ? Theme.green : Theme.secondary)
                             }
                             Spacer()
@@ -90,7 +91,16 @@ struct TripPlanPane: View {
                 .accessibilityIdentifier("planItemRow")
             }
         }
-        if !plan.byTag.isEmpty {
+        if !plan.byCategory.isEmpty {
+            CardGroup(header: "Planned by category") {
+                ForEach(plan.byCategory, id: \.category) { spend in
+                    CardRow(title: spend.category.isEmpty ? "No category" : spend.category) {
+                        Text(model.tripText(spend.amount, trip)).monospacedDigit()
+                    }
+                }
+            }
+        }
+        if plan.byTag.contains(where: { !$0.tag.isEmpty }) {
             CardGroup(header: "Planned by tag") {
                 ForEach(plan.byTag, id: \.tag) { spend in
                     CardRow(title: spend.tag.isEmpty ? "No tag" : spend.tag) {
@@ -131,6 +141,8 @@ struct TripPlanItemSheet: View {
     @State private var description = ""
     @State private var amountText = ""
     @State private var tag = ""
+    @State private var category = ""
+    @State private var subCategory = ""
     @State private var choosingTag = false
     @State private var confirmingDelete = false
     @State private var errorMessage: String?
@@ -143,6 +155,8 @@ struct TripPlanItemSheet: View {
         _description = State(initialValue: editing.description)
         _amountText = State(initialValue: IndianMoneyFormat.plain(editing.amount))
         _tag = State(initialValue: editing.tag)
+        _category = State(initialValue: editing.category)
+        _subCategory = State(initialValue: editing.subCategory)
     }
 
     var body: some View {
@@ -153,6 +167,7 @@ struct TripPlanItemSheet: View {
                         .accessibilityIdentifier("planItemNameField")
                     TextField("Expected cost", text: $amountText).keyboardType(.decimalPad).rowPadding()
                         .accessibilityIdentifier("planItemAmountField")
+                    TripCategoryFields(model: model, category: $category, subCategory: $subCategory)
                     Button { choosingTag = true } label: {
                         CardRow(title: "Tag") { Text(tag.isEmpty ? "None" : tag).foregroundStyle(Theme.secondary) }
                     }
@@ -183,8 +198,11 @@ struct TripPlanItemSheet: View {
     }
 
     private func save() {
-        errorMessage = editing.map { model.updateTripPlanItem($0.id, description: description, amountText: amountText, tag: tag) }
-            ?? model.addTripPlanItem(tripID, description: description, amountText: amountText, tag: tag)
+        errorMessage = editing.map {
+            model.updateTripPlanItem($0.id, description: description, amountText: amountText, tag: tag, category: category, subCategory: subCategory)
+        } ?? model.addTripPlanItem(
+            tripID, description: description, amountText: amountText, tag: tag, category: category, subCategory: subCategory
+        )
         if errorMessage == nil { dismiss() }
     }
 }

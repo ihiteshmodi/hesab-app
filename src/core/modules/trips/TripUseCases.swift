@@ -238,7 +238,7 @@ public struct SaveTripExpense: Sendable {
         let saved = try store.trips.saveExpense(
             id: id, tripID: tripID, description: new.description.trimmed, date: new.date ?? store.clock.today(),
             amount: amount, paidBy: new.paidBy, paidWith: paidWith, shares: shares, paidInHome: charge, tag: tag,
-            note: new.note.trimmed
+            category: new.category.trimmed, subCategory: new.subCategory.trimmed, note: new.note.trimmed
         )
         if id == nil, let receipt = new.receipt { try store.trips.setReceipt(receipt, of: saved.id) }
         try store.syncMainLedger(tripID)
@@ -416,7 +416,10 @@ public struct AddTripPlanItem: Sendable {
         let amount = try validated(new)
         let tag = new.tag.trimmed
         if !tag.isEmpty { try AddTripTag(trips: trips)(tag) }
-        try trips.addPlanItem(tripID: tripID, description: new.description.trimmed, amount: amount, tag: tag)
+        try trips.addPlanItem(
+            tripID: tripID, description: new.description.trimmed, amount: amount, tag: tag, category: new.category.trimmed,
+            subCategory: new.subCategory.trimmed
+        )
         return try trips.planItems(of: tripID).last!
     }
 }
@@ -428,7 +431,10 @@ public struct UpdateTripPlanItem: Sendable {
         let amount = try validated(new)
         let tag = new.tag.trimmed
         if !tag.isEmpty { try AddTripTag(trips: trips)(tag) }
-        try trips.updatePlanItem(id, description: new.description.trimmed, amount: amount, tag: tag)
+        try trips.updatePlanItem(
+            id, description: new.description.trimmed, amount: amount, tag: tag, category: new.category.trimmed,
+            subCategory: new.subCategory.trimmed
+        )
     }
 }
 
@@ -453,7 +459,8 @@ public struct MarkTripPlanItemPaid: Sendable {
         guard !item.isPaid else { throw TripError.alreadyPaid(item.description) }
         let expense = try saver.save(id: nil, tripID: item.tripID, NewTripExpense(
             description: item.description, date: payment.date, amount: payment.amount ?? item.amount, paidWith: payment.paidWith,
-            split: .equal([.me]), paidInHome: payment.paidInHome, tag: item.tag
+            split: .equal([.me]), paidInHome: payment.paidInHome, tag: item.tag,
+            category: item.category, subCategory: item.subCategory
         ))
         try store.trips.setPlanItemExpense(id, expense.id)
         return expense

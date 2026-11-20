@@ -30,6 +30,8 @@ struct TripExpenseSheet: View {
     @State private var paidWith = ExpensePayment.bank
     @State private var date = Date()
     @State private var tag = ""
+    @State private var category = ""
+    @State private var subCategory = ""
     @State private var note = ""
     @State private var kind = SplitKind.equally
     @State private var selected: Set<Participant> = []
@@ -61,6 +63,8 @@ struct TripExpenseSheet: View {
         _paidWith = State(initialValue: editing.paidWith)
         _date = State(initialValue: editing.date.instant())
         _tag = State(initialValue: editing.tag)
+        _category = State(initialValue: editing.category)
+        _subCategory = State(initialValue: editing.subCategory)
         _note = State(initialValue: editing.note)
         _kind = State(initialValue: .amounts)
         _selected = State(initialValue: Set(editing.shares.keys))
@@ -127,6 +131,7 @@ struct TripExpenseSheet: View {
                         .rowPadding()
                     }
                     FieldRow("Date") { DatePicker("Date", selection: $date, displayedComponents: .date).labelsHidden() }
+                    TripCategoryFields(model: model, category: $category, subCategory: $subCategory)
                     Button { choosingTag = true } label: {
                         CardRow(title: "Tag") { Text(tag.isEmpty ? "None" : tag).foregroundStyle(Theme.secondary) }
                     }
@@ -334,8 +339,8 @@ struct TripExpenseSheet: View {
         let charge = cardText.trimmingCharacters(in: .whitespaces)
         let expense = NewTripExpense(
             description: title, date: CalendarDate(date), amount: MoneyInput.parse(amountText), paidBy: paidBy, paidWith: paidWith,
-            split: split(), paidInHome: charge.isEmpty ? nil : MoneyInput.parse(charge), tag: tag, note: note,
-            receipt: editing == nil ? receipt : nil
+            split: split(), paidInHome: charge.isEmpty ? nil : MoneyInput.parse(charge), tag: tag,
+            category: category, subCategory: subCategory, note: note, receipt: editing == nil ? receipt : nil
         )
         if let editing {
             errorMessage = model.updateTripExpense(editing.id, expense)

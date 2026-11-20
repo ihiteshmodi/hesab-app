@@ -388,6 +388,15 @@ public final class AppDatabase: Sendable {
             }
         }
 
+        migrator.registerMigration("v21-trip-categories") { db in
+            for table in ["trip_expense", "trip_plan_item"] {
+                try db.alter(table: table) { table in
+                    table.add(column: "category", .text).notNull().defaults(to: "")
+                    table.add(column: "sub_category", .text).notNull().defaults(to: "")
+                }
+            }
+        }
+
         return migrator
     }
 }

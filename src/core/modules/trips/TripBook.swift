@@ -139,6 +139,12 @@ struct TripBook {
         return PersonStatement(person: person, owesMe: owes, owesMeHome: homeValue(owes), lines: lines)
     }
 
+    private static func byCategory(_ amounts: [(category: String, amount: Money)]) -> [CategorySpend] {
+        var totals: [String: Money] = [:]
+        for item in amounts { totals[item.category, default: .zero] = totals[item.category, default: .zero] + item.amount }
+        return totals.map { CategorySpend(category: $0.key, amount: $0.value) }.sorted { ($1.amount, $0.category) < ($0.amount, $1.category) }
+    }
+
     func plan() -> TripPlan {
         let pending = planItems.filter { !$0.isPaid }.reduce(Money.zero) { $0 + $1.amount }
         let planned = planItems.reduce(Money.zero) { $0 + $1.amount }
@@ -149,7 +155,8 @@ struct TripBook {
         return TripPlan(
             items: planItems, plannedTotal: planned, plannedTotalHome: homeValue(planned), pendingTotal: pending,
             pendingTotalHome: homeValue(pending), paidTotal: paid,
-            byTag: byTag.map { TagSpend(tag: $0.key, amount: $0.value) }.sorted { ($1.amount, $0.tag) < ($0.amount, $1.tag) }
+            byTag: byTag.map { TagSpend(tag: $0.key, amount: $0.value) }.sorted { ($1.amount, $0.tag) < ($0.amount, $1.tag) },
+            byCategory: Self.byCategory(planItems.map { ($0.category, $0.amount) })
         )
     }
 
@@ -189,7 +196,8 @@ struct TripBook {
             myShare: expenses.reduce(.zero) { $0 + ($1.shares[.me] ?? .zero) }, totalSpentHome: expenses.reduce(.zero) { $0 + home(of: $1) },
             myShareHome: expenses.reduce(.zero) { $0 + homeShare(of: $1, .me) }, ledgerAmount: ledgerAmount, netCost: netCost,
             receivedBankHome: bank, receivedCashHome: cashHome, receivedCashTrip: cashTrip, writtenOffHome: homeValue(cost),
-            extraReceivedHome: homeValue(gain), cash: cash, spendByTag: spendByTag, totals: totals, plan: plan()
+            extraReceivedHome: homeValue(gain), cash: cash, spendByTag: spendByTag,
+            spendByCategory: Self.byCategory(expenses.map { ($0.category, $0.amount) }), totals: totals, plan: plan()
         )
     }
 }
