@@ -46,6 +46,7 @@ private func validated(_ trip: NewTrip) throws -> (name: String, ledgerName: Str
         guard let rate = trip.rate else { throw TripError.rateMissing }
         guard rate > 0 else { throw TripError.rateNotPositive }
     }
+    if let start = trip.startDate, let end = trip.endDate, end < start { throw TripError.endBeforeStart }
     let ledgerName = trip.ledgerName.trimmed
     return (name, ledgerName.isEmpty ? "\(name) expenses" : ledgerName)
 }
@@ -401,10 +402,44 @@ public struct StartTrip: Sendable {
     }
 }
 
+/// The total of a new item: typed, or the parts' total when it comes with parts.
 private func validated(_ item: NewTripPlanItem) throws -> Money {
     guard !item.description.trimmed.isEmpty else { throw TripError.descriptionMissing }
+    if !item.payments.isEmpty {
+        for part in item.payments { _ = try validated(part) }
+        return item.payments.reduce(.zero) { $0 + ($1.amount ?? .zero) }
+    }
     guard let amount = item.amount, amount > .zero else { throw TripError.amountMissingOrZero }
     return amount
+}
+
+private func validated(_ part: NewTripPlanPayment) throws -> Money {
+    guard let amount = part.amount, amount > .zero else { throw TripError.amountMissingOrZero }
+    return amount
+}
+
+private func validated(_ leg: NewTripLeg) throws {
+    for minutes in [leg.departureMinutes, leg.arrivalMinutes] {
+        if let minutes, !(0..<1_440).contains(minutes) { throw TripError.timeInvalid }
+    }
+    guard let left = leg.departure, let arrival = leg.arrivalDate else { return }
+    if arrival < left { throw TripError.legArrivesBeforeLeaving }
+    if arrival == left, let leaves = leg.departureMinutes, let arrives = leg.arrivalMinutes, arrives < leaves {
+        throw TripError.legArrivesBeforeLeaving
+    }
+}
+
+private func cleaned(_ part: NewTripPlanPayment) -> NewTripPlanPayment {
+    NewTripPlanPayment(label: part.label.trimmed, amount: part.amount, dueDate: part.dueDate)
+}
+
+private func cleaned(_ leg: NewTripLeg) -> NewTripLeg {
+    var copy = leg
+    copy.from = leg.from.trimmed
+    copy.to = leg.to.trimmed
+    copy.carrier = leg.carrier.trimmed
+    copy.number = leg.number.trimmed
+    return copy
 }
 
 public struct AddTripPlanItem: Sendable {
@@ -414,26 +449,35 @@ public struct AddTripPlanItem: Sendable {
     public func callAsFunction(_ tripID: Int64, _ new: NewTripPlanItem) throws -> TripPlanItem {
         _ = try trips.trip(tripID)
         let amount = try validated(new)
+        for leg in new.legs { try validated(leg) }
         let tag = new.tag.trimmed
         if !tag.isEmpty { try AddTripTag(trips: trips)(tag) }
-        try trips.addPlanItem(
+        let id = try trips.addPlanItem(
             tripID: tripID, description: new.description.trimmed, amount: amount, tag: tag, category: new.category.trimmed,
-            subCategory: new.subCategory.trimmed
+            subCategory: new.subCategory.trimmed, note: new.note.trimmed, dueDate: new.dueDate,
+            payments: new.payments.map(cleaned), legs: new.legs.map(cleaned)
         )
-        return try trips.planItems(of: tripID).last!
+        return try trips.planItem(id)
     }
 }
 
 public struct UpdateTripPlanItem: Sendable {
     let trips: TripRepository
 
+    /// Parts and legs are changed one by one; when the item has parts, its total is theirs and `amount` is not needed.
     public func callAsFunction(_ id: Int64, _ new: NewTripPlanItem) throws {
-        let amount = try validated(new)
+        let existing = try trips.planItem(id)
+        guard !new.description.trimmed.isEmpty else { throw TripError.descriptionMissing }
+        var amount = existing.amount
+        if existing.payments.isEmpty {
+            guard let typed = new.amount, typed > .zero else { throw TripError.amountMissingOrZero }
+            amount = typed
+        }
         let tag = new.tag.trimmed
         if !tag.isEmpty { try AddTripTag(trips: trips)(tag) }
         try trips.updatePlanItem(
             id, description: new.description.trimmed, amount: amount, tag: tag, category: new.category.trimmed,
-            subCategory: new.subCategory.trimmed
+            subCategory: new.subCategory.trimmed, note: new.note.trimmed, dueDate: new.dueDate
         )
     }
 }
@@ -447,21 +491,28 @@ public struct DeleteTripPlanItem: Sendable {
     }
 }
 
+/// The trip expense a plan item (or one of its parts) becomes: only I share it, so it reaches the main ledger like any other.
+private func makeExpense(
+    _ item: TripPlanItem, title: String, amount: Money, _ payment: PlanItemPayment, saver: SaveTripExpense
+) throws -> TripExpense {
+    try saver.save(id: nil, tripID: item.tripID, NewTripExpense(
+        description: title, date: payment.date, amount: payment.amount ?? amount, paidWith: payment.paidWith,
+        split: .equal([.me]), paidInHome: payment.paidInHome, tag: item.tag, category: item.category,
+        subCategory: item.subCategory, note: item.note
+    ))
+}
+
 public struct MarkTripPlanItemPaid: Sendable {
     let store: TripStore
     let saver: SaveTripExpense
 
-    /// Makes the item a real trip expense that only I share, so it reaches the main ledger like any other.
     @discardableResult
     public func callAsFunction(_ id: Int64, _ payment: PlanItemPayment = PlanItemPayment()) throws -> TripExpense {
         let item = try store.trips.planItem(id)
         guard !(try store.trips.trip(item.tripID)).isPlanning else { throw TripError.tripNotStarted }
+        guard item.payments.isEmpty else { throw TripError.paidInParts }
         guard !item.isPaid else { throw TripError.alreadyPaid(item.description) }
-        let expense = try saver.save(id: nil, tripID: item.tripID, NewTripExpense(
-            description: item.description, date: payment.date, amount: payment.amount ?? item.amount, paidWith: payment.paidWith,
-            split: .equal([.me]), paidInHome: payment.paidInHome, tag: item.tag,
-            category: item.category, subCategory: item.subCategory
-        ))
+        let expense = try makeExpense(item, title: item.description, amount: item.amount, payment, saver: saver)
         try store.trips.setPlanItemExpense(id, expense.id)
         return expense
     }
@@ -476,5 +527,136 @@ public struct UnmarkTripPlanItemPaid: Sendable {
         guard let expenseID = item.paidExpenseID else { throw TripError.notPaidYet(item.description) }
         try store.trips.deleteExpense(expenseID)
         try store.syncMainLedger(item.tripID)
+    }
+}
+
+// MARK: paying in parts
+
+public struct AddTripPlanPayment: Sendable {
+    let trips: TripRepository
+
+    @discardableResult
+    public func callAsFunction(_ itemID: Int64, _ new: NewTripPlanPayment) throws -> TripPlanPayment {
+        let item = try trips.planItem(itemID)
+        guard !item.isPaid || !item.payments.isEmpty else { throw TripError.itemAlreadyPaid(item.description) }
+        _ = try validated(new)
+        return try trips.payment(try trips.addPayment(cleaned(new), to: itemID))
+    }
+}
+
+public struct UpdateTripPlanPayment: Sendable {
+    let trips: TripRepository
+
+    public func callAsFunction(_ id: Int64, _ new: NewTripPlanPayment) throws {
+        guard !(try trips.payment(id)).isPaid else { throw TripError.paymentPaid }
+        _ = try validated(new)
+        try trips.updatePayment(id, cleaned(new))
+    }
+}
+
+public struct DeleteTripPlanPayment: Sendable {
+    let trips: TripRepository
+
+    public func callAsFunction(_ id: Int64) throws {
+        guard !(try trips.payment(id)).isPaid else { throw TripError.paymentPaid }
+        try trips.deletePayment(id)
+    }
+}
+
+public struct MarkTripPlanPaymentPaid: Sendable {
+    let store: TripStore
+    let saver: SaveTripExpense
+
+    @discardableResult
+    public func callAsFunction(_ id: Int64, _ payment: PlanItemPayment = PlanItemPayment()) throws -> TripExpense {
+        let part = try store.trips.payment(id)
+        let item = try store.trips.planItem(part.itemID)
+        guard !(try store.trips.trip(item.tripID)).isPlanning else { throw TripError.tripNotStarted }
+        guard !part.isPaid else { throw TripError.alreadyPaid(part.label.isEmpty ? item.description : part.label) }
+        let title = part.label.isEmpty ? item.description : "\(item.description) · \(part.label)"
+        let expense = try makeExpense(item, title: title, amount: part.amount, payment, saver: saver)
+        try store.trips.setPaymentExpense(id, expense.id)
+        return expense
+    }
+}
+
+public struct UnmarkTripPlanPaymentPaid: Sendable {
+    let store: TripStore
+
+    public func callAsFunction(_ id: Int64) throws {
+        let part = try store.trips.payment(id)
+        guard let expenseID = part.paidExpenseID else { throw TripError.notPaidYet(part.label) }
+        try store.trips.deleteExpense(expenseID)
+        try store.syncMainLedger(try store.trips.planItem(part.itemID).tripID)
+    }
+}
+
+// MARK: due dates
+
+extension TripStore {
+    /// Unpaid payments with a due date on trips that have started and are not settled, soonest first.
+    /// `within` keeps those due that many days from today (overdue ones are always kept).
+    func dues(within days: Int) throws -> [TripDue] {
+        let today = clock.today()
+        var found: [TripDue] = []
+        for trip in try trips.trips() where !trip.isPlanning && !trip.isSettled {
+            let book = try book(trip.id)
+            for item in book.planItems {
+                let parts: [(paymentID: Int64?, title: String, amount: Money, due: CalendarDate?)] = item.payments.isEmpty
+                    ? (item.isPaid ? [] : [(nil, item.description, item.amount, item.dueDate)])
+                    : item.payments.filter { !$0.isPaid }.map {
+                        ($0.id, $0.label.isEmpty ? item.description : "\(item.description) · \($0.label)", $0.amount, $0.dueDate)
+                    }
+                for part in parts {
+                    guard let due = part.due, today.days(until: due) <= days else { continue }
+                    found.append(TripDue(
+                        tripID: trip.id, tripName: trip.name, itemID: item.id, paymentID: part.paymentID, title: part.title,
+                        amount: part.amount, amountHome: book.homeValue(part.amount), dueDate: due, daysUntil: today.days(until: due),
+                        affectsLeftToSpend: trip.paymentMethod.movesLeftToSpend
+                    ))
+                }
+            }
+        }
+        return found.sorted { ($0.dueDate, $0.title) < ($1.dueDate, $1.title) }
+    }
+}
+
+public struct GetTripDues: Sendable {
+    let store: TripStore
+    let settings: SettingsRepository
+
+    /// What is due within the "upcoming" window of Settings, or already overdue.
+    public func callAsFunction() throws -> [TripDue] {
+        try store.dues(within: Preferences(stored: try settings.all()).upcomingWindowDays)
+    }
+}
+
+// MARK: travel legs
+
+public struct AddTripLeg: Sendable {
+    let trips: TripRepository
+
+    @discardableResult
+    public func callAsFunction(_ itemID: Int64, _ new: NewTripLeg) throws -> TripLeg {
+        _ = try trips.planItem(itemID)
+        try validated(new)
+        return try trips.leg(try trips.addLeg(cleaned(new), to: itemID))
+    }
+}
+
+public struct UpdateTripLeg: Sendable {
+    let trips: TripRepository
+
+    public func callAsFunction(_ id: Int64, _ new: NewTripLeg) throws {
+        try validated(new)
+        try trips.updateLeg(id, cleaned(new))
+    }
+}
+
+public struct DeleteTripLeg: Sendable {
+    let trips: TripRepository
+
+    public func callAsFunction(_ id: Int64) throws {
+        try trips.deleteLeg(id)
     }
 }

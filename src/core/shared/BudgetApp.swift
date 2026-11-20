@@ -149,6 +149,15 @@ public final class BudgetApp: Sendable {
     public let deleteTripPlanItem: DeleteTripPlanItem
     public let markTripPlanItemPaid: MarkTripPlanItemPaid
     public let unmarkTripPlanItemPaid: UnmarkTripPlanItemPaid
+    public let addTripPlanPayment: AddTripPlanPayment
+    public let updateTripPlanPayment: UpdateTripPlanPayment
+    public let deleteTripPlanPayment: DeleteTripPlanPayment
+    public let markTripPlanPaymentPaid: MarkTripPlanPaymentPaid
+    public let unmarkTripPlanPaymentPaid: UnmarkTripPlanPaymentPaid
+    public let tripDues: GetTripDues
+    public let addTripLeg: AddTripLeg
+    public let updateTripLeg: UpdateTripLeg
+    public let deleteTripLeg: DeleteTripLeg
 
     public init(database: AppDatabase, clock: any DayClock) {
         let expenses = ExpenseRepository(database: database)
@@ -156,6 +165,7 @@ public final class BudgetApp: Sendable {
         let ledgerBook = LedgerRepository(database: database)
         let cash = CashAdjustmentRepository(database: database)
         let tripBook = TripRepository(database: database)
+        let tripStore = TripStore(trips: tripBook, expenses: expenses, clock: clock)
         let borrowingBook = BorrowingRepository(database: database)
         let settingsBook = SettingsRepository(database: database)
         let schemeBook = PayoutSchemeRepository(database: database)
@@ -248,7 +258,7 @@ public final class BudgetApp: Sendable {
         undoAutoAdded = UndoAutoAdded(store: billStore, expenses: expenses)
         billsAttention = GetBillsAttention(store: billStore, schemes: schemeStore)
         billsCalendar = GetBillsCalendar(store: billStore, schemes: schemeStore, income: income)
-        cashForecast = GetCashForecast(budget: monthBudget, bills: billStore, schemes: schemeStore, expenses: expenses, income: income, clock: clock)
+        cashForecast = GetCashForecast(budget: monthBudget, bills: billStore, schemes: schemeStore, expenses: expenses, income: income, trips: tripStore, clock: clock)
         searchExpenses = SearchExpenses(expenses: expenses)
         searchIncome = SearchIncome(income: income)
         spendingBreakdown = GetSpendingBreakdown(expenses: expenses)
@@ -288,7 +298,6 @@ public final class BudgetApp: Sendable {
         payoutDraft = GetPayoutDraft(store: schemeStore)
         recordPayout = RecordPayout(store: schemeStore, income: income)
         closeScheme = CloseScheme(schemes: schemeBook)
-        let tripStore = TripStore(trips: tripBook, expenses: expenses, clock: clock)
         addPerson = AddPerson(trips: tripBook)
         people = GetPeople(trips: tripBook)
         deletePerson = DeletePerson(store: tripStore)
@@ -320,5 +329,14 @@ public final class BudgetApp: Sendable {
         deleteTripPlanItem = DeleteTripPlanItem(trips: tripBook)
         markTripPlanItemPaid = MarkTripPlanItemPaid(store: tripStore, saver: tripSaver)
         unmarkTripPlanItemPaid = UnmarkTripPlanItemPaid(store: tripStore)
+        addTripPlanPayment = AddTripPlanPayment(trips: tripBook)
+        updateTripPlanPayment = UpdateTripPlanPayment(trips: tripBook)
+        deleteTripPlanPayment = DeleteTripPlanPayment(trips: tripBook)
+        markTripPlanPaymentPaid = MarkTripPlanPaymentPaid(store: tripStore, saver: tripSaver)
+        unmarkTripPlanPaymentPaid = UnmarkTripPlanPaymentPaid(store: tripStore)
+        tripDues = GetTripDues(store: tripStore, settings: settingsBook)
+        addTripLeg = AddTripLeg(trips: tripBook)
+        updateTripLeg = UpdateTripLeg(trips: tripBook)
+        deleteTripLeg = DeleteTripLeg(trips: tripBook)
     }
 }

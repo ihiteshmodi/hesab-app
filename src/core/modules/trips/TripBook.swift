@@ -155,15 +155,18 @@ struct TripBook {
     }
 
     func plan() -> TripPlan {
-        let pending = planItems.filter { !$0.isPaid }.reduce(Money.zero) { $0 + $1.amount }
+        let pending = planItems.reduce(Money.zero) { $0 + $1.pendingAmount }
         let planned = planItems.reduce(Money.zero) { $0 + $1.amount }
-        let paid = planItems.compactMap(\.paidExpenseID).compactMap { id in expenses.first { $0.id == id }?.amount }
+        let paid = planItems.flatMap(\.paidExpenseIDs).compactMap { id in expenses.first { $0.id == id }?.amount }
             .reduce(Money.zero) { $0 + $1 }
         var byTag: [String: Money] = [:]
         for item in planItems { byTag[item.tag, default: .zero] = byTag[item.tag, default: .zero] + item.amount }
         return TripPlan(
             items: planItems, plannedTotal: planned, plannedTotalHome: homeValue(planned), pendingTotal: pending,
             pendingTotalHome: homeValue(pending), paidTotal: paid,
+            itinerary: planItems.flatMap(\.legs).sorted {
+                ($0.departure ?? CalendarDate.farFuture, $0.departureMinutes ?? 0, $0.id) < ($1.departure ?? CalendarDate.farFuture, $1.departureMinutes ?? 0, $1.id)
+            },
             byTag: byTag.map { TagSpend(tag: $0.key, amount: $0.value) }.sorted { ($1.amount, $0.tag) < ($0.amount, $1.tag) },
             byCategory: Self.byCategory(planItems.map { ($0.category, $0.amount) }), categoryProgress: progress()
         )
@@ -209,4 +212,9 @@ struct TripBook {
             spendByCategory: Self.byCategory(expenses.map { ($0.category, $0.amount) }), totals: totals, plan: plan()
         )
     }
+}
+
+extension CalendarDate {
+    /// Sorts "no date" after every real one.
+    static let farFuture = try! CalendarDate(year: 9_999, month: 12, day: 31)
 }

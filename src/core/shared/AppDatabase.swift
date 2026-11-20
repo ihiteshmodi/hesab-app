@@ -437,6 +437,38 @@ public final class AppDatabase: Sendable {
             }
         }
 
+        migrator.registerMigration("v26-trip-dates-parts-and-legs") { db in
+            try db.alter(table: "trip") { table in
+                table.add(column: "start_date", .text)
+            }
+            try db.alter(table: "trip_plan_item") { table in
+                table.add(column: "note", .text).notNull().defaults(to: "")
+                table.add(column: "due_date", .text)
+            }
+            try db.create(table: "trip_plan_payment") { table in
+                table.autoIncrementedPrimaryKey("id")
+                table.column("item_id", .integer).notNull().references("trip_plan_item", onDelete: .cascade)
+                table.column("label", .text).notNull().defaults(to: "")
+                table.column("amount_paise", .integer).notNull()
+                table.column("due_date", .text)
+                table.column("trip_expense_id", .integer).references("trip_expense", onDelete: .setNull)
+            }
+            try db.create(table: "trip_leg") { table in
+                table.autoIncrementedPrimaryKey("id")
+                table.column("item_id", .integer).notNull().references("trip_plan_item", onDelete: .cascade)
+                table.column("mode", .text).notNull()
+                table.column("from_place", .text).notNull().defaults(to: "")
+                table.column("to_place", .text).notNull().defaults(to: "")
+                table.column("carrier", .text).notNull().defaults(to: "")
+                table.column("number", .text).notNull().defaults(to: "")
+                table.column("departure_date", .text)
+                table.column("departure_minutes", .integer)
+                table.column("arrival_date", .text)
+                table.column("arrival_minutes", .integer)
+                table.column("booked", .boolean).notNull().defaults(to: false)
+            }
+        }
+
         return migrator
     }
 }

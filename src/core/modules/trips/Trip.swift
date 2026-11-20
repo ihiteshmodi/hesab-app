@@ -88,6 +88,7 @@ public struct Trip: Equatable, Sendable {
     public let subCategory: String
     public let paymentMethod: PaymentMethod
     public let endDate: CalendarDate?
+    public let startDate: CalendarDate?
     public let isSettled: Bool
     /// A trip still being worked out: its plan is a price list, and nothing in it has been paid yet.
     public let isPlanning: Bool
@@ -103,12 +104,14 @@ public struct NewTrip: Sendable {
     public var subCategory: String
     public var paymentMethod: PaymentMethod
     public var endDate: CalendarDate?
+    public var startDate: CalendarDate?
     /// Only read when the trip is created; `startTrip` is what ends planning.
     public var isPlanning: Bool
 
     public init(
         name: String, currency: String? = nil, rate: Decimal? = nil, ledgerName: String = "", category: String,
-        subCategory: String = "", paymentMethod: PaymentMethod = .upi, endDate: CalendarDate? = nil, isPlanning: Bool = false
+        subCategory: String = "", paymentMethod: PaymentMethod = .upi, endDate: CalendarDate? = nil, startDate: CalendarDate? = nil,
+        isPlanning: Bool = false
     ) {
         self.name = name
         self.currency = currency
@@ -118,6 +121,7 @@ public struct NewTrip: Sendable {
         self.subCategory = subCategory
         self.paymentMethod = paymentMethod
         self.endDate = endDate
+        self.startDate = startDate
         self.isPlanning = isPlanning
     }
 }
@@ -176,35 +180,174 @@ public struct TripExpense: Equatable, Sendable {
     public let hasReceipt: Bool
 }
 
-/// One thing in a trip's plan, with what it is expected to cost in the trip currency.
-public struct TripPlanItem: Equatable, Sendable {
+/// One part of a plan item that is paid in instalments, such as an advance or a balance.
+public struct TripPlanPayment: Equatable, Sendable {
     public let id: Int64
-    public let tripID: Int64
-    public let description: String
+    public let itemID: Int64
+    /// "Advance", "Balance" ...; may be blank.
+    public let label: String
     public let amount: Money
-    public let tag: String
-    public let category: String
-    public let subCategory: String
-    /// The trip expense made when the item was ticked as paid.
+    public let dueDate: CalendarDate?
+    /// The trip expense made when the part was ticked as paid.
     public let paidExpenseID: Int64?
 
     public var isPaid: Bool { paidExpenseID != nil }
 }
 
+public struct NewTripPlanPayment: Sendable {
+    public var label: String
+    public var amount: Money?
+    public var dueDate: CalendarDate?
+
+    public init(label: String = "", amount: Money?, dueDate: CalendarDate? = nil) {
+        self.label = label
+        self.amount = amount
+        self.dueDate = dueDate
+    }
+}
+
+public enum TravelMode: String, CaseIterable, Sendable {
+    case flight, train, bus, other
+
+    public var title: String {
+        switch self {
+        case .flight: "Flight"
+        case .train: "Train"
+        case .bus: "Bus"
+        case .other: "Other"
+        }
+    }
+}
+
+/// One leg of the journey: where, when, and on what. A plan item (such as "Flights") can hold several.
+public struct TripLeg: Equatable, Sendable {
+    public let id: Int64
+    public let itemID: Int64
+    /// The plan item it belongs to.
+    public let itemName: String
+    public let mode: TravelMode
+    public let from: String
+    public let to: String
+    /// The airline, railway or bus company.
+    public let carrier: String
+    /// The flight, train or bus number.
+    public let number: String
+    public let departure: CalendarDate?
+    /// Minutes after midnight, so 6:40 is 400.
+    public let departureMinutes: Int?
+    public let arrivalDate: CalendarDate?
+    public let arrivalMinutes: Int?
+    /// False while it is only planned.
+    public let isBooked: Bool
+}
+
+public struct NewTripLeg: Sendable {
+    public var mode: TravelMode
+    public var from: String
+    public var to: String
+    public var carrier: String
+    public var number: String
+    public var departure: CalendarDate?
+    public var departureMinutes: Int?
+    public var arrivalDate: CalendarDate?
+    public var arrivalMinutes: Int?
+    public var isBooked: Bool
+
+    public init(
+        mode: TravelMode = .flight, from: String = "", to: String = "", carrier: String = "", number: String = "",
+        departure: CalendarDate? = nil, departureMinutes: Int? = nil, arrivalDate: CalendarDate? = nil,
+        arrivalMinutes: Int? = nil, isBooked: Bool = false
+    ) {
+        self.mode = mode
+        self.from = from
+        self.to = to
+        self.carrier = carrier
+        self.number = number
+        self.departure = departure
+        self.departureMinutes = departureMinutes
+        self.arrivalDate = arrivalDate
+        self.arrivalMinutes = arrivalMinutes
+        self.isBooked = isBooked
+    }
+}
+
+/// One thing in a trip's plan, with what it is expected to cost in the trip currency.
+public struct TripPlanItem: Equatable, Sendable {
+    public let id: Int64
+    public let tripID: Int64
+    public let description: String
+    /// What was typed; once the item has parts, the parts' total is what counts (see `amount`).
+    let enteredAmount: Money
+    public let tag: String
+    public let category: String
+    public let subCategory: String
+    public let note: String
+    /// When a single payment is due; parts have their own dates.
+    public let dueDate: CalendarDate?
+    /// The trip expense made when a single-payment item was ticked as paid.
+    public let paidExpenseID: Int64?
+    /// Earliest due date first, parts without a date last.
+    public let payments: [TripPlanPayment]
+    public let legs: [TripLeg]
+
+    public var amount: Money { payments.isEmpty ? enteredAmount : payments.reduce(.zero) { $0 + $1.amount } }
+
+    public var isPaid: Bool { payments.isEmpty ? paidExpenseID != nil : payments.allSatisfy(\.isPaid) }
+
+    /// What is still to pay on it.
+    public var pendingAmount: Money {
+        payments.isEmpty ? (isPaid ? .zero : enteredAmount) : payments.filter { !$0.isPaid }.reduce(.zero) { $0 + $1.amount }
+    }
+
+    /// The trip expenses it has made so far.
+    var paidExpenseIDs: [Int64] { payments.isEmpty ? paidExpenseID.map { [$0] } ?? [] : payments.compactMap(\.paidExpenseID) }
+}
+
 public struct NewTripPlanItem: Sendable {
     public var description: String
+    /// May be left out when the item is given parts, which then set the total.
     public var amount: Money?
     public var tag: String
     public var category: String
     public var subCategory: String
+    public var note: String
+    public var dueDate: CalendarDate?
+    /// Only used when the item is first planned; parts and legs are changed one by one afterwards.
+    public var payments: [NewTripPlanPayment]
+    public var legs: [NewTripLeg]
 
-    public init(description: String, amount: Money?, tag: String = "", category: String = "", subCategory: String = "") {
+    public init(
+        description: String, amount: Money?, tag: String = "", category: String = "", subCategory: String = "", note: String = "",
+        dueDate: CalendarDate? = nil, payments: [NewTripPlanPayment] = [], legs: [NewTripLeg] = []
+    ) {
         self.description = description
         self.amount = amount
         self.tag = tag
         self.category = category
         self.subCategory = subCategory
+        self.note = note
+        self.dueDate = dueDate
+        self.payments = payments
+        self.legs = legs
     }
+}
+
+/// A payment that is coming up (or overdue) on a trip that has started.
+public struct TripDue: Equatable, Sendable {
+    public let tripID: Int64
+    public let tripName: String
+    public let itemID: Int64
+    public let paymentID: Int64?
+    /// "Group tour · Advance", or just the item's name.
+    public let title: String
+    /// In the trip's currency.
+    public let amount: Money
+    public let amountHome: Money
+    public let dueDate: CalendarDate
+    /// Negative once it is overdue.
+    public let daysUntil: Int
+    /// Whether the money leaves the bank, and so lowers Left to spend.
+    public let affectsLeftToSpend: Bool
 }
 
 /// What is really paid when an item is ticked; anything left out is taken from the plan or from today.
@@ -235,6 +378,8 @@ public struct TripPlan: Equatable, Sendable {
     public let pendingTotalHome: Money
     /// What the paid items really cost.
     public let paidTotal: Money
+    /// Every leg of the journey, earliest first; legs with no date come last.
+    public let itinerary: [TripLeg]
     /// Estimates by tag, largest first.
     public let byTag: [TagSpend]
     /// Estimates by main category, largest first; items with none are together under a blank name.
@@ -391,6 +536,14 @@ public enum TripError: Error, Equatable, Sendable {
     case noTripCash
     case tagMissing
     case tagIsDefault(String)
+    case endBeforeStart
+    case paidInParts
+    case itemAlreadyPaid(String)
+    case paymentPaid
+    case paymentNotFound(Int64)
+    case legNotFound(Int64)
+    case legArrivesBeforeLeaving
+    case timeInvalid
     case planItemNotFound(Int64)
     case tripNotStarted
     case alreadyPaid(String)
@@ -420,6 +573,14 @@ public enum TripError: Error, Equatable, Sendable {
         case .noTripCash: "This trip is in your home currency, so it uses your main Cash in Hand."
         case .tagMissing: "Enter a tag"
         case .tagIsDefault(let name): "\(name) is a default tag and stays"
+        case .endBeforeStart: "The trip can't end before it starts."
+        case .paidInParts: "This item is paid in parts. Tick each part instead."
+        case .itemAlreadyPaid(let name): "\(name) is already paid, so it can't be split into parts."
+        case .paymentPaid: "A part that is paid can't be changed. Untick it first."
+        case .paymentNotFound: "That part no longer exists."
+        case .legNotFound: "That leg no longer exists."
+        case .legArrivesBeforeLeaving: "The leg can't arrive before it leaves."
+        case .timeInvalid: "Enter a time between 00:00 and 23:59"
         case .planItemNotFound: "That plan item no longer exists."
         case .tripNotStarted: "Start the trip before ticking things as paid."
         case .alreadyPaid(let name): "\(name) is already paid."

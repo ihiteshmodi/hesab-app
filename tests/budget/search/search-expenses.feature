@@ -64,3 +64,18 @@ Feature: Search expenses
     When she taps "Post office" in the income results
     Then the Edit Income form opens
 
+  # Activity search follows the tab she is on.
+  Scenario: On the Expenses tab only expenses are searched
+    Given an expense and an income entry both called "Post office"
+    When she types "post office" in the Activity search field on the Expenses tab
+    Then she sees the expense and no income
+
+  Scenario: On the Income tab only income is searched
+    When she is on the Income tab and types "post office"
+    Then she sees the income entry and no expense
+
+  Scenario: The Calendar tab has no search field
+    When she opens the Calendar tab
+    Then there is no search field
+    And going back to Expenses shows the field empty
+

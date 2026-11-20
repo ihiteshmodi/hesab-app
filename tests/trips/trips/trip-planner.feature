@@ -105,3 +105,78 @@ Feature: Trip planner
     Given a trip expense in "Food & Dining" and nothing planned there
     Then "Food & Dining" reads paid against a plan of 0
 
+  # Feedback round: start date, notes, paying in parts with due dates, reminders, and travel legs.
+  Scenario: A trip can have a start date as well as an end date
+    When I make a trip from 2026-12-10 to 2026-12-18
+    Then both dates are kept
+    And a trip cannot end before it starts
+
+  Scenario: A plan item keeps a note, and the note follows it to the expense
+    Given "Flights" is planned with the note "Window seat, 2 bags"
+    When I tick it as paid
+    Then the trip expense has the same note
+
+  Scenario: A plan item can be paid in parts, each with its own due date
+    Given "Group tour" is planned in two parts: "Advance" 20,000 due 2026-11-25 and "Balance" 60,000 due 2027-01-10
+    Then the item totals 80,000 and nothing is paid
+    And the parts are listed by due date
+
+  Scenario: Each part is ticked on its own
+    When I tick "Advance" as paid
+    Then the trip expense "Group tour · Advance" of 20,000 exists
+    And 60,000 is still to pay
+    When I tick "Balance" as well
+    Then the item shows as paid
+
+  Scenario: An item paid in parts cannot be ticked as a whole
+    When I tick "Group tour" as a whole
+    Then I see "This item is paid in parts. Tick each part instead."
+
+  Scenario: A paid part cannot be changed or removed
+    Given "Advance" is paid
+    When I remove it
+    Then I see "A part that is paid can't be changed. Untick it first."
+
+  Scenario: An item already paid cannot be split into parts
+    Given "Flights" was ticked as paid
+    When I add a part to it
+    Then I see "Flights is already paid, so it can't be split into parts."
+
+  Scenario: Removing every part puts the item back to one amount
+    Given "Group tour" has two unpaid parts
+    When I remove both
+    Then it is one item again, tickable as a whole
+
+  Scenario: A payment due soon shows a red count
+    Given the trip has started and "Advance" is due in 3 days and "Balance" in 60 days
+    Then the trip shows a red 1, on its row, on its Plan tab and on the Trips tab
+    And the advance reads "Due in 3 days"
+    And a payment past its date reads "Overdue by 2 days"
+
+  Scenario: Only unpaid payments of started trips remind her
+    Given a paid advance, and a payment on a trip still being planned
+    Then neither shows a red count
+
+  Scenario: Trip payments due soon count against the 30-day look at Left to spend
+    Given an unpaid trip payment of IDR 1,000,000 due in 10 days at rate 0.0053
+    Then 5,300 comes off Left to spend on day 10
+
+  Scenario: A travel leg keeps mode, route, carrier, number and times
+    Given "Flights" is planned
+    When I add a leg: flight, Delhi to Denpasar, IndiGo 6E 1175, leaves 2026-12-10 at 06:40, arrives 15:05
+    Then the leg is kept, marked planned until she marks it booked
+
+  Scenario: The trip lists every leg in date order
+    Given an onward train and flight, and a return flight
+    Then the itinerary lists them by date and time, with the item each belongs to
+    And a leg with no date comes last
+
+  Scenario Outline: A leg must make sense
+    When I save a leg that <problem>
+    Then I see "<message>"
+
+    Examples:
+      | problem                       | message                                  |
+      | arrives before it leaves      | The leg can't arrive before it leaves.   |
+      | leaves at 25:00               | Enter a time between 00:00 and 23:59     |
+

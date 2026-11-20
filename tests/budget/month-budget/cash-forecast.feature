@@ -55,3 +55,8 @@ Feature: Next 30 days: will I run short?
   Scenario: Nothing set up
     Given no bills, payouts or history
     Then the line is flat at today's Left to spend
+
+  Scenario: Unpaid trip payments come off on their due date
+    Given a started trip with a payment of 10,000 due on 2026-11-25
+    Then 10,000 comes off on day 5 and counts in "Bills out"
+

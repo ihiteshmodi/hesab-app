@@ -16,6 +16,7 @@ public struct GetCashForecast: Sendable {
     let schemes: SchemeStore
     let expenses: ExpenseRepository
     let income: IncomeRepository
+    let trips: TripStore
     let clock: any DayClock
 
     public func callAsFunction(days: Int = 30) throws -> CashForecast {
@@ -37,6 +38,11 @@ public struct GetCashForecast: Sendable {
                 billsOut = billsOut + bill.amount
                 due = bill.endsOn.map { current >= $0 } == true ? nil : bill.repeats.next(after: current, anchorDay: bill.firstDue.day)
             }
+        }
+
+        for due in try trips.dues(within: days) where due.affectsLeftToSpend {
+            place(due.dueDate, .zero - due.amountHome)
+            billsOut = billsOut + due.amountHome
         }
 
         let schemeBook = try schemes.book()
