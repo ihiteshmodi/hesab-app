@@ -96,6 +96,15 @@ struct RootView: View {
         .accessibilityIdentifier("lockScreen")
     }
 
+    /// Bills counts what needs attention there; Trips counts payments due soon on trips.
+    private func badge(for item: AppTab) -> Int {
+        switch item {
+        case .bills: model.attention.badge
+        case .trips: model.tripDues.count
+        default: 0
+        }
+    }
+
     private var bar: some View {
         HStack(spacing: 0) {
             ForEach(AppTab.allCases, id: \.self) { item in
@@ -108,8 +117,8 @@ struct RootView: View {
                     .foregroundStyle(tab == item ? Color.blue : Color.primary)
                     .background(RoundedRectangle(cornerRadius: 24).fill(tab == item ? Color.gray.opacity(0.15) : .clear))
                     .overlay(alignment: .topTrailing) {
-                        if item == .bills, model.attention.badge > 0 {
-                            Text("\(model.attention.badge)").font(.system(size: 11, weight: .bold)).foregroundStyle(.white)
+                        if badge(for: item) > 0 {
+                            Text("\(badge(for: item))").font(.system(size: 11, weight: .bold)).foregroundStyle(.white)
                                 .padding(.horizontal, 5).frame(minWidth: 18, minHeight: 18)
                                 .background(Capsule().fill(.red)).offset(x: -4, y: -2)
                         }
@@ -117,7 +126,7 @@ struct RootView: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityElement(children: .ignore)
-                .accessibilityLabel(item == .bills && model.attention.badge > 0 ? "\(item.rawValue), \(model.attention.badge)" : item.rawValue)
+                .accessibilityLabel(badge(for: item) > 0 ? "\(item.rawValue), \(badge(for: item))" : item.rawValue)
                 .accessibilityAddTraits(tab == item ? [.isButton, .isSelected] : .isButton)
                 .accessibilityIdentifier("tab-\(item.rawValue)")
             }

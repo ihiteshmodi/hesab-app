@@ -41,6 +41,11 @@ struct TripsScreen: View {
                     Text(summary.trip.name).font(.headline)
                     if summary.trip.isSettled { StatusPill(text: "Settled", tone: .green) }
                     if summary.trip.isPlanning { StatusPill(text: "Planning") }
+                    if model.dueCount(tripID: summary.trip.id) > 0 {
+                        Text("\(model.dueCount(tripID: summary.trip.id))").font(.system(size: 11, weight: .bold)).foregroundStyle(.white)
+                            .padding(.horizontal, 5).frame(minWidth: 17, minHeight: 17).background(Theme.red, in: Capsule())
+                            .accessibilityLabel("Payments due soon").accessibilityIdentifier("tripRowDueBadge")
+                    }
                     Spacer()
                     VStack(alignment: .trailing) {
                         if summary.trip.isPlanning {
@@ -51,6 +56,13 @@ struct TripsScreen: View {
                             Text("net cost so far").font(.caption).foregroundStyle(Theme.secondary)
                         }
                     }
+                }
+                if let dates = TripDates.text(summary.trip) {
+                    Text(dates).font(.footnote).foregroundStyle(Theme.secondary).accessibilityIdentifier("tripDates")
+                }
+                if let due = model.tripDues.first(where: { $0.tripID == summary.trip.id }) {
+                    Text("\(due.title): \(dueText(due.dueDate, windowDays: model.preferences.upcomingWindowDays).text)")
+                        .font(.footnote).foregroundStyle(Theme.red)
                 }
                 Text((summary.trip.currency ?? "₹") + " · " + (summary.members.isEmpty ? "no people yet" : summary.members.map(\.name).joined(separator: ", ")))
                     .font(.footnote).foregroundStyle(Theme.secondary)
@@ -89,6 +101,8 @@ struct NewTripSheet: View {
     @State private var category = ""
     @State private var subCategory = ""
     @State private var payment = PaymentChoice.all[0]
+    @State private var hasStart = false
+    @State private var startDate = Date()
     @State private var hasEnd = false
     @State private var endDate = Date()
     @State private var planOnly = false
@@ -110,6 +124,8 @@ struct NewTripSheet: View {
         _category = State(initialValue: trip.category)
         _subCategory = State(initialValue: trip.subCategory)
         _payment = State(initialValue: PaymentChoice(method: trip.paymentMethod))
+        _hasStart = State(initialValue: trip.startDate != nil)
+        _startDate = State(initialValue: trip.startDate?.instant() ?? Date())
         _hasEnd = State(initialValue: trip.endDate != nil)
         _endDate = State(initialValue: trip.endDate?.instant() ?? Date())
     }
@@ -170,6 +186,10 @@ struct NewTripSheet: View {
                         }
                         .labelsHidden()
                     }
+                    Toggle("Starts on", isOn: $hasStart).rowPadding().accessibilityIdentifier("tripStartToggle")
+                    if hasStart {
+                        FieldRow("Start date") { DatePicker("Start date", selection: $startDate, displayedComponents: .date).labelsHidden() }
+                    }
                     Toggle("Ends on", isOn: $hasEnd).rowPadding()
                     if hasEnd {
                         FieldRow("End date") { DatePicker("End date", selection: $endDate, displayedComponents: .date).labelsHidden() }
@@ -199,9 +219,21 @@ struct NewTripSheet: View {
             name: name, currency: currency.isEmpty ? nil : currency,
             rate: currency.isEmpty ? nil : Decimal(string: rateText.trimmingCharacters(in: .whitespaces)),
             ledgerName: ledgerName, category: category, subCategory: subCategory, paymentMethod: payment.method,
-            endDate: hasEnd ? CalendarDate(endDate) : nil, isPlanning: planOnly
+            endDate: hasEnd ? CalendarDate(endDate) : nil, startDate: hasStart ? CalendarDate(startDate) : nil, isPlanning: planOnly
         )
         errorMessage = editing.map { model.updateTrip($0.id, trip) } ?? model.createTrip(trip)
         if errorMessage == nil { dismiss() }
+    }
+}
+
+enum TripDates {
+    /// "10 Dec – 18 Dec 2026", "From 10 Dec 2026" or "Until 18 Dec 2026"; nil when the trip has no dates.
+    static func text(_ trip: Trip) -> String? {
+        switch (trip.startDate, trip.endDate) {
+        case let (start?, end?): "\(start.shortTitle) – \(end.shortTitleWithYear)"
+        case let (start?, nil): "From \(start.shortTitleWithYear)"
+        case let (nil, end?): "Until \(end.shortTitleWithYear)"
+        default: nil
+        }
     }
 }

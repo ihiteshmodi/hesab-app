@@ -3,13 +3,17 @@ import SwiftUI
 
 /// What a search found, expenses and income together; shared by the Search tab and the Activity search field.
 struct SearchResultsList: View {
+    /// What to look through: the Search tab shows both, Activity follows its tab.
+    enum Scope { case expenses, income, both }
+
     let model: BudgetViewModel
     let text: String
+    var scope = Scope.both
     let openExpense: (Int64) -> Void
     let openIncome: (IncomeEntry) -> Void
 
-    private var expenseGroups: [SearchMonth] { model.searchResults.groups }
-    private var incomeEntries: [IncomeEntry] { model.incomeResults.entries }
+    private var expenseGroups: [SearchMonth] { scope == .income ? [] : model.searchResults.groups }
+    private var incomeEntries: [IncomeEntry] { scope == .expenses ? [] : model.incomeResults.entries }
 
     var body: some View {
         if expenseGroups.isEmpty, incomeEntries.isEmpty {

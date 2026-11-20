@@ -38,6 +38,7 @@ final class BudgetViewModel {
     private(set) var monthlyTrend: [MonthTrend] = []
     private(set) var vsNormal = SpendingVsNormal(changes: [], hasHistory: false)
     private(set) var categoryTrends: [CategoryTrend] = []
+    private(set) var tripDues: [TripDue] = []
     private(set) var forecast: CashForecast?
     private(set) var netWorthHistory = NetWorthHistory(points: [])
     /// Shown on Activity until dismissed, for example "Added automatically: Internet 800".
@@ -82,6 +83,7 @@ final class BudgetViewModel {
             vsNormal = try app.spendingVsNormal(for: reportMonth)
             categoryTrends = try app.categoryTrends(endingAt: reportMonth)
             forecast = try app.cashForecast()
+            tripDues = try app.tripDues()
             // A failed snapshot must never stop the screens from loading.
             try? app.recordNetWorth()
             netWorthHistory = try app.netWorthHistory()
@@ -243,21 +245,63 @@ final class BudgetViewModel {
     func deleteTripPlanItem(_ id: Int64) -> String? { run { try app.deleteTripPlanItem(id) } }
     func unmarkTripPlanItemPaid(_ id: Int64) -> String? { run { try app.unmarkTripPlanItemPaid(id) } }
 
-    func addTripPlanItem(_ tripID: Int64, description: String, amountText: String, tag: String, category: String, subCategory: String) -> String? {
-        run {
-            try app.addTripPlanItem(tripID, NewTripPlanItem(
-                description: description, amount: MoneyInput.parse(amountText), tag: tag, category: category, subCategory: subCategory
+    /// Returns the new item so the form can stay open on it, for adding parts and legs.
+    func addTripPlanItem(_ tripID: Int64, _ form: PlanItemForm) -> (item: TripPlanItem?, error: String?) {
+        do {
+            let item = try app.addTripPlanItem(tripID, newPlanItem(form))
+            reload()
+            return (item, nil)
+        } catch let error as any UserMessage {
+            return (nil, error.message)
+        } catch {
+            return (nil, "Could not do that. Try again.")
+        }
+    }
+
+    func updateTripPlanItem(_ id: Int64, _ form: PlanItemForm) -> String? { run { try app.updateTripPlanItem(id, newPlanItem(form)) } }
+
+    private func newPlanItem(_ form: PlanItemForm) -> NewTripPlanItem {
+        NewTripPlanItem(
+            description: form.description, amount: MoneyInput.parse(form.amountText), tag: form.tag, category: form.category,
+            subCategory: form.subCategory, note: form.note, dueDate: form.dueDate
+        )
+    }
+
+    /// Reads `trips` first so an open sheet redraws after its item changes.
+    func tripPlanItem(_ tripID: Int64, _ itemID: Int64) -> TripPlanItem? {
+        _ = trips
+        return (try? app.tripSummary(tripID))?.plan.items.first { $0.id == itemID }
+    }
+
+    func addTripPlanPayment(_ itemID: Int64, label: String, amountText: String, dueDate: CalendarDate?) -> String? {
+        run { try app.addTripPlanPayment(itemID, NewTripPlanPayment(label: label, amount: MoneyInput.parse(amountText), dueDate: dueDate)) }
+    }
+
+    func updateTripPlanPayment(_ id: Int64, label: String, amountText: String, dueDate: CalendarDate?) -> String? {
+        run { try app.updateTripPlanPayment(id, NewTripPlanPayment(label: label, amount: MoneyInput.parse(amountText), dueDate: dueDate)) }
+    }
+
+    func deleteTripPlanPayment(_ id: Int64) -> String? { run { try app.deleteTripPlanPayment(id) } }
+    func unmarkTripPlanPaymentPaid(_ id: Int64) -> String? { run { try app.unmarkTripPlanPaymentPaid(id) } }
+
+    func markTripPlanPaymentPaid(
+        _ id: Int64, amountText: String, date: CalendarDate, paidWith: ExpensePayment, chargeText: String
+    ) -> String? {
+        guard let amount = MoneyInput.parse(amountText) else { return TripError.amountMissingOrZero.message }
+        return run {
+            try app.markTripPlanPaymentPaid(id, PlanItemPayment(
+                amount: amount, date: date, paidWith: paidWith,
+                paidInHome: chargeText.trimmingCharacters(in: .whitespaces).isEmpty ? nil : MoneyInput.parse(chargeText)
             ))
         }
     }
 
-    func updateTripPlanItem(_ id: Int64, description: String, amountText: String, tag: String, category: String, subCategory: String) -> String? {
-        run {
-            try app.updateTripPlanItem(id, NewTripPlanItem(
-                description: description, amount: MoneyInput.parse(amountText), tag: tag, category: category, subCategory: subCategory
-            ))
-        }
-    }
+    func addTripLeg(_ itemID: Int64, _ leg: NewTripLeg) -> String? { run { try app.addTripLeg(itemID, leg) } }
+    func updateTripLeg(_ id: Int64, _ leg: NewTripLeg) -> String? { run { try app.updateTripLeg(id, leg) } }
+    func deleteTripLeg(_ id: Int64) -> String? { run { try app.deleteTripLeg(id) } }
+
+    /// How many payments are due soon on one trip.
+    func dueCount(tripID: Int64) -> Int { tripDues.filter { $0.tripID == tripID }.count }
 
     func markTripPlanItemPaid(
         _ id: Int64, amountText: String, date: CalendarDate, paidWith: ExpensePayment, chargeText: String
@@ -520,4 +564,15 @@ struct HoldingForm {
     var kind = HoldingKind.other
     var sipAmountText = ""
     var sipDay: Int?
+}
+
+/// What the plan item form holds.
+struct PlanItemForm {
+    var description = ""
+    var amountText = ""
+    var tag = ""
+    var category = ""
+    var subCategory = ""
+    var note = ""
+    var dueDate: CalendarDate?
 }

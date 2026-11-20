@@ -93,7 +93,7 @@ final class NewFeaturesUITests: XCTestCase {
     // MARK: search
 
     @MainActor
-    func testTheSearchFieldOnActivityFindsAnExpenseAndAnIncomeEntry() {
+    func testTheSearchFieldFollowsTheTabAndIsAbsentOnTheCalendar() {
         let app = launchApp()
         app.buttons["addMenu"].tap()
         app.buttons["addExpenseButton"].tap()
@@ -113,9 +113,17 @@ final class NewFeaturesUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["leftToSpend"].waitForExistence(timeout: 20))
 
         type(app.textFields["activitySearchField"], "bean")
-
         XCTAssertTrue(app.descendants(matching: .any)["searchResultRow"].waitForExistence(timeout: 20), "no expense result")
+        XCTAssertFalse(app.descendants(matching: .any)["searchIncomeRow"].exists, "income showed up under the Expenses tab")
+
+        app.buttons["Income"].tap()
         XCTAssertTrue(app.descendants(matching: .any)["searchIncomeRow"].waitForExistence(timeout: 20), "no income result")
+        XCTAssertFalse(app.descendants(matching: .any)["searchResultRow"].exists, "an expense showed up under the Income tab")
+
+        app.buttons["Calendar"].tap()
+        XCTAssertFalse(app.textFields["activitySearchField"].exists, "the Calendar tab should have no search field")
+        app.buttons["Expenses"].tap()
+        XCTAssertEqual(app.textFields["activitySearchField"].value as? String, "Search expenses", "the field should come back empty")
     }
 
     // MARK: reports
@@ -169,6 +177,97 @@ final class NewFeaturesUITests: XCTestCase {
         XCTAssertEqual(app.staticTexts["tripPendingTotal"].label, "₹0.00")
         app.buttons["Expenses"].tap()
         XCTAssertEqual(app.staticTexts["tripLedgerAmount"].label, "₹6,000.00")
+    }
+
+    @MainActor
+    func testAnItemPaidInPartsRemindsWhenAPartIsDueAndEachPartIsTickedOnItsOwn() {
+        let app = launchApp()
+        openNewTrip(app, name: "Himalaya trek", planOnly: false)
+        app.buttons["Plan"].tap()
+        app.buttons["addPlanItemButton"].tap()
+        type(app.textFields["planItemNameField"], "Group tour")
+        type(app.textFields["planItemAmountField"], "80000")
+        type(app.textFields["planItemNoteField"], "Advance holds the seats")
+        app.buttons["saveAndAddDetailsButton"].tap()
+
+        app.buttons["addPartButton"].tap()
+        type(app.textFields["partLabelField"], "Advance")
+        type(app.textFields["partAmountField"], "20000")
+        app.switches["partDueToggle"].coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: 0.5)).tap()
+        app.buttons["savePartButton"].tap()
+        app.buttons["addPartButton"].tap()
+        type(app.textFields["partLabelField"], "Balance")
+        type(app.textFields["partAmountField"], "60000")
+        app.buttons["savePartButton"].tap()
+        XCTAssertEqual(app.staticTexts["planItemTotal"].label, "₹80,000.00")
+        app.buttons["savePlanItemButton"].tap()
+
+        XCTAssertTrue(app.descendants(matching: .any)["tripDueHeading"].waitForExistence(timeout: 20), "no due-soon reminder")
+        XCTAssertTrue(app.buttons["tab-Trips"].label.contains("1"), "no red 1 on the Trips tab: \(app.buttons["tab-Trips"].label)")
+        XCTAssertEqual(app.descendants(matching: .any).matching(identifier: "planPartRow").count, 2)
+        XCTAssertTrue(app.staticTexts["Advance holds the seats"].exists, "the note is not shown on the item")
+
+        app.buttons["payDueButton"].tap()
+        app.buttons["confirmPlanPaidButton"].tap()
+        XCTAssertTrue(app.staticTexts["tripPendingTotal"].waitForExistence(timeout: 20))
+        XCTAssertEqual(app.staticTexts["tripPendingTotal"].label, "₹60,000.00")
+        XCTAssertFalse(app.descendants(matching: .any)["tripDueHeading"].exists, "the reminder stays after the part was paid")
+    }
+
+    @MainActor
+    func testAFlightLegKeepsItsRouteNumberAndTimesAndListsInTheTravelSection() {
+        let app = launchApp()
+        openNewTrip(app, name: "Bali plan", planOnly: true)
+        app.buttons["addPlanItemButton"].tap()
+        type(app.textFields["planItemNameField"], "Flights")
+        type(app.textFields["planItemAmountField"], "9000")
+        app.buttons["saveAndAddDetailsButton"].tap()
+
+        app.buttons["addLegButton"].tap()
+        type(app.textFields["legFromField"], "Delhi")
+        type(app.textFields["legToField"], "Denpasar")
+        type(app.textFields["legCarrierField"], "IndiGo")
+        type(app.textFields["legNumberField"], "6E1175")
+        app.switches["legDepartureToggle"].coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: 0.5)).tap()
+        app.switches["legDepartureTimeToggle"].coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: 0.5)).tap()
+        app.buttons["saveLegButton"].tap()
+        app.buttons["savePlanItemButton"].tap()
+
+        let leg = app.descendants(matching: .any)["itineraryLeg"]
+        XCTAssertTrue(leg.waitForExistence(timeout: 20), "no leg in the Travel section")
+        XCTAssertTrue(leg.label.contains("Delhi → Denpasar"), "leg reads \(leg.label)")
+        XCTAssertTrue(leg.label.contains("IndiGo 6E1175"), "leg reads \(leg.label)")
+        XCTAssertTrue(leg.label.contains("Planned"), "leg reads \(leg.label)")
+    }
+
+    @MainActor
+    func testATripShowsItsStartAndEndDatesInTheList() {
+        let app = launchApp()
+        selectTab(app, "Trips")
+        app.buttons["newTripButton"].tap()
+        XCTAssertTrue(app.textFields["tripNameField"].waitForExistence(timeout: 20))
+        let picker = app.buttons["tripCategoryPicker"]
+        if picker.label.hasSuffix("Choose") { picker.tap(); app.buttons["Home & Utilities"].tap() }
+        type(app.textFields["tripNameField"], "Goa weekend")
+        app.switches["tripStartToggle"].coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: 0.5)).tap()
+        app.buttons["saveTripButton"].tap()
+
+        let dates = app.staticTexts["tripDates"]
+        XCTAssertTrue(dates.waitForExistence(timeout: 20), "no dates on the trip row")
+        XCTAssertTrue(dates.label.hasPrefix("From "), "dates read \(dates.label)")
+    }
+
+    @MainActor
+    private func openNewTrip(_ app: XCUIApplication, name: String, planOnly: Bool) {
+        selectTab(app, "Trips")
+        app.buttons["newTripButton"].tap()
+        XCTAssertTrue(app.textFields["tripNameField"].waitForExistence(timeout: 20))
+        let picker = app.buttons["tripCategoryPicker"]
+        if picker.label.hasSuffix("Choose") { picker.tap(); app.buttons["Home & Utilities"].tap() }
+        type(app.textFields["tripNameField"], name)
+        if planOnly { app.switches["tripPlanOnlyToggle"].coordinate(withNormalizedOffset: CGVector(dx: 0.92, dy: 0.5)).tap() }
+        app.buttons["saveTripButton"].tap()
+        app.descendants(matching: .any)["tripRow"].firstMatch.tap()
     }
 
     // MARK: investments

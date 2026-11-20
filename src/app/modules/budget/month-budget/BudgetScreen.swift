@@ -64,6 +64,7 @@ struct BudgetScreen: View {
             .cardNavigation("Activity")
             .onDisappear { revealed = false }
             .onChange(of: pane) { authMessage = nil }
+            .onChange(of: view) { if view == .calendar { searchText = ""; model.search("") } }
             .onChange(of: scenePhase) {
                 if scenePhase != .active { revealed = false }
             }
@@ -231,7 +232,7 @@ struct BudgetScreen: View {
     private var searchField: some View {
         HStack(spacing: 8) {
             Image(systemName: "magnifyingglass").foregroundStyle(Theme.secondary)
-            TextField("Search expenses and income", text: $searchText)
+            TextField(view == .income ? "Search income" : "Search expenses", text: $searchText)
                 .font(.system(size: 15)).focused($searchFocused)
                 .submitLabel(.search).autocorrectionDisabled()
                 .accessibilityIdentifier("activitySearchField")
@@ -246,21 +247,25 @@ struct BudgetScreen: View {
         .onChange(of: searchText) { model.search(searchText) }
     }
 
+    /// The search follows the tab: Expenses searches expenses, Income searches income, and Calendar has no search.
     @ViewBuilder private func entries(_ budget: MonthBudget) -> some View {
-        searchField
-        if searching {
-            SearchResultsList(model: model, text: searchText, openExpense: { openedExpense = $0 }, openIncome: { editingIncome = $0 })
+        CardPanel {
+            PillSegments(selection: $view, options: ActivityView.allCases.map { ($0, $0.rawValue) })
+                .accessibilityIdentifier("activityViewPicker")
+        }
+        if let errorMessage { Text(errorMessage).foregroundStyle(Theme.red) }
+        if view != .calendar { searchField }
+        if searching, view != .calendar {
+            SearchResultsList(
+                model: model, text: searchText, scope: view == .income ? .income : .expenses,
+                openExpense: { openedExpense = $0 }, openIncome: { editingIncome = $0 }
+            )
         } else {
             monthEntries(budget)
         }
     }
 
     @ViewBuilder private func monthEntries(_ budget: MonthBudget) -> some View {
-        CardPanel {
-            PillSegments(selection: $view, options: ActivityView.allCases.map { ($0, $0.rawValue) })
-                .accessibilityIdentifier("activityViewPicker")
-        }
-        if let errorMessage { Text(errorMessage).foregroundStyle(Theme.red) }
         if budget.hasNoEntriesAtAll, view == .expenses {
             Text("No entries yet. Add your first expense or income.").foregroundStyle(Theme.secondary).padding(.horizontal, 4)
         }

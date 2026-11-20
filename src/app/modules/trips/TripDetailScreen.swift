@@ -34,11 +34,15 @@ struct TripDetailScreen: View {
                 // A trip still being planned has only its plan; the other panes arrive when it starts.
                 let shown = summary.trip.isPlanning ? TripPane.plan : pane
                 CardScreen {
+                    if let dates = TripDates.text(summary.trip) {
+                        Text(dates).font(.footnote).foregroundStyle(Theme.secondary).padding(.horizontal, 6)
+                            .accessibilityIdentifier("tripDates")
+                    }
                     if !summary.trip.isPlanning {
-                        Picker("View", selection: $pane) {
-                            ForEach(TripPane.allCases, id: \.self) { Text($0.rawValue).tag($0) }
-                        }
-                        .pickerStyle(.segmented)
+                        PillSegments(
+                            selection: $pane, options: TripPane.allCases.map { ($0, $0.rawValue) },
+                            badges: [.plan: model.dueCount(tripID: tripID)]
+                        )
                         .accessibilityIdentifier("tripPanePicker")
                     }
                     if let errorMessage { Text(errorMessage).foregroundStyle(Theme.red) }
@@ -82,6 +86,9 @@ struct TripDetailScreen: View {
                     case .newItem: TripPlanItemSheet(model: model, tripID: tripID, editing: nil)
                     case .editItem(let item): TripPlanItemSheet(model: model, tripID: tripID, editing: item)
                     case .pay(let item): TripPlanPaySheet(model: model, trip: summary.trip, item: item)
+                    case .payPart(let item, let part): TripPlanPaySheet(model: model, trip: summary.trip, item: item, part: part)
+                    case .editLeg(let leg):
+                        if let item = summary.plan.items.first(where: { $0.id == leg.itemID }) { TripLegSheet(model: model, item: item, editing: leg) }
                     }
                 }
                 .overlay(alignment: .bottomTrailing) {
