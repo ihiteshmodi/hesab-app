@@ -27,6 +27,7 @@ public final class BudgetApp: Sendable {
     public let updateIncome: UpdateIncome
     public let deleteIncome: DeleteIncome
     public let monthBudget: GetMonthBudget
+    public let cashForecast: GetCashForecast
     public let addCard: AddCard
     public let cards: GetCards
     public let cardBills: GetCardBills
@@ -85,6 +86,10 @@ public final class BudgetApp: Sendable {
     public let searchExpenses: SearchExpenses
     public let searchIncome: SearchIncome
     public let spendingBreakdown: GetSpendingBreakdown
+    public let spendingPace: GetSpendingPace
+    public let monthlyTrend: GetMonthlyTrend
+    public let spendingVsNormal: GetSpendingVsNormal
+    public let categoryTrends: GetCategoryTrends
     public let categoryBreakdown: GetCategoryBreakdown
     public let groupBreakdown: GetGroupBreakdown
     public let currencies: GetCurrencies
@@ -93,10 +98,14 @@ public final class BudgetApp: Sendable {
     public let setHomeCurrency: SetHomeCurrency
     public let portfolio: GetPortfolio
     public let setBankBalance: SetBankBalance
+    public let recordNetWorth: RecordNetWorth
+    public let netWorthHistory: GetNetWorthHistory
     public let setExchangeRate: SetExchangeRate
     public let addHolding: AddHolding
     public let updateHolding: UpdateHolding
     public let deleteHolding: DeleteHolding
+    public let addToHolding: AddToHolding
+    public let holdingHistory: GetHoldingHistory
     public let addAllocatedFund: AddAllocatedFund
     public let updateAllocatedFund: UpdateAllocatedFund
     public let deleteAllocatedFund: DeleteAllocatedFund
@@ -237,9 +246,14 @@ public final class BudgetApp: Sendable {
         undoAutoAdded = UndoAutoAdded(store: billStore, expenses: expenses)
         billsAttention = GetBillsAttention(store: billStore, schemes: schemeStore)
         billsCalendar = GetBillsCalendar(store: billStore, schemes: schemeStore, income: income)
+        cashForecast = GetCashForecast(budget: monthBudget, bills: billStore, schemes: schemeStore, expenses: expenses, income: income, clock: clock)
         searchExpenses = SearchExpenses(expenses: expenses)
         searchIncome = SearchIncome(income: income)
         spendingBreakdown = GetSpendingBreakdown(expenses: expenses)
+        spendingPace = GetSpendingPace(expenses: expenses, clock: clock)
+        monthlyTrend = GetMonthlyTrend(expenses: expenses, income: income, settings: settingsBook, clock: clock)
+        spendingVsNormal = GetSpendingVsNormal(expenses: expenses, clock: clock)
+        categoryTrends = GetCategoryTrends(expenses: expenses, clock: clock)
         categoryBreakdown = GetCategoryBreakdown(expenses: expenses)
         groupBreakdown = GetGroupBreakdown(expenses: expenses)
         let currencyBook = CurrencyRepository(database: database)
@@ -250,9 +264,14 @@ public final class BudgetApp: Sendable {
         let portfolioBook = PortfolioRepository(database: database, settings: settingsBook)
         portfolio = GetPortfolio(portfolio: portfolioBook, ledgers: ledgerBook, expenses: expenses, schemes: schemeBook)
         setBankBalance = SetBankBalance(portfolio: portfolioBook, clock: clock)
+        let netWorthBook = NetWorthRepository(database: database)
+        recordNetWorth = RecordNetWorth(portfolio: portfolio, snapshots: netWorthBook, clock: clock)
+        netWorthHistory = GetNetWorthHistory(snapshots: netWorthBook)
         setExchangeRate = SetExchangeRate(portfolio: portfolioBook, clock: clock)
-        addHolding = AddHolding(portfolio: portfolioBook, setRate: setExchangeRate)
-        updateHolding = UpdateHolding(portfolio: portfolioBook, setRate: setExchangeRate)
+        addHolding = AddHolding(portfolio: portfolioBook, setRate: setExchangeRate, clock: clock)
+        addToHolding = AddToHolding(portfolio: portfolioBook, clock: clock)
+        holdingHistory = GetHoldingHistory(portfolio: portfolioBook)
+        updateHolding = UpdateHolding(portfolio: portfolioBook, setRate: setExchangeRate, clock: clock)
         deleteHolding = DeleteHolding(portfolio: portfolioBook)
         addAllocatedFund = AddAllocatedFund(portfolio: portfolioBook)
         updateAllocatedFund = UpdateAllocatedFund(portfolio: portfolioBook)

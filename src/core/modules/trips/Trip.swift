@@ -239,6 +239,8 @@ public struct TripPlan: Equatable, Sendable {
     public let byTag: [TagSpend]
     /// Estimates by main category, largest first; items with none are together under a blank name.
     public let byCategory: [CategorySpend]
+    /// Planned against really spent in each category, the bigger of the two first. Empty when nothing is planned.
+    public let categoryProgress: [CategoryProgress]
 }
 
 public struct TripSettlement: Equatable, Sendable {
@@ -291,6 +293,12 @@ public struct CategorySpend: Equatable, Sendable {
     /// Blank for spending with no category.
     public let category: String
     public let amount: Money
+}
+
+public struct CategoryProgress: Equatable, Sendable {
+    public let category: String
+    public let planned: Money
+    public let spent: Money
 }
 
 public struct ParticipantTotal: Equatable, Sendable {

@@ -397,6 +397,26 @@ public final class AppDatabase: Sendable {
             }
         }
 
+        migrator.registerMigration("v22-net-worth-history") { db in
+            try db.create(table: "net_worth_snapshot") { table in
+                table.primaryKey("date", .text)
+                table.column("amount_paise", .integer).notNull()
+            }
+        }
+
+        migrator.registerMigration("v23-investment-performance") { db in
+            try db.alter(table: "holding") { table in
+                table.add(column: "invested_paise", .integer)
+            }
+            try db.create(table: "holding_value") { table in
+                table.column("holding_id", .integer).notNull().references("holding", onDelete: .cascade)
+                table.column("date", .text).notNull()
+                table.column("value_paise", .integer).notNull()
+                table.column("invested_paise", .integer)
+                table.primaryKey(["holding_id", "date"])
+            }
+        }
+
         return migrator
     }
 }

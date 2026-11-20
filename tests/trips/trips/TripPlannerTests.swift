@@ -280,4 +280,34 @@ struct TripPlannerTests {
         let lifestyle = try #require(try p.app.categories().first { $0.name == "Lifestyle" })
         #expect(lifestyle.subCategories.map(\.name).contains("Diving"))
     }
+
+    // MARK: planned against paid
+
+    @Test func eachCategoryShowsWhatWasPlannedAgainstWhatWasSpent() throws {
+        let p = try planning(started: true)
+        let flights = try p.app.addTripPlanItem(p.trip.id, NewTripPlanItem(description: "Flights", amount: .rupees(6_500_000), category: "Transport"))
+        try p.app.addTripPlanItem(p.trip.id, NewTripPlanItem(description: "Hotel", amount: .rupees(8_000_000), category: "Lifestyle"))
+        try p.app.markTripPlanItemPaid(flights.id)
+        try p.app.addTripExpense(p.trip.id, NewTripExpense(
+            description: "First night", amount: .rupees(4_000_000), split: .equal([.me]), category: "Lifestyle"
+        ))
+        try p.app.addTripExpense(p.trip.id, NewTripExpense(
+            description: "Dinner", amount: .rupees(400_000), split: .equal([.me]), category: "Food & Dining"
+        ))
+
+        let progress = try p.summary().plan.categoryProgress
+
+        #expect(progress == [
+            CategoryProgress(category: "Lifestyle", planned: .rupees(8_000_000), spent: .rupees(4_000_000)),
+            CategoryProgress(category: "Transport", planned: .rupees(6_500_000), spent: .rupees(6_500_000)),
+            CategoryProgress(category: "Food & Dining", planned: .zero, spent: .rupees(400_000)),
+        ])
+    }
+
+    @Test func aTripWithNoPlanHasNoProgress() throws {
+        let p = try planning(started: true)
+        try p.app.addTripExpense(p.trip.id, NewTripExpense(description: "Dinner", amount: .rupees(400_000), split: .equal([.me])))
+
+        #expect(try p.summary().plan.categoryProgress.isEmpty)
+    }
 }

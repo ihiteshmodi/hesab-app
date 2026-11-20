@@ -30,14 +30,7 @@ public struct MonthBudget: Equatable, Sendable {
             .sorted { ($0.date, $0.id) > ($1.date, $1.id) }
         let bankSpend: (Expense) -> Money = { $0.paymentMethod.movesLeftToSpend ? $0.netAmount : .zero }
         let spentSpend: (Expense) -> Money = { preferences.includeCashAndLedgerInSpent ? $0.netAmount : bankSpend($0) }
-        let countsAsIncome: (IncomeKind) -> Bool = { kind in
-            switch kind {
-            case .salary, .investmentIncome: true
-            case .moneyReceived: preferences.countMoneyReceivedAsIncome
-            case .borrowed: preferences.countBorrowedAsIncome
-            case .savings: false
-            }
-        }
+        let countsAsIncome: (IncomeKind) -> Bool = { $0.countsAsIncome(preferences) }
 
         self.month = month
         self.expenses = expensesInMonth

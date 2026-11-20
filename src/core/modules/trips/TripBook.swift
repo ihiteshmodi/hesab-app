@@ -145,6 +145,15 @@ struct TripBook {
         return totals.map { CategorySpend(category: $0.key, amount: $0.value) }.sorted { ($1.amount, $0.category) < ($0.amount, $1.category) }
     }
 
+    private func progress() -> [CategoryProgress] {
+        guard !planItems.isEmpty else { return [] }
+        let planned = Dictionary(uniqueKeysWithValues: Self.byCategory(planItems.map { ($0.category, $0.amount) }).map { ($0.category, $0.amount) })
+        let spent = Dictionary(uniqueKeysWithValues: Self.byCategory(expenses.map { ($0.category, $0.amount) }).map { ($0.category, $0.amount) })
+        return Set(planned.keys).union(spent.keys)
+            .map { CategoryProgress(category: $0, planned: planned[$0] ?? .zero, spent: spent[$0] ?? .zero) }
+            .sorted { (max($1.planned, $1.spent), $0.category) < (max($0.planned, $0.spent), $1.category) }
+    }
+
     func plan() -> TripPlan {
         let pending = planItems.filter { !$0.isPaid }.reduce(Money.zero) { $0 + $1.amount }
         let planned = planItems.reduce(Money.zero) { $0 + $1.amount }
@@ -156,7 +165,7 @@ struct TripBook {
             items: planItems, plannedTotal: planned, plannedTotalHome: homeValue(planned), pendingTotal: pending,
             pendingTotalHome: homeValue(pending), paidTotal: paid,
             byTag: byTag.map { TagSpend(tag: $0.key, amount: $0.value) }.sorted { ($1.amount, $0.tag) < ($0.amount, $1.tag) },
-            byCategory: Self.byCategory(planItems.map { ($0.category, $0.amount) })
+            byCategory: Self.byCategory(planItems.map { ($0.category, $0.amount) }), categoryProgress: progress()
         )
     }
 

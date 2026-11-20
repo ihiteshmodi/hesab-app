@@ -95,3 +95,13 @@ Feature: Trip planner
     Then the trip expense "Flights" is under "Transport" > "Flight"
     And the main ledger still holds one entry for the trip
 
+  # D6: planned against what was really spent, per category
+  Scenario: Planned against paid, by category
+    Given the trip has started with Transport planned at IDR 6,500,000 and Stay at IDR 8,000,000
+    And IDR 6,500,000 of Transport and IDR 4,000,000 of Stay are paid
+    Then Transport reads paid 6,500,000 of 6,500,000 and Stay reads 4,000,000 of 8,000,000
+
+  Scenario: Spending in a category that was never planned shows against a plan of zero
+    Given a trip expense in "Food & Dining" and nothing planned there
+    Then "Food & Dining" reads paid against a plan of 0
+
