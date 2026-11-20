@@ -18,7 +18,9 @@ Feature: Fresh install, backup and restore
   Scenario: Priya exports her data
     Given she has recorded entries
     When she chooses "Export Data"
-    Then she can share one file named "budget-2026-10-29.sqlite"
+    Then the iOS share sheet opens at once, with no Files picker first
+    And it carries one file named "budget-2026-10-29.sqlite"
+    And AirDrop, Save to Files and Google Drive are among the choices
     And nothing leaves the phone unless she shares it
 
   Scenario: Priya restores from a backup

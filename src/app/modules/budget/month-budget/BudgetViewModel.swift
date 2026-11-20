@@ -406,10 +406,12 @@ final class BudgetViewModel {
         run { try app.addCash(MoneyInput.parse(amountText), note: title, on: date) }
     }
 
-    /// Writes the export into the temporary folder; the screen hands it to the system file saver.
+    /// Writes the export into a fresh temporary folder; the screen hands it to the share sheet.
     func exportData() -> (file: URL?, error: String?) {
         do {
-            return (try app.exportData(into: FileManager.default.temporaryDirectory), nil)
+            let folder = FileManager.default.temporaryDirectory.appendingPathComponent("export-\(UUID().uuidString)")
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            return (try app.exportData(into: folder), nil)
         } catch let error as BackupError {
             return (nil, error.message)
         } catch {

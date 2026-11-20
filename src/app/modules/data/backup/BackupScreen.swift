@@ -1,12 +1,9 @@
 import HisaabCore
 import SwiftUI
-import UniformTypeIdentifiers
 
 struct BackupScreen: View {
     let model: BudgetViewModel
-    @State private var exportedFile: SQLiteDocument?
-    @State private var exportFileName = "budget.sqlite"
-    @State private var exporting = false
+    @State private var shareItem: ShareItem?
     @State private var choosingFile = false
     @State private var pendingImport: ImportPreview?
     @State private var message: String?
@@ -35,12 +32,10 @@ struct BackupScreen: View {
             }
         }
         .cardNavigation("Backup")
-        .fileExporter(
-            isPresented: $exporting, document: exportedFile, contentType: SQLiteDocument.sqlite,
-            defaultFilename: exportFileName
-        ) { result in
-            if case .failure = result { show("Could not save the file. Try again.", isError: true) }
-            else { show("Exported \(exportFileName).", isError: false) }
+        .sheet(item: $shareItem) { item in
+            ShareSheet(items: [item.url]) { completed in
+                if completed { show("Exported \(item.url.lastPathComponent).", isError: false) }
+            }
         }
         .fileImporter(isPresented: $choosingFile, allowedContentTypes: [.data]) { result in
             choose(result)
@@ -60,13 +55,11 @@ struct BackupScreen: View {
 
     private func export() {
         let result = model.exportData()
-        guard let file = result.file, let data = try? Data(contentsOf: file) else {
+        guard let file = result.file else {
             show(result.error ?? "Could not export. Try again.", isError: true)
             return
         }
-        exportFileName = file.lastPathComponent
-        exportedFile = SQLiteDocument(data: data)
-        exporting = true
+        shareItem = ShareItem(url: file)
     }
 
     private func choose(_ result: Result<URL, any Error>) {
@@ -102,24 +95,5 @@ struct BackupScreen: View {
     private func show(_ text: String, isError: Bool) {
         message = text
         messageIsError = isError
-    }
-}
-
-struct SQLiteDocument: FileDocument {
-    static let sqlite = UTType(filenameExtension: "sqlite") ?? .data
-    static let readableContentTypes: [UTType] = [.data]
-
-    let data: Data
-
-    init(data: Data) {
-        self.data = data
-    }
-
-    init(configuration: ReadConfiguration) throws {
-        data = configuration.file.regularFileContents ?? Data()
-    }
-
-    func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
-        FileWrapper(regularFileWithContents: data)
     }
 }
