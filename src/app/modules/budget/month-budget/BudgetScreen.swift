@@ -26,6 +26,8 @@ struct BudgetScreen: View {
     @State private var pane = ActivityPane.spending
     @State private var view = ActivityView.expenses
     @State private var revealed = false
+    @State private var searchText = ""
+    @FocusState private var searchFocused: Bool
     @State private var authMessage: String?
 
     private var hidden: Bool { model.preferences.hideBalances && !revealed }
@@ -224,7 +226,37 @@ struct BudgetScreen: View {
         String(month.title.split(separator: " ").first ?? "")
     }
 
+    private var searching: Bool { !searchText.trimmingCharacters(in: .whitespaces).isEmpty }
+
+    /// A slim field under the summary card; it looks through every month's expenses and income.
+    private var searchField: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass").foregroundStyle(Theme.secondary)
+            TextField("Search expenses and income", text: $searchText)
+                .font(.system(size: 15)).focused($searchFocused)
+                .submitLabel(.search).autocorrectionDisabled()
+                .accessibilityIdentifier("activitySearchField")
+            if !searchText.isEmpty {
+                Button("Clear", systemImage: "xmark.circle.fill") { searchText = ""; searchFocused = false }
+                    .labelStyle(.iconOnly).foregroundStyle(Theme.secondary).buttonStyle(.plain)
+                    .accessibilityIdentifier("activitySearchClear")
+            }
+        }
+        .padding(.vertical, 9).padding(.horizontal, 12)
+        .background(Theme.tile, in: Capsule())
+        .onChange(of: searchText) { model.search(searchText) }
+    }
+
     @ViewBuilder private func entries(_ budget: MonthBudget) -> some View {
+        searchField
+        if searching {
+            SearchResultsList(model: model, text: searchText, openExpense: { openedExpense = $0 }, openIncome: { editingIncome = $0 })
+        } else {
+            monthEntries(budget)
+        }
+    }
+
+    @ViewBuilder private func monthEntries(_ budget: MonthBudget) -> some View {
         CardPanel {
             PillSegments(selection: $view, options: ActivityView.allCases.map { ($0, $0.rawValue) })
                 .accessibilityIdentifier("activityViewPicker")
@@ -462,7 +494,7 @@ struct CalendarGrid<Day: View>: View {
     }
 }
 
-private struct IncomeRow: View {
+struct IncomeRow: View {
     let entry: IncomeEntry
 
     var body: some View {

@@ -38,8 +38,39 @@ public struct SearchExpenses: Sendable {
     }
 
     /// "1250" or "1250.50": the amount as typed without grouping.
-    private static func digits(_ money: Money) -> String {
+    static func digits(_ money: Money) -> String {
         let paise = money.paise % 100
         return paise == 0 ? String(money.paise / 100) : "\(money.paise / 100).\(paise < 10 ? "0" : "")\(paise)"
+    }
+}
+
+public struct IncomeSearchResults: Equatable, Sendable {
+    /// Newest first.
+    public let entries: [IncomeEntry]
+    /// Money that came in; moves into savings are not counted.
+    public let total: Money
+
+    public init(entries: [IncomeEntry], total: Money) {
+        self.entries = entries
+        self.total = total
+    }
+}
+
+public struct SearchIncome: Sendable {
+    let income: IncomeRepository
+
+    /// Matches the note, the type's name or the amount, ignoring case.
+    public func callAsFunction(_ typed: String) throws -> IncomeSearchResults {
+        let text = typed.trimmed.lowercased()
+        guard !text.isEmpty else { return IncomeSearchResults(entries: [], total: .zero) }
+        let amountText = text.filter { $0 != "," && $0 != "₹" && !$0.isWhitespace }
+        let matching = try income.all().filter { entry in
+            entry.note.lowercased().contains(text) || entry.kind.title.lowercased().contains(text)
+                || (amountText.allSatisfy { $0.isNumber || $0 == "." } && SearchExpenses.digits(entry.amount).contains(amountText))
+        }
+        return IncomeSearchResults(
+            entries: matching.sorted { ($0.date, $0.id) > ($1.date, $1.id) },
+            total: matching.filter { $0.kind != .savings }.reduce(.zero) { $0 + $1.amount }
+        )
     }
 }

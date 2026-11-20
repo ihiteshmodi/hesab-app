@@ -25,6 +25,7 @@ final class BudgetViewModel {
     private(set) var preferences = Preferences()
     private(set) var currencies: [Currency] = []
     private(set) var searchResults = SearchResults(groups: [], total: .zero)
+    private(set) var incomeResults = IncomeSearchResults(entries: [], total: .zero)
     private(set) var trips: [TripSummary] = []
     private(set) var portfolio: Portfolio?
     private(set) var payouts = PayoutOverview(schemes: [], investedTotal: .zero, monthlyPayoutTotal: .zero)
@@ -36,6 +37,7 @@ final class BudgetViewModel {
     /// Shown on Activity until dismissed, for example "Added automatically: Internet 800".
     private(set) var notices: [String] = []
     private(set) var loadError: String?
+    private var searchText = ""
     private var cardMonth: CalendarDate.YearMonth?
     private var budgetMonth: CalendarDate.YearMonth?
 
@@ -69,6 +71,7 @@ final class BudgetViewModel {
             payouts = try app.payoutSchemes()
             upcomingIncome = try app.upcomingIncome()
             report = try app.spendingBreakdown(reportAllTime ? .allTime : .month(reportMonth), by: reportGrouping)
+            runSearch()
             loadError = nil
         } catch {
             loadError = "Could not read your data. Close and reopen the app."
@@ -308,7 +311,14 @@ final class BudgetViewModel {
     }
 
     func search(_ text: String) {
-        searchResults = (try? app.searchExpenses(text)) ?? SearchResults(groups: [], total: .zero)
+        searchText = text
+        runSearch()
+    }
+
+    /// Runs again after every reload so an entry changed from a result does not linger in the list.
+    private func runSearch() {
+        searchResults = (try? app.searchExpenses(searchText)) ?? SearchResults(groups: [], total: .zero)
+        incomeResults = (try? app.searchIncome(searchText)) ?? IncomeSearchResults(entries: [], total: .zero)
     }
 
     func showReport(grouping: BreakdownGrouping, month: CalendarDate.YearMonth, allTime: Bool) {

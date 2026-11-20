@@ -65,4 +65,42 @@ struct SearchTests {
     @Test func aBlankSearchFindsNothing() throws {
         #expect(try appWithExpenses().searchExpenses("   ").groups.isEmpty)
     }
+
+    private func appWithIncome() throws -> BudgetApp {
+        let app = try makeApp()
+        try app.addIncome(NewIncome(date: day("2026-10-03"), kind: .investmentIncome, amount: .rupees(1_850), note: "Post office"))
+        try app.addIncome(NewIncome(date: day("2026-10-01"), kind: .salary, amount: .rupees(90_000), note: "October pay"))
+        try app.addIncome(NewIncome(date: day("2026-09-20"), kind: .moneyReceived, amount: .rupees(1_125), note: "Ben paid"))
+        try app.addIncome(NewIncome(date: day("2026-10-02"), kind: .savings, amount: .rupees(5_000), note: "Moved"))
+        return app
+    }
+
+    @Test(arguments: [
+        ("post", ["Post office"]),
+        ("SALARY", ["October pay"]),
+        ("1125", ["Ben paid"]),
+        ("1,850", ["Post office"]),
+        ("money received", ["Ben paid"]),
+    ])
+    func incomeMatchesNoteTypeOrAmountIgnoringCase(text: String, expected: [String]) throws {
+        let app = try appWithIncome()
+
+        #expect(try app.searchIncome(text).entries.map(\.note) == expected)
+    }
+
+    @Test func incomeResultsAreNewestFirstAndTotalWhatCameInWithoutSavingsMoves() throws {
+        let app = try appWithIncome()
+
+        let results = try app.searchIncome("o")
+
+        #expect(results.entries.map(\.note) == ["Post office", "Moved", "October pay", "Ben paid"])
+        #expect(results.total == .rupees(1_850 + 90_000 + 1_125))
+    }
+
+    @Test func aBlankOrUnmatchedIncomeSearchFindsNothing() throws {
+        let app = try appWithIncome()
+
+        #expect(try app.searchIncome("  ").entries.isEmpty)
+        #expect(try app.searchIncome("xyz").entries.isEmpty)
+    }
 }

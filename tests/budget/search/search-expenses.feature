@@ -37,3 +37,30 @@ Feature: Search expenses
   Scenario: Opening a result shows the whole expense
     When she taps "Sev bhaji" in the results
     Then she sees its amount, entity, category, payment method, date and refund state
+
+  # Activity gets a small search field between the summary card and the Expenses / Income / Calendar card.
+  # It searches expenses and income together; the Search tab shows both too.
+  Scenario Outline: Income matches note, type or amount
+    Given the income entries "Post office" 1,850 (Investment Income), "October pay" 90,000 (Salary) and "Ben paid" 1,125 (Money Received)
+    When she searches for "<text>"
+    Then she sees income <results>
+
+    Examples:
+      | text   | results                     |
+      | post   | "Post office"               |
+      | SALARY | "October pay"               |
+      | 1125   | "Ben paid"                  |
+
+  Scenario: One search finds both expenses and income
+    Given an expense "Post office stamps" and the income "Post office"
+    When she types "post office" in the Activity search field
+    Then she sees the expense under Expenses and the income under Income
+
+  Scenario: Clearing the search brings back the month
+    When she clears the Activity search field
+    Then she sees the month's expenses, income or calendar again
+
+  Scenario: Opening an income result lets her change it
+    When she taps "Post office" in the income results
+    Then the Edit Income form opens
+

@@ -83,6 +83,7 @@ public final class BudgetApp: Sendable {
     public let billsAttention: GetBillsAttention
     public let billsCalendar: GetBillsCalendar
     public let searchExpenses: SearchExpenses
+    public let searchIncome: SearchIncome
     public let spendingBreakdown: GetSpendingBreakdown
     public let categoryBreakdown: GetCategoryBreakdown
     public let groupBreakdown: GetGroupBreakdown
@@ -231,6 +232,7 @@ public final class BudgetApp: Sendable {
         billsAttention = GetBillsAttention(store: billStore, schemes: schemeStore)
         billsCalendar = GetBillsCalendar(store: billStore, schemes: schemeStore, income: income)
         searchExpenses = SearchExpenses(expenses: expenses)
+        searchIncome = SearchIncome(income: income)
         spendingBreakdown = GetSpendingBreakdown(expenses: expenses)
         categoryBreakdown = GetCategoryBreakdown(expenses: expenses)
         groupBreakdown = GetGroupBreakdown(expenses: expenses)
