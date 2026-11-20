@@ -173,7 +173,7 @@ struct SparkLine: View {
             }
         }
         .chartXAxis(.hidden).chartYAxis(.hidden)
-        .frame(width: 64, height: 22)
+        .frame(width: 48, height: 22)
         .accessibilityHidden(true)
     }
 }

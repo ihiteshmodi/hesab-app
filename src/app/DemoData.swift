@@ -77,3 +77,78 @@ enum DemoData {
         ))
     }
 }
+
+/// A clock that can be moved, so made-up history can be dated in the past.
+private final class DemoClock: DayClock, @unchecked Sendable {
+    var date: CalendarDate
+    init(_ date: CalendarDate) { self.date = date }
+    func today() -> CalendarDate { date }
+}
+
+extension DemoData {
+    /// Investments with noted values and instalments, net worth snapshots over six months, and trips (one still
+    /// being planned), all dated in the past; for screenshots of the newer screens, on any database.
+    static func seedExtras(_ database: AppDatabase) {
+        let today = CalendarDate(Date())
+        let clock = DemoClock(today)
+        let app = BudgetApp(database: database, clock: clock)
+        func at(_ days: Int) { clock.date = today.adding(days: days) }
+
+        at(-300)
+        try? app.addHolding(NewHolding(name: "Demo stock", amount: .rupees(7_000), invested: .rupees(7_000), investedOn: clock.date, kind: .stock))
+        at(-200)
+        try? app.addHolding(NewHolding(
+            name: "Demo index SIP", amount: .rupees(10_000), invested: .rupees(10_000), investedOn: clock.date, kind: .sip,
+            sipAmount: .rupees(2_000), sipDay: 5
+        ))
+        let holdings = (try? app.portfolio().holdings) ?? []
+        if let stock = holdings.first(where: { $0.holding.name == "Demo stock" })?.holding.id {
+            for (days, worth) in [(-240, 7_600), (-180, 8_100), (-120, 7_900), (-60, 9_800), (-10, 10_862)] {
+                at(days)
+                try? app.updateHoldingWorth(stock, .rupees(worth))
+            }
+        }
+        if let sip = holdings.first(where: { $0.holding.name == "Demo index SIP" })?.holding.id {
+            for (days, worth) in [(-150, 12_300), (-120, 14_600), (-90, 16_300), (-60, 18_900), (-35, 20_400)] {
+                at(days)
+                try? app.addToHolding(sip, amount: .rupees(2_000), on: clock.date)
+                try? app.updateHoldingWorth(sip, .rupees(worth))
+            }
+        }
+
+        for (index, months) in [5, 4, 3, 2, 1, 0].enumerated() {
+            at(-30 * months)
+            try? app.setBankBalance(.rupees(380_000 + index * 21_000 - (index == 3 ? 15_000 : 0)))
+            try? app.recordNetWorth()
+        }
+
+        at(0)
+        if let bali = try? app.createTrip(NewTrip(
+            name: "Bali trip", currency: "IDR", rate: Decimal(string: "0.0053"), category: "Lifestyle", subCategory: "Vacation"
+        )) {
+            let plan: [(String, Int, String, String)] = [
+                ("Flights", 6_500_000, "Transport", "Flight tickets"), ("Villa, 4 nights", 8_000_000, "Lifestyle", "Vacation"),
+                ("Dinners", 2_000_000, "Food & Dining", "Restaurant"), ("Scooter hire", 900_000, "Transport", "Ride share"),
+                ("Shirts and gifts", 1_000_000, "Shopping - Wants", ""),
+            ]
+            var ids: [Int64] = []
+            for (name, idr, category, sub) in plan {
+                if let item = try? app.addTripPlanItem(bali.id, NewTripPlanItem(description: name, amount: .rupees(idr), category: category, subCategory: sub)) {
+                    ids.append(item.id)
+                }
+            }
+            try? app.startTrip(bali.id)
+            for id in ids.prefix(2) { try? app.markTripPlanItemPaid(id, PlanItemPayment(date: today.adding(days: -3))) }
+            try? app.addTripExpense(bali.id, NewTripExpense(
+                description: "Seafood dinner", date: today.adding(days: -2), amount: .rupees(2_400_000), split: .equal([.me]),
+                category: "Food & Dining", subCategory: "Restaurant"
+            ))
+        }
+        if let goa = try? app.createTrip(NewTrip(name: "Goa plan", category: "Lifestyle", subCategory: "Vacation", isPlanning: true)) {
+            for (name, rupees, category) in [("Train tickets", 4_800, "Transport"), ("Hotel", 14_000, "Lifestyle"), ("Food", 6_000, "Food & Dining")] {
+                try? app.addTripPlanItem(goa.id, NewTripPlanItem(description: name, amount: .rupees(rupees), category: category))
+            }
+        }
+    }
+}
+

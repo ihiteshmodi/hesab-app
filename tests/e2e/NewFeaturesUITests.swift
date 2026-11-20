@@ -77,6 +77,19 @@ final class NewFeaturesUITests: XCTestCase {
         XCTAssertTrue(app.buttons["undoSettlementButton"].waitForExistence(timeout: 20), "the expense went blank after the refund")
     }
 
+    @MainActor
+    func testExportOpensTheShareSheetAtOnce() {
+        let app = launchApp()
+        app.buttons["profileButton"].tap()
+        let backup = app.buttons["backupLink"]
+        XCTAssertTrue(backup.waitForExistence(timeout: 20))
+        backup.tap()
+
+        app.buttons["exportDataButton"].tap()
+
+        XCTAssertTrue(app.otherElements["ActivityListView"].waitForExistence(timeout: 30), "the share sheet never opened")
+    }
+
     // MARK: search
 
     @MainActor

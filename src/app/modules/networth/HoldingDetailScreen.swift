@@ -48,7 +48,8 @@ struct HoldingDetailScreen: View {
     }
 
     private func signed(_ money: Money, _ holding: Holding) -> String {
-        (money > .zero ? "+" : money < .zero ? "−" : "") + amount(money < .zero ? .zero - money : money, holding)
+        if hidden { return "••••••" }
+        return (money > .zero ? "+" : money < .zero ? "−" : "") + amount(money < .zero ? .zero - money : money, holding)
     }
 
     @ViewBuilder private func summary(_ detail: HoldingDetail) -> some View {

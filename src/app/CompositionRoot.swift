@@ -6,19 +6,28 @@ enum CompositionRoot {
     static func makeApp() -> BudgetApp {
         do {
             let arguments = ProcessInfo.processInfo.arguments
-            let database = arguments.contains("-ui-testing")
-                ? try AppDatabase.inMemory()
-                : try AppDatabase.file(at: try databaseFileURL())
+            let database = try openDatabase(arguments)
             let app = BudgetApp(database: database, clock: SystemDayClock())
             // The in-memory test database starts empty, so a test asks for the lock to be on from the first screen.
             if arguments.contains("-ui-testing"), arguments.contains("-ui-app-lock") { try app.updatePreferences { $0.appLock = true } }
             if arguments.contains("-ui-testing"), arguments.contains("-ui-demo-data") { DemoData.seed(app) }
+            if arguments.contains("-ui-testing"), arguments.contains("-ui-extras") { DemoData.seedExtras(database) }
             if arguments.contains("-ui-testing"), arguments.contains("-ui-hide-balances") { try app.updatePreferences { $0.hideBalances = true } }
             return app
         } catch {
             // Without its database the app has nothing to show, so stop rather than run on empty data.
             fatalError("Could not open the Hisaab database: \(error)")
         }
+    }
+
+    /// A UI test starts from an empty in-memory database, or from a scratch copy of a file named after `-ui-database`
+    /// (so a screenshot run can use real data without ever touching the real file).
+    private static func openDatabase(_ arguments: [String]) throws -> AppDatabase {
+        guard arguments.contains("-ui-testing") else { return try AppDatabase.file(at: try databaseFileURL()) }
+        guard let flag = arguments.firstIndex(of: "-ui-database"), flag + 1 < arguments.count else { return try AppDatabase.inMemory() }
+        let copy = FileManager.default.temporaryDirectory.appendingPathComponent("ui-\(UUID().uuidString).sqlite")
+        try FileManager.default.copyItem(at: URL(fileURLWithPath: arguments[flag + 1]), to: copy)
+        return try AppDatabase.file(at: copy)
     }
 
     private static func databaseFileURL() throws -> URL {

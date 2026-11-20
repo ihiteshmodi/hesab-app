@@ -282,23 +282,31 @@ struct TripInsightsScreen: View {
                 }
                 CardGroup(header: "Spend by category") {
                     if summary.spendByCategory.isEmpty { Text("No expenses yet.").foregroundStyle(Theme.secondary).rowPadding() }
+                    Chart(summary.spendByCategory, id: \.category) { item in
+                        SectorMark(angle: .value("Spend", item.amount.paise), innerRadius: .ratio(0.55))
+                            .foregroundStyle(by: .value("Category", item.category.isEmpty ? "No category" : item.category))
+                    }
+                    .frame(height: 180)
+                    .padding(18)
                     ForEach(summary.spendByCategory, id: \.category) { item in
                         CardRow(title: item.category.isEmpty ? "No category" : item.category) {
                             Text(model.tripText(item.amount, trip)).monospacedDigit()
                         }
                     }
                 }
-                CardGroup(header: "Spend by tag") {
-                    if summary.spendByTag.isEmpty { Text("No expenses yet.").foregroundStyle(Theme.secondary).rowPadding() }
-                    Chart(summary.spendByTag, id: \.tag) { item in
-                        SectorMark(angle: .value("Spend", item.amount.paise), innerRadius: .ratio(0.55))
-                            .foregroundStyle(by: .value("Tag", item.tag.isEmpty ? "Untagged" : item.tag))
-                    }
-                    .frame(height: 180)
-                    .padding(18)
-                    ForEach(summary.spendByTag, id: \.tag) { item in
-                        CardRow(title: item.tag.isEmpty ? "Untagged" : item.tag) {
-                            Text(model.tripText(item.amount, trip)).monospacedDigit()
+                // Tags are optional now that line items have categories, so a donut of "Untagged" would say nothing.
+                if summary.spendByTag.contains(where: { !$0.tag.isEmpty }) {
+                    CardGroup(header: "Spend by tag") {
+                        Chart(summary.spendByTag, id: \.tag) { item in
+                            SectorMark(angle: .value("Spend", item.amount.paise), innerRadius: .ratio(0.55))
+                                .foregroundStyle(by: .value("Tag", item.tag.isEmpty ? "Untagged" : item.tag))
+                        }
+                        .frame(height: 180)
+                        .padding(18)
+                        ForEach(summary.spendByTag, id: \.tag) { item in
+                            CardRow(title: item.tag.isEmpty ? "Untagged" : item.tag) {
+                                Text(model.tripText(item.amount, trip)).monospacedDigit()
+                            }
                         }
                     }
                 }
