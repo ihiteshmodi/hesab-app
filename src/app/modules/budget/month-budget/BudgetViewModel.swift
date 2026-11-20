@@ -314,28 +314,36 @@ final class BudgetViewModel {
         return run { try app.setBankBalance(amount) }
     }
 
-    func addHolding(name: String, amountText: String, investedText: String, currency: String?, rateText: String) -> String? {
-        run {
-            try app.addHolding(newHolding(name, amountText, investedText, currency, rateText))
-        }
+    func addHolding(
+        name: String, amountText: String, investedText: String, investedOn: CalendarDate?, currency: String?, rateText: String
+    ) -> String? {
+        run { try app.addHolding(newHolding(name, amountText, investedText, investedOn, currency, rateText)) }
     }
 
-    func updateHolding(_ id: Int64, name: String, amountText: String, investedText: String, currency: String?, rateText: String) -> String? {
-        run {
-            try app.updateHolding(id, newHolding(name, amountText, investedText, currency, rateText))
-        }
+    func updateHolding(
+        _ id: Int64, name: String, amountText: String, investedText: String, investedOn: CalendarDate?, currency: String?, rateText: String
+    ) -> String? {
+        run { try app.updateHolding(id, newHolding(name, amountText, investedText, investedOn, currency, rateText)) }
     }
 
-    func addToHolding(_ id: Int64, amountText: String) -> String? { run { try app.addToHolding(id, amount: MoneyInput.parse(amountText)) } }
+    func addToHolding(_ id: Int64, amountText: String, on date: CalendarDate) -> String? {
+        run { try app.addToHolding(id, amount: MoneyInput.parse(amountText), on: date) }
+    }
+
+    /// Reads `portfolio` first so the open page redraws after every change.
+    func holdingDetail(_ id: Int64) -> HoldingDetail? { _ = portfolio; return try? app.holdingDetail(id) }
     func holdingHistory(_ id: Int64) -> [HoldingPoint] { _ = portfolio; return (try? app.holdingHistory(id)) ?? [] }
 
     /// An empty "amount invested" box means she does not track what she paid; text that is not a number is passed on as
     /// a negative amount so the core refuses it with its usual message.
-    private func newHolding(_ name: String, _ amountText: String, _ investedText: String, _ currency: String?, _ rateText: String) -> NewHolding {
+    private func newHolding(
+        _ name: String, _ amountText: String, _ investedText: String, _ investedOn: CalendarDate?, _ currency: String?, _ rateText: String
+    ) -> NewHolding {
         NewHolding(
             name: name, amount: MoneyInput.parse(amountText), currency: currency,
             rate: Decimal(string: rateText.trimmingCharacters(in: .whitespaces)),
-            invested: investedText.trimmingCharacters(in: .whitespaces).isEmpty ? nil : MoneyInput.parse(investedText) ?? Money(paise: -1)
+            invested: investedText.trimmingCharacters(in: .whitespaces).isEmpty ? nil : MoneyInput.parse(investedText) ?? Money(paise: -1),
+            investedOn: investedOn
         )
     }
 

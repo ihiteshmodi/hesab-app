@@ -62,3 +62,35 @@ Feature: Is this investment up or down?
     Given a holding worth 12,500
     When she fills in 10,000 invested
     Then net worth is unchanged
+
+  # Dates and the detail page: tapping an investment opens it.
+  Scenario: An investment remembers the day it was bought
+    Given "Index fund" was bought on 2025-11-20 for 100,000 and is worth 121,000
+    When she opens it on 2027-11-20
+    Then it shows "Since 20 Nov 2025" and "Held for 2 years"
+
+  Scenario: A lump sum shows how much it grows a year
+    Given "Index fund" was bought for 100,000 two years ago and is worth 121,000
+    Then it shows about 10.0% a year
+
+  Scenario: A short holding shows no yearly figure
+    Given "Stock A" was bought 3 months ago
+    Then it shows the gain and percent but no yearly figure
+
+  Scenario: A holding that has had money added shows no yearly figure
+    Given "Index fund" has had a SIP instalment added
+    Then the yearly figure is left out, because the money was not all in for the same time
+
+  Scenario: Money added is listed with its date
+    Given "Index fund" was bought for 10,000 and 5,000 was added on 2026-10-05 and 2,000 on 2026-11-05
+    Then the page lists "Bought 10,000" and the two additions in date order
+    And what she paid is 17,000
+
+  Scenario: The date cannot be in the future
+    When she saves a holding bought tomorrow
+    Then she sees "The date can't be in the future."
+
+  Scenario: A holding without a date still opens
+    Given "Gold" has no date and no amount invested
+    Then the page shows its worth and offers to fill in what she paid
+

@@ -141,6 +141,99 @@ struct InvestmentPerformanceTests {
     }
 }
 
+struct HoldingDetailTests {
+    private func add(
+        _ app: BudgetApp, _ name: String = "Index fund", paid: Int? = 100_000, now: Int = 121_000, on date: String? = "2025-11-20"
+    ) throws -> Int64 {
+        try app.addHolding(NewHolding(
+            name: name, amount: .rupees(now), invested: paid.map { .rupees($0) }, investedOn: date.map(day)
+        ))
+        return try #require(try app.portfolio().holdings.first { $0.holding.name == name }).holding.id
+    }
+
+    @Test func anInvestmentRemembersTheDayItWasBoughtAndHowLongItHasBeenHeld() throws {
+        let app = try makeApp(today: "2027-11-20")
+        let id = try add(app)
+
+        let detail = try app.holdingDetail(id)
+
+        #expect(detail.holding.investedOn == day("2025-11-20"))
+        #expect(detail.daysHeld == 730)
+        #expect(detail.holding.gain == .rupees(21_000))
+    }
+
+    @Test func aLumpSumShowsHowMuchItGrowsAYear() throws {
+        let app = try makeApp(today: "2027-11-20")
+        let id = try add(app)
+
+        #expect(try app.holdingDetail(id).yearlyGrowthTenths == 100)
+    }
+
+    @Test func aShortHoldingShowsNoYearlyFigure() throws {
+        let app = try makeApp(today: "2026-02-20")
+        let id = try add(app)
+
+        #expect(try app.holdingDetail(id).yearlyGrowthTenths == nil)
+    }
+
+    @Test func aHoldingWithMoneyAddedShowsNoYearlyFigure() throws {
+        let app = try makeApp(today: "2027-11-20")
+        let id = try add(app)
+        try app.addToHolding(id, amount: .rupees(5_000), on: day("2026-10-05"))
+
+        #expect(try app.holdingDetail(id).yearlyGrowthTenths == nil)
+    }
+
+    @Test func moneyAddedIsListedWithItsDateAndTheFirstBuyIsWhatRemains() throws {
+        let app = try makeApp(today: "2026-11-20")
+        let id = try add(app, paid: 10_000, now: 12_000, on: "2026-01-10")
+        try app.addToHolding(id, amount: .rupees(2_000), on: day("2026-11-05"))
+        try app.addToHolding(id, amount: .rupees(5_000), on: day("2026-10-05"))
+
+        let detail = try app.holdingDetail(id)
+
+        #expect(detail.contributions.map(\.date) == [day("2026-10-05"), day("2026-11-05")])
+        #expect(detail.contributions.map(\.amount) == [.rupees(5_000), .rupees(2_000)])
+        #expect(detail.boughtAmount == .rupees(10_000))
+        #expect(detail.holding.invested == .rupees(17_000))
+    }
+
+    @Test func addingMoneyWithoutADateUsesToday() throws {
+        let app = try makeApp(today: "2026-11-20")
+        let id = try add(app, paid: 10_000, now: 12_000, on: nil)
+
+        try app.addToHolding(id, amount: .rupees(1_000))
+
+        #expect(try app.holdingDetail(id).contributions.map(\.date) == [day("2026-11-20")])
+    }
+
+    @Test func theDateCannotBeInTheFuture() throws {
+        let app = try makeApp(today: "2026-11-20")
+
+        let error = #expect(throws: PortfolioError.self) {
+            try app.addHolding(NewHolding(name: "Stock", amount: .rupees(100), invested: .rupees(100), investedOn: day("2026-11-21")))
+        }
+
+        #expect(error?.message == "The date can't be in the future.")
+    }
+
+    @Test func aHoldingWithoutADateOrAmountInvestedStillOpens() throws {
+        let app = try makeApp()
+        let id = try add(app, "Gold", paid: nil, now: 50_000, on: nil)
+
+        let detail = try app.holdingDetail(id)
+
+        #expect(detail.daysHeld == nil)
+        #expect(detail.holding.gain == nil)
+        #expect(detail.contributions.isEmpty)
+        #expect(detail.boughtAmount == nil)
+    }
+
+    @Test func aMissingHoldingIsRefused() throws {
+        #expect(throws: PortfolioError.self) { try makeApp().holdingDetail(99) }
+    }
+}
+
 final class SteppingClock: DayClock, @unchecked Sendable {
     var date: CalendarDate
     init(_ iso: String) { date = day(iso) }

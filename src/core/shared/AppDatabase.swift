@@ -417,6 +417,18 @@ public final class AppDatabase: Sendable {
             }
         }
 
+        migrator.registerMigration("v24-holding-dates") { db in
+            try db.alter(table: "holding") { table in
+                table.add(column: "invested_on", .text)
+            }
+            try db.create(table: "holding_contribution") { table in
+                table.autoIncrementedPrimaryKey("id")
+                table.column("holding_id", .integer).notNull().references("holding", onDelete: .cascade)
+                table.column("date", .text).notNull()
+                table.column("amount_paise", .integer).notNull()
+            }
+        }
+
         return migrator
     }
 }

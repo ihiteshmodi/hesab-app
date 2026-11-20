@@ -10,6 +10,8 @@ public struct Holding: Equatable, Sendable {
     public let currency: String?
     /// What was paid for it, in the holding's own currency; nil when she does not track it.
     public let invested: Money?
+    /// The day it was first bought; nil when she has not said.
+    public let investedOn: CalendarDate?
 
     /// Up or down against what was paid, in the holding's own currency.
     public var gain: Money? { invested.map { amount - $0 } }
@@ -41,6 +43,30 @@ public struct InvestmentPerformance: Equatable, Sendable {
     public var gainPercentTenths: Int? { invested > .zero ? Holding.tenths(of: gain, over: invested) : nil }
 }
 
+/// Money added later, such as a SIP instalment.
+public struct HoldingContribution: Equatable, Sendable {
+    public let id: Int64
+    public let date: CalendarDate
+    public let amount: Money
+}
+
+/// Everything the page of one investment shows.
+public struct HoldingDetail: Equatable, Sendable {
+    public let line: HoldingLine
+    /// Days since it was bought; nil when no date was given.
+    public let daysHeld: Int?
+    /// About how much it grows a year, in tenths of a percent: only for a lump sum held a year or more, because money added
+    /// at different times cannot be averaged this simply.
+    public let yearlyGrowthTenths: Int?
+    /// Oldest first.
+    public let contributions: [HoldingContribution]
+    /// What the first purchase was: what she paid less everything added later; nil when she does not track what she paid.
+    public let boughtAmount: Money?
+    public let history: [HoldingPoint]
+
+    public var holding: Holding { line.holding }
+}
+
 public struct HoldingPoint: Equatable, Sendable {
     public let date: CalendarDate
     public let value: Money
@@ -66,13 +92,19 @@ public struct NewHolding: Sendable {
     public var rate: Decimal?
     /// What was paid; leave out for a holding she does not track.
     public var invested: Money?
+    /// The day it was bought.
+    public var investedOn: CalendarDate?
 
-    public init(name: String, amount: Money?, currency: String? = nil, rate: Decimal? = nil, invested: Money? = nil) {
+    public init(
+        name: String, amount: Money?, currency: String? = nil, rate: Decimal? = nil, invested: Money? = nil,
+        investedOn: CalendarDate? = nil
+    ) {
         self.name = name
         self.amount = amount
         self.currency = currency
         self.rate = rate
         self.invested = invested
+        self.investedOn = investedOn
     }
 }
 
@@ -99,9 +131,11 @@ public enum PortfolioError: Error, Equatable, Sendable {
     case rateNotPositive
     case notFound(Int64)
     case investedMissing
+    case dateInFuture
 
     public var message: String {
         switch self {
+        case .dateInFuture: "The date can't be in the future."
         case .investedMissing: "Enter what you paid for it first."
         case .nameMissing: "Enter a name"
         case .amountInvalid: "Enter an amount of 0 or more"
@@ -135,30 +169,35 @@ final class PortfolioRepository: Sendable {
 
     func holdings() throws -> [Holding] {
         try database.writer.read { db in
-            try Row.fetchAll(db, sql: "SELECT id, name, amount_paise, currency, invested_paise FROM holding ORDER BY id").map {
+            try Row.fetchAll(db, sql: "SELECT id, name, amount_paise, currency, invested_paise, invested_on FROM holding ORDER BY id").map {
                 Holding(
                     id: $0["id"], name: $0["name"], amount: Money(paise: $0["amount_paise"]), currency: $0["currency"],
-                    invested: ($0["invested_paise"] as Int?).map { Money(paise: $0) }
+                    invested: ($0["invested_paise"] as Int?).map { Money(paise: $0) },
+                    investedOn: try ($0["invested_on"] as String?).map { try CalendarDate(isoString: $0) }
                 )
             }
         }
     }
 
-    func addHolding(name: String, amount: Money, currency: String?, invested: Money?, on date: CalendarDate) throws {
+    func addHolding(
+        name: String, amount: Money, currency: String?, invested: Money?, investedOn: CalendarDate?, on date: CalendarDate
+    ) throws {
         try database.writer.write { db in
             try db.execute(
-                sql: "INSERT INTO holding (name, amount_paise, currency, invested_paise) VALUES (?, ?, ?, ?)",
-                arguments: [name, amount.paise, currency, invested?.paise]
+                sql: "INSERT INTO holding (name, amount_paise, currency, invested_paise, invested_on) VALUES (?, ?, ?, ?, ?)",
+                arguments: [name, amount.paise, currency, invested?.paise, investedOn?.isoString]
             )
             try Self.remember(db, db.lastInsertedRowID, date, amount, invested)
         }
     }
 
-    func updateHolding(_ id: Int64, name: String, amount: Money, currency: String?, invested: Money?, on date: CalendarDate) throws {
+    func updateHolding(
+        _ id: Int64, name: String, amount: Money, currency: String?, invested: Money?, investedOn: CalendarDate?, on date: CalendarDate
+    ) throws {
         try database.writer.write { db in
             try db.execute(
-                sql: "UPDATE holding SET name = ?, amount_paise = ?, currency = ?, invested_paise = ? WHERE id = ?",
-                arguments: [name, amount.paise, currency, invested?.paise, id]
+                sql: "UPDATE holding SET name = ?, amount_paise = ?, currency = ?, invested_paise = ?, invested_on = ? WHERE id = ?",
+                arguments: [name, amount.paise, currency, invested?.paise, investedOn?.isoString, id]
             )
             guard db.changesCount > 0 else { throw PortfolioError.notFound(id) }
             try Self.remember(db, id, date, amount, invested)
@@ -170,6 +209,32 @@ final class PortfolioRepository: Sendable {
         try db.execute(sql: """
             INSERT OR REPLACE INTO holding_value (holding_id, date, value_paise, invested_paise) VALUES (?, ?, ?, ?)
             """, arguments: [id, date.isoString, value.paise, invested?.paise])
+    }
+
+    /// Adds money to a holding in one step: what was paid and what it is worth both rise, and the addition is listed.
+    func contribute(_ holding: Holding, amount: Money, on date: CalendarDate, today: CalendarDate) throws {
+        try database.writer.write { db in
+            let invested = (holding.invested ?? .zero) + amount
+            let value = holding.amount + amount
+            try db.execute(
+                sql: "UPDATE holding SET amount_paise = ?, invested_paise = ? WHERE id = ?", arguments: [value.paise, invested.paise, holding.id]
+            )
+            try db.execute(
+                sql: "INSERT INTO holding_contribution (holding_id, date, amount_paise) VALUES (?, ?, ?)",
+                arguments: [holding.id, date.isoString, amount.paise]
+            )
+            try Self.remember(db, holding.id, today, value, invested)
+        }
+    }
+
+    func contributions(of id: Int64) throws -> [HoldingContribution] {
+        try database.writer.read { db in
+            try Row.fetchAll(db, sql: """
+                SELECT id, date, amount_paise FROM holding_contribution WHERE holding_id = ? ORDER BY date, id
+                """, arguments: [id]).map {
+                HoldingContribution(id: $0["id"], date: try CalendarDate(isoString: $0["date"]), amount: Money(paise: $0["amount_paise"]))
+            }
+        }
     }
 
     func history(of id: Int64) throws -> [HoldingPoint] {
@@ -308,7 +373,9 @@ public struct AddHolding: Sendable {
 
     public func callAsFunction(_ new: NewHolding) throws {
         let (name, amount) = try validatedHolding(new, portfolio: portfolio, setRate: setRate)
-        try portfolio.addHolding(name: name, amount: amount, currency: new.currency, invested: new.invested, on: clock.today())
+        try portfolio.addHolding(
+            name: name, amount: amount, currency: new.currency, invested: new.invested, investedOn: new.investedOn, on: clock.today()
+        )
     }
 }
 
@@ -320,7 +387,8 @@ public struct UpdateHolding: Sendable {
     public func callAsFunction(_ id: Int64, _ new: NewHolding) throws {
         let (name, amount) = try validatedHolding(new, portfolio: portfolio, setRate: setRate)
         try portfolio.updateHolding(
-            id, name: name, amount: amount, currency: new.currency, invested: new.invested, on: clock.today()
+            id, name: name, amount: amount, currency: new.currency, invested: new.invested, investedOn: new.investedOn,
+            on: clock.today()
         )
     }
 }
@@ -329,14 +397,36 @@ public struct AddToHolding: Sendable {
     let portfolio: PortfolioRepository
     let clock: any DayClock
 
-    /// A SIP instalment or a top-up: what was paid and what it is worth both go up by `amount`.
-    public func callAsFunction(_ id: Int64, amount: Money?) throws {
+    /// A SIP instalment or a top-up: what was paid and what it is worth both go up by `amount`, as of `date` (default today).
+    public func callAsFunction(_ id: Int64, amount: Money?, on date: CalendarDate? = nil) throws {
         guard let amount, amount > .zero else { throw PortfolioError.amountInvalid }
         guard let holding = try portfolio.holdings().first(where: { $0.id == id }) else { throw PortfolioError.notFound(id) }
-        guard let invested = holding.invested else { throw PortfolioError.investedMissing }
-        try portfolio.updateHolding(
-            id, name: holding.name, amount: holding.amount + amount, currency: holding.currency, invested: invested + amount,
-            on: clock.today()
+        guard holding.invested != nil else { throw PortfolioError.investedMissing }
+        let today = clock.today()
+        guard (date ?? today) <= today else { throw PortfolioError.dateInFuture }
+        try portfolio.contribute(holding, amount: amount, on: date ?? today, today: today)
+    }
+}
+
+public struct GetHoldingDetail: Sendable {
+    let portfolio: GetPortfolio
+    let repository: PortfolioRepository
+    let clock: any DayClock
+
+    public func callAsFunction(_ id: Int64) throws -> HoldingDetail {
+        guard let line = try portfolio().holdings.first(where: { $0.holding.id == id }) else { throw PortfolioError.notFound(id) }
+        let holding = line.holding
+        let contributions = try repository.contributions(of: id)
+        let days = holding.investedOn.map { max(0, $0.days(until: clock.today())) }
+        var yearly: Int?
+        if let days, days >= 365, contributions.isEmpty, let invested = holding.invested, invested > .zero {
+            let ratio = Double(holding.amount.paise) / Double(invested.paise)
+            yearly = Int(((pow(ratio, 365 / Double(days)) - 1) * 1_000).rounded())
+        }
+        return HoldingDetail(
+            line: line, daysHeld: days, yearlyGrowthTenths: yearly, contributions: contributions,
+            boughtAmount: holding.invested.map { $0 - contributions.reduce(Money.zero) { $0 + $1.amount } },
+            history: try repository.history(of: id)
         )
     }
 }
@@ -357,6 +447,7 @@ private func validatedHolding(
     guard !name.isEmpty else { throw PortfolioError.nameMissing }
     guard let amount = new.amount, amount >= .zero else { throw PortfolioError.amountInvalid }
     if let invested = new.invested, invested < .zero { throw PortfolioError.amountInvalid }
+    if let boughtOn = new.investedOn, boughtOn > setRate.clock.today() { throw PortfolioError.dateInFuture }
     if let currency = new.currency {
         if let rate = new.rate {
             try setRate(currency, rate)

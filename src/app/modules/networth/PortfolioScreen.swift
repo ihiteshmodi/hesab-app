@@ -73,7 +73,7 @@ struct PortfolioScreen: View {
                         }
                         addButton("Add Allocation", identifier: "addFundButton") { addingFund = true }
                     }
-                    CardGroup(header: "Investments", footer: portfolio.holdings.isEmpty ? nil : "Tap an investment to change it. Touch and hold to delete it.") {
+                    CardGroup(header: "Investments", footer: portfolio.holdings.isEmpty ? nil : "Tap an investment to see it. Touch and hold to change or delete it.") {
                         if let performance = portfolio.performance {
                             CardRow(title: "Up or down", subtitle: "Holdings with an amount invested") {
                                 VStack(alignment: .trailing, spacing: 1) {
@@ -86,7 +86,9 @@ struct PortfolioScreen: View {
                             .accessibilityIdentifier("investmentPerformance")
                         }
                         ForEach(portfolio.holdings, id: \.holding.id) { line in
-                            Button { editingHolding = line.holding } label: {
+                            NavigationLink {
+                                HoldingDetailScreen(model: model, holdingID: line.holding.id, hidden: hidden)
+                            } label: {
                                 CardRow(title: line.holding.name, subtitle: holdingSubtitle(line)) {
                                     VStack(alignment: .trailing, spacing: 1) {
                                         Text(money(line.valueInHome)).monospacedDigit()
@@ -95,6 +97,7 @@ struct PortfolioScreen: View {
                                                 .foregroundStyle(gainColour(gain)).monospacedDigit()
                                         }
                                     }
+                                    Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
                                 }
                             }
                             .buttonStyle(.plain)
@@ -247,13 +250,15 @@ private struct FundSheet: View {
     }
 }
 
-private struct HoldingSheet: View {
+struct HoldingSheet: View {
     let model: BudgetViewModel
     var editing: Holding?
     @Environment(\.dismiss) private var dismiss
     @State private var name = ""
     @State private var amountText = ""
     @State private var investedText = ""
+    @State private var hasBoughtOn = false
+    @State private var boughtOn = Date()
     @State private var currency = ""
     @State private var rateText = ""
     @State private var errorMessage: String?
@@ -266,6 +271,12 @@ private struct HoldingSheet: View {
                     TextField("Worth today", text: $amountText).keyboardType(.decimalPad).rowPadding().accessibilityIdentifier("holdingAmountField")
                     TextField("Amount invested (what you paid, optional)", text: $investedText).keyboardType(.decimalPad).rowPadding()
                         .accessibilityIdentifier("holdingInvestedField")
+                    Toggle("I know the day I bought it", isOn: $hasBoughtOn).rowPadding().accessibilityIdentifier("holdingDateToggle")
+                    if hasBoughtOn {
+                        FieldRow("Bought on") {
+                            DatePicker("Bought on", selection: $boughtOn, in: ...Date(), displayedComponents: .date).labelsHidden()
+                        }
+                    }
                     CurrencyField(model: model, selection: $currency, identifier: "holdingCurrencyPicker")
                     if !currency.isEmpty {
                         TextField("Rate (\(model.preferences.homeCurrency) per 1 \(currency))", text: $rateText).keyboardType(.decimalPad)
@@ -282,6 +293,8 @@ private struct HoldingSheet: View {
                 name = editing.name
                 amountText = IndianMoneyFormat.plain(editing.amount)
                 investedText = editing.invested.map { IndianMoneyFormat.plain($0) } ?? ""
+                hasBoughtOn = editing.investedOn != nil
+                boughtOn = editing.investedOn?.instant() ?? Date()
                 currency = editing.currency ?? ""
             }
             .toolbar {
@@ -291,10 +304,12 @@ private struct HoldingSheet: View {
                         let chosen = currency.isEmpty ? nil : currency
                         errorMessage = editing.map {
                             model.updateHolding(
-                                $0.id, name: name, amountText: amountText, investedText: investedText, currency: chosen, rateText: rateText
+                                $0.id, name: name, amountText: amountText, investedText: investedText,
+                                investedOn: hasBoughtOn ? CalendarDate(boughtOn) : nil, currency: chosen, rateText: rateText
                             )
                         } ?? model.addHolding(
-                            name: name, amountText: amountText, investedText: investedText, currency: chosen, rateText: rateText
+                            name: name, amountText: amountText, investedText: investedText,
+                            investedOn: hasBoughtOn ? CalendarDate(boughtOn) : nil, currency: chosen, rateText: rateText
                         )
                         if errorMessage == nil { dismiss() }
                     }
@@ -306,11 +321,12 @@ private struct HoldingSheet: View {
 }
 
 /// A SIP instalment or a top-up: what was paid and what it is worth both go up.
-private struct AddMoneySheet: View {
+struct AddMoneySheet: View {
     let model: BudgetViewModel
     let holding: Holding
     @Environment(\.dismiss) private var dismiss
     @State private var amountText = ""
+    @State private var date = Date()
     @State private var errorMessage: String?
 
     var body: some View {
@@ -320,6 +336,7 @@ private struct AddMoneySheet: View {
                     CardRow(title: holding.name) { Text(IndianMoneyFormat.plain(holding.amount)).foregroundStyle(Theme.secondary) }
                     TextField("Amount added", text: $amountText).keyboardType(.decimalPad).rowPadding()
                         .accessibilityIdentifier("addMoneyField")
+                    FieldRow("Date") { DatePicker("Date", selection: $date, in: ...Date(), displayedComponents: .date).labelsHidden() }
                     if let errorMessage { Text(errorMessage).foregroundStyle(Theme.red).rowPadding() }
                 }
             }
@@ -328,7 +345,7 @@ private struct AddMoneySheet: View {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Add") {
-                        errorMessage = model.addToHolding(holding.id, amountText: amountText)
+                        errorMessage = model.addToHolding(holding.id, amountText: amountText, on: CalendarDate(date))
                         if errorMessage == nil { dismiss() }
                     }
                     .accessibilityIdentifier("confirmAddMoneyButton")
@@ -339,7 +356,7 @@ private struct AddMoneySheet: View {
 }
 
 /// The values she has noted for one holding, against what she paid.
-private struct HoldingHistoryChart: View {
+struct HoldingHistoryChart: View {
     let points: [HoldingPoint]
 
     var body: some View {
