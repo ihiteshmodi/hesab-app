@@ -193,3 +193,19 @@ Feature: Payout schemes and maturity reminders
     When she sets "Show payouts due within" to 14 days
     Then Bond A's payout is listed
 
+  # Portfolio > Monthly payouts lists the schemes; a Sort menu in the top bar reorders them.
+  Scenario: Schemes can be sorted by maturity
+    Given Bond A matures 2027-02-06, Bank FD matures 2027-08-23 and Post scheme has no maturity date
+    When she sorts the schemes by maturity
+    Then the order is Bond A, Bank FD, Post scheme
+    And schemes with no maturity date come last
+
+  Scenario: Other sort orders
+    When she sorts by name, amount invested or payout amount
+    Then the list is A to Z, largest invested first, or largest payout first
+
+  Scenario: Closed schemes always sit at the bottom
+    Given Bond A is closed
+    When she sorts by any order
+    Then Bond A is listed after every open scheme
+

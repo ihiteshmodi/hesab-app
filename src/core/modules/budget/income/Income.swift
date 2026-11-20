@@ -27,14 +27,19 @@ public struct IncomeEntry: Equatable, Sendable {
     public let note: String
     /// Only for borrowed money: it arrived as cash rather than in the bank.
     public let viaCash: Bool
+    /// Income that was put straight into savings: it counts as income but never raises "left to spend".
+    public let toSavings: Bool
 
-    public init(id: Int64, date: CalendarDate, kind: IncomeKind, amount: Money, note: String, viaCash: Bool = false) {
+    public init(
+        id: Int64, date: CalendarDate, kind: IncomeKind, amount: Money, note: String, viaCash: Bool = false, toSavings: Bool = false
+    ) {
         self.id = id
         self.date = date
         self.kind = kind
         self.amount = amount
         self.note = note
         self.viaCash = viaCash
+        self.toSavings = toSavings
     }
 }
 
@@ -45,14 +50,21 @@ public struct NewIncome: Sendable {
     public var amount: Money?
     public var note: String
     public var viaCash: Bool
+    public var toSavings: Bool
 
-    public init(date: CalendarDate? = nil, kind: IncomeKind?, amount: Money?, note: String = "", viaCash: Bool = false) {
+    public init(
+        date: CalendarDate? = nil, kind: IncomeKind?, amount: Money?, note: String = "", viaCash: Bool = false, toSavings: Bool = false
+    ) {
         self.date = date
         self.kind = kind
         self.amount = amount
         self.note = note
         self.viaCash = viaCash
+        self.toSavings = toSavings
     }
+
+    /// Only money that is income can go straight to savings; savings and borrowed money already have their own meaning.
+    var savesDirectly: Bool { toSavings && kind != .savings && kind != .borrowed }
 }
 
 public enum IncomeValidationError: Error, Equatable, Sendable {

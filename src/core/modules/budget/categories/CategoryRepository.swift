@@ -8,6 +8,22 @@ final class CategoryRepository: Sendable {
         self.database = database
     }
 
+    /// The saved spelling of a sub-category typed on an expense, saving it under its category first when it is new.
+    /// A category that is not in the list (old imported data) is left alone.
+    static func canonicalSub(_ db: Database, category: String, _ name: String?) throws -> String? {
+        guard let trimmed = name?.trimmed, !trimmed.isEmpty else { return nil }
+        guard let parentID = try Int64.fetchOne(db, sql: "SELECT id FROM category WHERE name = ?", arguments: [category]) else {
+            return trimmed
+        }
+        if let saved = try String.fetchOne(
+            db, sql: "SELECT name FROM sub_category WHERE category_id = ? AND name = ? COLLATE NOCASE", arguments: [parentID, trimmed]
+        ) {
+            return saved
+        }
+        try db.execute(sql: "INSERT INTO sub_category (category_id, name) VALUES (?, ?)", arguments: [parentID, trimmed])
+        return trimmed
+    }
+
     func all() throws -> [CategoryNode] {
         try database.writer.read { db in
             let subs = try Row.fetchAll(db, sql: "SELECT id, category_id, name FROM sub_category ORDER BY id")

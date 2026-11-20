@@ -3,6 +3,7 @@ public final class BudgetApp: Sendable {
     public let addExpense: AddExpense
     public let updateExpense: UpdateExpense
     public let deleteExpense: DeleteExpense
+    public let expense: GetExpense
     public let markRefundable: MarkRefundable
     public let recordReceived: RecordReceived
     public let undoSettlement: UndoSettlement
@@ -157,6 +158,7 @@ public final class BudgetApp: Sendable {
         addExpense = AddExpense(expenses: expenses, clock: clock)
         updateExpense = UpdateExpense(expenses: expenses, clock: clock)
         deleteExpense = DeleteExpense(expenses: expenses)
+        expense = GetExpense(expenses: expenses)
         markRefundable = MarkRefundable(expenses: expenses)
         recordReceived = RecordReceived(expenses: expenses)
         undoSettlement = UndoSettlement(expenses: expenses)

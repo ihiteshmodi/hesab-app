@@ -367,6 +367,12 @@ public final class AppDatabase: Sendable {
             }
         }
 
+        migrator.registerMigration("v19-income-to-savings") { db in
+            try db.alter(table: "income_entry") { table in
+                table.add(column: "to_savings", .boolean).notNull().defaults(to: false)
+            }
+        }
+
         return migrator
     }
 }

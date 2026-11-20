@@ -24,6 +24,7 @@ struct NewExpenseSheet: View {
     @State private var rateText = ""
     @State private var paidText = ""
     @State private var pendingSubCategory: String?
+    @State private var typingNewSubCategory = false
     @State private var errorMessage: String?
 
     init(
@@ -77,6 +78,15 @@ struct NewExpenseSheet: View {
     private var subCategories: [String] {
         model.categories.first { $0.name == category }?.subCategories.map(\.name) ?? []
     }
+
+    /// Saved sub-categories, plus an old free-typed one this expense already carries.
+    private var subCategoryOptions: [String] {
+        let saved = subCategories
+        guard !subCategory.isEmpty, !typingNewSubCategory, !saved.contains(subCategory) else { return saved }
+        return saved + [subCategory]
+    }
+
+    private static let newSubCategoryTag = "\u{1}new"
 
     private var categorySuggestion: CategoryChoice? {
         guard category.isEmpty else { return nil }
@@ -168,14 +178,26 @@ struct NewExpenseSheet: View {
                         .labelsHidden()
                         .accessibilityIdentifier("categoryPicker")
                     }
-                    if !subCategories.isEmpty {
+                    if !category.isEmpty {
                         FieldRow("Sub-category") {
-                            Picker("Sub-category", selection: $subCategory) {
+                            Picker("Sub-category", selection: Binding(
+                                get: { typingNewSubCategory ? Self.newSubCategoryTag : subCategory },
+                                set: { choice in
+                                    typingNewSubCategory = choice == Self.newSubCategoryTag
+                                    subCategory = typingNewSubCategory ? "" : choice
+                                }
+                            )) {
                                 Text("None").tag("")
-                                ForEach(subCategories, id: \.self) { Text($0).tag($0) }
+                                ForEach(subCategoryOptions, id: \.self) { Text($0).tag($0) }
+                                Text("New sub-category…").tag(Self.newSubCategoryTag)
                             }
                             .labelsHidden()
                             .accessibilityIdentifier("subCategoryPicker")
+                        }
+                        if typingNewSubCategory {
+                            TextField("New sub-category name", text: $subCategory)
+                                .rowPadding()
+                                .accessibilityIdentifier("newSubCategoryField")
                         }
                     }
                     FieldRow("Paid with") {
@@ -210,6 +232,7 @@ struct NewExpenseSheet: View {
             .onChange(of: category) {
                 subCategory = pendingSubCategory ?? ""
                 pendingSubCategory = nil
+                typingNewSubCategory = false
             }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {

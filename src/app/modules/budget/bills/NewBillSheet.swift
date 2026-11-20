@@ -222,10 +222,8 @@ private struct ChangePlanSheet: View {
                             alert: old.alert, notes: old.notes, autoDebit: old.autoDebit
                         )
                         errorMessage = model.changeBillPlan(billID, endsOn: CalendarDate(oldEnds), startingWith: replacement)
-                        if errorMessage == nil {
-                            dismiss()
-                            onDone()
-                        }
+                        // Closing the parent closes this sheet with it; dismissing both at once leaves a blank screen.
+                        if errorMessage == nil { onDone() }
                     }
                 }
             }

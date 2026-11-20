@@ -214,4 +214,43 @@ struct CategoryTests {
     @Test func errorsReadInPlainWords() {
         #expect(CategoryError.notFound(1).message == "That category no longer exists.")
     }
+
+    @Test func aSubCategoryTypedWhileAddingAnExpenseIsSavedUnderItsCategory() throws {
+        let app = try makeApp()
+
+        let saved = try spend(app, category: "Shopping - Needs", sub: "Kitchenware")
+
+        #expect(saved.subCategory == "Kitchenware")
+        #expect(try parent(app, "Shopping - Needs").subCategories.map(\.name).contains("Kitchenware"))
+    }
+
+    @Test func aTypedSubCategoryThatExistsKeepsTheSavedSpellingAndIsNotDuplicated() throws {
+        let app = try makeApp()
+        try spend(app, category: "Shopping - Needs", sub: "Kitchenware")
+
+        let again = try spend(app, category: "Shopping - Needs", sub: " kitchenware ")
+
+        #expect(again.subCategory == "Kitchenware")
+        #expect(try parent(app, "Shopping - Needs").subCategories.filter { $0.name.lowercased() == "kitchenware" }.count == 1)
+    }
+
+    @Test func editingAnExpenseToANewSubCategorySavesItToo() throws {
+        let app = try makeApp()
+        let expense = try spend(app, category: "Shopping - Needs")
+
+        try app.updateExpense(expense.id!, NewExpense(
+            date: expense.date, description: "Item", amount: .rupees(100), category: "Shopping - Needs", subCategory: "Gifts"
+        ))
+
+        #expect(try parent(app, "Shopping - Needs").subCategories.map(\.name).contains("Gifts"))
+    }
+
+    @Test func noSubCategoryIsCreatedWhenNoneIsTyped() throws {
+        let app = try makeApp()
+        let before = try parent(app, "Shopping - Needs").subCategories.count
+
+        try spend(app, category: "Shopping - Needs")
+
+        #expect(try parent(app, "Shopping - Needs").subCategories.count == before)
+    }
 }

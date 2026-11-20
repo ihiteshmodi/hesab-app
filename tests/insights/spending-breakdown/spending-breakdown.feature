@@ -87,3 +87,24 @@ Feature: Where the money went
     Given expenses of 600, 300 and 100 under Food & Dining
     When she opens it with the slider at 80%
     Then she sees the 600 and 300 expenses
+
+  Scenario: The total follows the slider
+    Given categories of 5,000, 3,000, 1,000 and 1,000
+    When she sets the slider to 80%
+    Then "Total spent" reads 8,000 out of 10,000, not the full 10,000
+
+  Scenario: Inside a row the slider also keeps the biggest sub-categories and expenses, and the total follows
+    Given expenses of 600, 300 and 100 under Food & Dining
+    When she opens it with the slider at 80%
+    Then the expenses total reads 900 out of 1,000
+
+  Scenario: Priya narrows an opened category to chosen sub-categories
+    Given Food & Dining has Restaurant 500, Snacks 300 and no sub-category 200
+    When she opens Food & Dining and taps "Snacks"
+    Then only the Snacks expenses are listed and the total reads 300
+    When she also taps "Restaurant"
+    Then Restaurant and Snacks expenses are listed and the total reads 800
+    And every sub-category row stays visible so she can change her choice
+    When she taps "Clear filter"
+    Then every expense of the category is listed again
+

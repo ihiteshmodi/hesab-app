@@ -50,3 +50,12 @@ public struct GetPendingRefunds: Sendable {
         PendingRefunds(allExpenses: try expenses.all())
     }
 }
+
+public struct GetExpense: Sendable {
+    let expenses: ExpenseRepository
+
+    /// Finds one expense in any month; nil once it has been deleted.
+    public func callAsFunction(_ id: Int64) throws -> Expense? {
+        try expenses.all().first { $0.id == id }
+    }
+}

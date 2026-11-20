@@ -117,3 +117,14 @@ Feature: Track refunds and reimbursements
     Given a 1,200 ticket that is not marked refundable
     Then she cannot record received money on it
     And she is offered "Mark as refundable"
+
+  Scenario: An old expense stays open after its refund changes
+    Given a pending 1,200 ticket from two months ago, opened from Pending Refunds
+    When Priya records 1,200 received, unmarks it, or edits its date
+    Then the open expense still shows the ticket as it is now, not a blank screen
+
+  Scenario: An expense that was deleted elsewhere is closed instead of shown blank
+    Given an expense is open on screen
+    When it no longer exists
+    Then the screen closes by itself
+

@@ -79,6 +79,16 @@ public struct Breakdown: Equatable, Sendable {
         Self.prefix(expenses.sorted { $0.netAmount > $1.netAmount }, reaching: percent, of: total, amount: \.netAmount)
     }
 
+    /// What the rows kept by `top(percent:)` add up to; this is the "Total spent" to show while the slider is below 100.
+    public func shownTotal(percent: Int) -> Money {
+        total - top(percent: percent).rest
+    }
+
+    /// What the expenses kept by `topExpenses(percent:)` add up to.
+    public func shownExpensesTotal(percent: Int) -> Money {
+        topExpenses(percent: percent).reduce(.zero) { $0 + $1.netAmount }
+    }
+
     private static func prefix<T>(_ items: [T], reaching percent: Int, of total: Money, amount: (T) -> Money) -> [T] {
         guard percent < 100 else { return items }
         var kept: [T] = []
@@ -121,9 +131,14 @@ public struct GetGroupBreakdown: Sendable {
     let expenses: ExpenseRepository
 
     /// The expenses behind one row of a report, split by sub-category for a category and by category otherwise.
-    public func callAsFunction(_ grouping: BreakdownGrouping, _ name: String, _ period: BreakdownPeriod) throws -> Breakdown {
-        let mine = try expenses.all().filter { GetSpendingBreakdown.contains($0, period) && grouping.names($0).contains(name) }
-        if grouping == .category { return Breakdown(expenses: mine) { $0.subCategory ?? "No sub-category" } }
-        return Breakdown(expenses: mine) { $0.category }
+    /// `only` keeps just the expenses under those split rows; empty keeps everything.
+    public func callAsFunction(
+        _ grouping: BreakdownGrouping, _ name: String, _ period: BreakdownPeriod, only: Set<String> = []
+    ) throws -> Breakdown {
+        let split: (Expense) -> String = grouping == .category ? { $0.subCategory ?? "No sub-category" } : { $0.category }
+        let mine = try expenses.all().filter {
+            GetSpendingBreakdown.contains($0, period) && grouping.names($0).contains(name) && (only.isEmpty || only.contains(split($0)))
+        }
+        return Breakdown(expenses: mine, name: split)
     }
 }

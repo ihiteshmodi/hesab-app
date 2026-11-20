@@ -291,16 +291,20 @@ final class BudgetViewModel {
     func addScheme(_ scheme: NewPayoutScheme) -> String? { run { try app.addScheme(scheme) } }
     func updateScheme(_ id: Int64, _ scheme: NewPayoutScheme) -> String? { run { try app.updateScheme(id, scheme) } }
     func payoutDraft(_ id: Int64) -> PayoutDraft? { try? app.payoutDraft(id) }
-    func recordPayout(_ id: Int64, amountText: String, on date: CalendarDate) -> String? { run { try app.recordPayout(id, amount: MoneyInput.parse(amountText), on: date) } }
+    func recordPayout(_ id: Int64, amountText: String, on date: CalendarDate, toSavings: Bool = false) -> String? {
+        run { try app.recordPayout(id, amount: MoneyInput.parse(amountText), on: date, toSavings: toSavings) }
+    }
     func closeScheme(_ id: Int64) -> String? { run { try app.closeScheme(id) } }
 
     func updatePreferences(_ change: (inout Preferences) -> Void) {
         _ = run { try app.updatePreferences(change) }
     }
 
+    /// Looks in the whole book, not the month on screen, so an open expense survives a refund or date change.
+    /// Reading `budget` first lets the open screen redraw whenever the data is reloaded.
     func expense(id: Int64) -> Expense? {
-        budget?.expenses.first { $0.id == id } ?? pendingRefunds?.expenses.first { $0.id == id }
-            ?? searchResults.groups.flatMap(\.expenses).first { $0.id == id }
+        _ = budget
+        return (try? app.expense(id)) ?? nil
     }
 
     func search(_ text: String) {
@@ -315,9 +319,9 @@ final class BudgetViewModel {
     }
 
     /// Reads `report` first so an open row redraws after an expense in it is edited.
-    func groupBreakdown(_ grouping: BreakdownGrouping, _ name: String) -> Breakdown? {
+    func groupBreakdown(_ grouping: BreakdownGrouping, _ name: String, only: Set<String> = []) -> Breakdown? {
         _ = report
-        return try? app.groupBreakdown(grouping, name, reportAllTime ? .allTime : .month(reportMonth))
+        return try? app.groupBreakdown(grouping, name, reportAllTime ? .allTime : .month(reportMonth), only: only)
     }
 
     /// Each action returns the message to show when it is refused, or nil when it worked.

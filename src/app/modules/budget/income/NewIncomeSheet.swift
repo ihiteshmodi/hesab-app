@@ -10,6 +10,7 @@ struct NewIncomeSheet: View {
     @State private var note: String
     @State private var date: Date
     @State private var viaCash: Bool
+    @State private var toSavings: Bool
     @State private var errorMessage: String?
 
     init(model: BudgetViewModel, editing entry: IncomeEntry? = nil) {
@@ -20,7 +21,10 @@ struct NewIncomeSheet: View {
         _note = State(initialValue: entry?.note ?? "")
         _date = State(initialValue: entry?.date.instant() ?? Date())
         _viaCash = State(initialValue: entry?.viaCash ?? false)
+        _toSavings = State(initialValue: entry?.toSavings ?? false)
     }
+
+    private var canSaveDirectly: Bool { kind != nil && kind != .savings && kind != .borrowed }
 
     var body: some View {
         NavigationStack {
@@ -52,9 +56,17 @@ struct NewIncomeSheet: View {
                             .accessibilityIdentifier("incomeBorrowedPocketPicker")
                         }
                     }
+                    if canSaveDirectly {
+                        Toggle("Add to savings", isOn: $toSavings).rowPadding()
+                            .accessibilityIdentifier("incomeToSavingsToggle")
+                    }
                     FieldRow("Date") {
                         DatePicker("Date", selection: $date, displayedComponents: .date).labelsHidden()
                     }
+                }
+                if canSaveDirectly, toSavings {
+                    Text("Counts as income, but is kept out of Left to spend.")
+                        .font(.footnote).foregroundStyle(Theme.secondary).padding(.horizontal, 18)
                 }
                 if let errorMessage {
                     Text(errorMessage)
@@ -77,7 +89,7 @@ struct NewIncomeSheet: View {
     }
 
     private func save() {
-        let income = NewIncome(date: CalendarDate(date), kind: kind, amount: MoneyInput.parse(amountText), note: note, viaCash: viaCash)
+        let income = NewIncome(date: CalendarDate(date), kind: kind, amount: MoneyInput.parse(amountText), note: note, viaCash: viaCash, toSavings: toSavings)
         errorMessage = if let editing { model.updateIncome(editing.id, income) } else { model.addIncome(income) }
         if errorMessage == nil { dismiss() }
     }

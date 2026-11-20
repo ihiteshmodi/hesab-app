@@ -14,6 +14,7 @@ final class ExpenseRepository: Sendable {
         try database.writer.write { db in
             var record = ExpenseRecord(expense)
             record.entity = try EntityRepository.canonical(db, record.entity)
+            record.subCategory = try CategoryRepository.canonicalSub(db, category: record.category, record.subCategory)
             try record.insert(db)
             return try record.expense()
         }
@@ -26,6 +27,7 @@ final class ExpenseRepository: Sendable {
             guard let existing = try ExpenseRecord.fetchOne(db, key: id) else { throw ExpenseNotFound(id: id) }
             var record = ExpenseRecord(try transform(try existing.expense()))
             record.entity = try EntityRepository.canonical(db, record.entity)
+            record.subCategory = try CategoryRepository.canonicalSub(db, category: record.category, record.subCategory)
             try record.update(db)
             return try record.expense()
         }

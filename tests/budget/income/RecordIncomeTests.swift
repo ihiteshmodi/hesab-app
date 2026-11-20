@@ -100,5 +100,49 @@ struct RecordIncomeTests {
         }
         #expect(try app.monthBudget().incomeEntries.first?.amount == .rupees(150_000))
     }
-}
 
+    @Test func incomeSentStraightToSavingsCountsAsIncomeButDoesNotRaiseLeftToSpend() throws {
+        let app = try makeApp()
+        try app.addIncome(NewIncome(kind: .salary, amount: .rupees(10_000)))
+
+        try app.addIncome(NewIncome(kind: .investmentIncome, amount: .rupees(800), note: "Bond A", toSavings: true))
+
+        let october = try app.monthBudget()
+        #expect(october.leftToSpend == .rupees(10_000))
+        #expect(october.incomeThisMonth == .rupees(10_800))
+        #expect(october.incomeEntries.contains { $0.note == "Bond A" && $0.toSavings })
+    }
+
+    @Test func aPayoutRecordedStraightToSavingsStaysOutOfLeftToSpend() throws {
+        let app = try makeApp(today: "2026-10-30")
+        let scheme = try app.addScheme(NewPayoutScheme(
+            name: "Post office", invested: .rupees(300_000), payoutAmount: .rupees(1_850), payoutDay: 30, maturity: nil
+        ))
+
+        let entry = try app.recordPayout(scheme.id, amount: .rupees(1_850), on: day("2026-10-30"), toSavings: true)
+
+        #expect(entry.toSavings)
+        let october = try app.monthBudget()
+        #expect(october.leftToSpend == .zero)
+        #expect(october.incomeThisMonth == .rupees(1_850))
+        #expect(try app.upcomingIncome().filter { $0.kind == .payout }.isEmpty)
+    }
+
+    @Test func theSavingsSwitchCanBeTurnedOffLater() throws {
+        let app = try makeApp()
+        let entry = try app.addIncome(NewIncome(kind: .moneyReceived, amount: .rupees(500), toSavings: true))
+
+        try app.updateIncome(entry.id, NewIncome(kind: .moneyReceived, amount: .rupees(500), toSavings: false))
+
+        #expect(try app.monthBudget().leftToSpend == .rupees(500))
+    }
+
+    @Test(arguments: [IncomeKind.savings, .borrowed])
+    func theSavingsSwitchDoesNothingForSavingsOrBorrowedMoney(kind: IncomeKind) throws {
+        let app = try makeApp()
+
+        let entry = try app.addIncome(NewIncome(kind: kind, amount: .rupees(500), note: "Ben", toSavings: true))
+
+        #expect(!entry.toSavings)
+    }
+}

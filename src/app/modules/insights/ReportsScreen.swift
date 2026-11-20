@@ -58,12 +58,13 @@ struct ReportsScreen: View {
                         TopShareSlider(percent: $topPercent)
                         HStack {
                             VStack(alignment: .leading, spacing: 1) {
-                                Text("Total spent").fontWeight(.semibold)
-                                Text("Expenses after refunds. Income is not included.")
+                                Text(topPercent >= 100 ? "Total spent" : "Top \(Int(topPercent))% of spending").fontWeight(.semibold)
+                                Text(topPercent >= 100 ? "Expenses after refunds. Income is not included."
+                                     : "Out of \(IndianMoneyFormat.string(report.total)) spent")
                                     .font(.footnote).foregroundStyle(Theme.secondary)
                             }
                             Spacer()
-                            Text(IndianMoneyFormat.string(report.total)).monospacedDigit().fontWeight(.semibold)
+                            Text(IndianMoneyFormat.string(report.shownTotal(percent: Int(topPercent)))).monospacedDigit().fontWeight(.semibold)
                                 .accessibilityIdentifier("reportTotal")
                         }
                     }
@@ -128,31 +129,62 @@ private struct ReportLine: View {
 }
 
 /// One row of a report opened: its split (sub-categories, or categories) and the expenses behind it, each one editable.
+/// Tapping split rows keeps only those; the total and the expense list follow.
 struct GroupReportScreen: View {
     let model: BudgetViewModel
     let grouping: BreakdownGrouping
     let name: String
     @Binding var topPercent: Double
     @State private var openedExpense: Int64?
+    @State private var chosen: Set<String> = []
 
     var body: some View {
         CardScreen {
-            if let detail = model.groupBreakdown(grouping, name) {
+            if let full = model.groupBreakdown(grouping, name), let detail = model.groupBreakdown(grouping, name, only: chosen) {
+                let percent = Int(topPercent)
                 CardPanel {
                     TopShareSlider(percent: $topPercent)
                     HStack {
-                        Text("Total spent").fontWeight(.semibold)
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(percent >= 100 ? "Total spent" : "Top \(percent)% of spending").fontWeight(.semibold)
+                            if percent < 100 {
+                                Text("Out of \(IndianMoneyFormat.string(detail.total))").font(.footnote).foregroundStyle(Theme.secondary)
+                            }
+                        }
                         Spacer()
-                        Text(IndianMoneyFormat.string(detail.total)).monospacedDigit().fontWeight(.semibold)
+                        Text(IndianMoneyFormat.string(detail.shownExpensesTotal(percent: percent))).monospacedDigit().fontWeight(.semibold)
+                            .accessibilityIdentifier("groupReportTotal")
                     }
                 }
-                CardGroup(header: grouping == .category ? "Sub-categories" : "Categories") {
-                    ForEach(detail.rows, id: \.name) { row in
-                        ReportLine(name: row.name, share: row.sharePercent, amount: row.amount, chevron: false)
+                let top = full.top(percent: percent)
+                let rows = chosen.isEmpty ? top.rows : full.rows
+                CardGroup(header: grouping == .category ? "Sub-categories" : "Categories",
+                          footer: "Tap one or more to see only those.") {
+                    ForEach(rows, id: \.name) { row in
+                        Button { toggle(row.name) } label: {
+                            CardRow(title: row.name) {
+                                Text("\(row.sharePercent)%").foregroundStyle(Theme.secondary)
+                                Text(IndianMoneyFormat.string(row.amount)).monospacedDigit()
+                                Image(systemName: chosen.contains(row.name) ? "checkmark.circle.fill" : "circle")
+                                    .foregroundStyle(chosen.contains(row.name) ? Theme.blue : Color.secondary.opacity(0.5))
+                            }
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityAddTraits(chosen.contains(row.name) ? .isSelected : [])
+                        .accessibilityIdentifier("groupSplitRow")
+                    }
+                    if chosen.isEmpty, top.rest > .zero {
+                        ReportLine(name: "Everything else", share: nil, amount: top.rest, chevron: false)
+                            .foregroundStyle(Theme.secondary)
+                    }
+                    if !chosen.isEmpty {
+                        Button { chosen = [] } label: { Text("Clear filter").foregroundStyle(Theme.blue).rowPadding() }
+                            .buttonStyle(.plain)
+                            .accessibilityIdentifier("clearGroupFilterButton")
                     }
                 }
-                let shown = detail.topExpenses(percent: Int(topPercent))
-                CardGroup(header: topPercent >= 100 ? "Expenses, newest first" : "Biggest expenses making up \(Int(topPercent))%",
+                let shown = detail.topExpenses(percent: percent)
+                CardGroup(header: percent >= 100 ? "Expenses, newest first" : "Biggest expenses making up \(percent)%",
                           footer: "Tap an expense to see or change it.") {
                     ForEach(shown.sorted { ($0.date, $0.id ?? 0) > ($1.date, $1.id ?? 0) }, id: \.id) { expense in
                         Button { openedExpense = expense.id } label: {
@@ -169,6 +201,10 @@ struct GroupReportScreen: View {
         }
         .cardNavigation(name)
         .sheet(item: $openedExpense) { id in ExpenseDetailSheet(model: model, expenseID: id) }
+    }
+
+    private func toggle(_ row: String) {
+        if chosen.contains(row) { chosen.remove(row) } else { chosen.insert(row) }
     }
 
     private func subtitle(_ expense: Expense) -> String {

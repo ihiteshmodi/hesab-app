@@ -60,6 +60,7 @@ struct AddSeveralPayoutsSheet: View {
     let model: BudgetViewModel
     @Environment(\.dismiss) private var dismiss
     @State private var ticked: Set<Int64>
+    @State private var toSavings = false
     @State private var errorMessage: String?
 
     init(model: BudgetViewModel) {
@@ -94,6 +95,9 @@ struct AddSeveralPayoutsSheet: View {
                         .accessibilityIdentifier("severalPayoutRow")
                     }
                 }
+                CardGroup(footer: "Counts as income, but is kept out of Left to spend.") {
+                    Toggle("Add to savings", isOn: $toSavings).rowPadding().accessibilityIdentifier("severalToSavingsToggle")
+                }
                 if let errorMessage { Text(errorMessage).foregroundStyle(Theme.red).padding(.horizontal, 18) }
             }
             .cardNavigation("Add Several")
@@ -109,7 +113,7 @@ struct AddSeveralPayoutsSheet: View {
     private func recordTicked() {
         for item in payouts where ticked.contains(item.scheme.id) {
             guard let draft = model.payoutDraft(item.scheme.id) else { continue }
-            errorMessage = model.recordPayout(item.scheme.id, amountText: IndianMoneyFormat.plain(draft.amount), on: draft.date)
+            errorMessage = model.recordPayout(item.scheme.id, amountText: IndianMoneyFormat.plain(draft.amount), on: draft.date, toSavings: toSavings)
             if errorMessage != nil { return }
         }
         dismiss()

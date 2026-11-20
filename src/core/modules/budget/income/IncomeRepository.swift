@@ -7,21 +7,26 @@ final class IncomeRepository: Sendable {
         self.database = database
     }
 
-    func add(date: CalendarDate, kind: IncomeKind, amount: Money, note: String, viaCash: Bool = false) throws -> IncomeEntry {
+    func add(
+        date: CalendarDate, kind: IncomeKind, amount: Money, note: String, viaCash: Bool = false, toSavings: Bool = false
+    ) throws -> IncomeEntry {
         try database.writer.write { db in
             var record = IncomeRecord(
-                id: nil, date: date.isoString, kind: kind.rawValue, amountPaise: amount.paise, note: note, viaCash: viaCash
+                id: nil, date: date.isoString, kind: kind.rawValue, amountPaise: amount.paise, note: note, viaCash: viaCash,
+                toSavings: toSavings
             )
             try record.insert(db)
             return try record.entry()
         }
     }
 
-    func update(_ id: Int64, date: CalendarDate, kind: IncomeKind, amount: Money, note: String, viaCash: Bool = false) throws {
+    func update(
+        _ id: Int64, date: CalendarDate, kind: IncomeKind, amount: Money, note: String, viaCash: Bool = false, toSavings: Bool = false
+    ) throws {
         try database.writer.write { db in
             try db.execute(
-                sql: "UPDATE income_entry SET date = ?, kind = ?, amount_paise = ?, note = ?, via_cash = ? WHERE id = ?",
-                arguments: [date.isoString, kind.rawValue, amount.paise, note, viaCash, id]
+                sql: "UPDATE income_entry SET date = ?, kind = ?, amount_paise = ?, note = ?, via_cash = ?, to_savings = ? WHERE id = ?",
+                arguments: [date.isoString, kind.rawValue, amount.paise, note, viaCash, toSavings, id]
             )
             guard db.changesCount > 0 else { throw IncomeNotFound(id: id) }
         }
@@ -51,12 +56,13 @@ private struct IncomeRecord: Codable, FetchableRecord, MutablePersistableRecord 
     var amountPaise: Int
     var note: String
     var viaCash: Bool
+    var toSavings: Bool
 
     func entry() throws -> IncomeEntry {
         IncomeEntry(
             id: id ?? 0, date: try CalendarDate(isoString: date),
             kind: IncomeKind(rawValue: kind) ?? .moneyReceived, amount: Money(paise: amountPaise), note: note,
-            viaCash: viaCash
+            viaCash: viaCash, toSavings: toSavings
         )
     }
 

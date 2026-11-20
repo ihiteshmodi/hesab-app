@@ -43,6 +43,9 @@ struct ExpenseDetailSheet: View {
                     Button("Delete Expense", role: .destructive) { confirmingDelete = true }
                         .buttonStyle(GreyButtonStyle(tint: Theme.red))
                         .accessibilityIdentifier("deleteExpenseButton")
+                } else {
+                    // Deleted elsewhere: close rather than leave an empty sheet.
+                    Color.clear.frame(height: 1).onAppear { dismiss() }
                 }
             }
             .cardNavigation("Expense")

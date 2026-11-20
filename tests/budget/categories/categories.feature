@@ -146,6 +146,22 @@ Feature: Categories with sub-categories
     Then she is offered Restaurant, Food delivery and Coffee
     And she may leave the sub-category empty
 
+  Scenario: Priya types a new sub-category while adding an expense
+    Given "Shopping - Needs" has no sub-category called "Kitchenware"
+    When she adds an expense under "Shopping - Needs" and chooses "New sub-category..." and types "Kitchenware"
+    Then the expense is saved under "Shopping - Needs" / "Kitchenware"
+    And "Kitchenware" is offered under "Shopping - Needs" from then on, in Categories and in the picker
+
+  Scenario: A typed sub-category that already exists reuses the saved spelling
+    Given "Shopping - Needs" has the sub-category "Clothes"
+    When she types "clothes" while adding an expense
+    Then no second sub-category appears and the expense shows "Clothes"
+
+  Scenario: Editing an expense to a new sub-category also saves it
+    Given an expense under "Shopping - Needs"
+    When she edits it and types the new sub-category "Gifts"
+    Then "Gifts" is offered under "Shopping - Needs"
+
   Scenario: The picker puts recently used sub-categories first
     Given she has used these sub-categories, most recent first: "Ride share", "Internet", "Coffee"
     When she opens the category picker

@@ -348,4 +348,32 @@ struct PayoutSchemeTests {
 
         #expect(try !app.upcomingIncome().contains { $0.kind == .matured })
     }
+
+    @Test func schemesCanBeSortedBySoonestMaturityWithUndatedOnesLast() throws {
+        let app = try background().app
+
+        let order = try app.payoutSchemes().sorted(by: .maturity).map(\.scheme.name)
+
+        #expect(order == ["Bond A", "Bank FD", "Post scheme"])
+    }
+
+    @Test(arguments: [
+        (SchemeSort.name, ["Bank FD", "Bond A", "Post scheme"]),
+        (.invested, ["Bank FD", "Post scheme", "Bond A"]),
+        (.payout, ["Bank FD", "Post scheme", "Bond A"]),
+    ])
+    func schemesCanBeSortedByNameInvestedOrPayout(sort: SchemeSort, expected: [String]) throws {
+        let app = try background().app
+
+        #expect(try app.payoutSchemes().sorted(by: sort).map(\.scheme.name) == expected)
+    }
+
+    @Test func closedSchemesStayAtTheBottomWhateverTheOrder() throws {
+        let (app, bond) = try background()
+        try app.closeScheme(bond.id)
+
+        let order = try app.payoutSchemes().sorted(by: .maturity).map(\.scheme.name)
+
+        #expect(order == ["Bank FD", "Post scheme", "Bond A"])
+    }
 }

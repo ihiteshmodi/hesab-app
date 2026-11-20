@@ -191,4 +191,52 @@ struct SpendingBreakdownTests {
         #expect(detail.topExpenses(percent: 80).map(\.amount) == [.rupees(600), .rupees(300)])
         #expect(detail.topExpenses(percent: 100).count == 3)
     }
+
+    @Test func theShownTotalFollowsTheSlider() throws {
+        let app = try makeApp()
+        for (category, rupees) in [("Home & Utilities", 5_000), ("Food & Dining", 3_000), ("Transport", 1_000), ("Fuel", 1_000)] {
+            try tagged(app, rupees, category: category)
+        }
+        let report = try app.spendingBreakdown(.month(october), by: .category)
+
+        #expect(report.shownTotal(percent: 80) == .rupees(8_000))
+        #expect(report.shownTotal(percent: 100) == .rupees(10_000))
+    }
+
+    @Test func theShownExpensesTotalFollowsTheSliderInsideARow() throws {
+        let app = try makeApp()
+        for rupees in [100, 600, 300] { try tagged(app, rupees) }
+
+        let detail = try app.groupBreakdown(.category, "Food & Dining", .month(october))
+
+        #expect(detail.shownExpensesTotal(percent: 80) == .rupees(900))
+        #expect(detail.shownExpensesTotal(percent: 100) == .rupees(1_000))
+    }
+
+    @Test func anOpenedCategoryCanBeNarrowedToChosenSubCategories() throws {
+        let app = try makeApp()
+        try tagged(app, 500, sub: "Restaurant")
+        try tagged(app, 300, sub: "Snacks")
+        try tagged(app, 200)
+
+        let snacks = try app.groupBreakdown(.category, "Food & Dining", .month(october), only: ["Snacks"])
+        let two = try app.groupBreakdown(.category, "Food & Dining", .month(october), only: ["Snacks", "Restaurant"])
+        let everything = try app.groupBreakdown(.category, "Food & Dining", .month(october), only: [])
+
+        #expect(snacks.total == .rupees(300))
+        #expect(snacks.expenses.count == 1)
+        #expect(two.total == .rupees(800))
+        #expect(everything.total == .rupees(1_000))
+        #expect(everything.rows.map(\.name) == ["Restaurant", "Snacks", "No sub-category"])
+    }
+
+    @Test func narrowingWorksForTheNoSubCategoryRowToo() throws {
+        let app = try makeApp()
+        try tagged(app, 500, sub: "Restaurant")
+        try tagged(app, 200)
+
+        let detail = try app.groupBreakdown(.category, "Food & Dining", .month(october), only: ["No sub-category"])
+
+        #expect(detail.total == .rupees(200))
+    }
 }

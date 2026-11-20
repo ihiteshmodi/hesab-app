@@ -327,6 +327,13 @@ Feature: Bills, one-off or repeating, added to the budget with a tap
     When she taps "Rent" and saves the date it was sent
     Then "Rent" leaves the list and the tile count drops
 
+  Scenario: The Pending to send tile carries a red counter like the Upcoming tabs do
+    Given "Rent" and "GeoFiber" wait to be sent
+    When she opens Activity
+    Then the "Pending to send" tile shows a red 2 in its top corner
+    When she marks "GeoFiber" as sent
+    Then the red counter reads 1
+
   Scenario: The tile is hidden when nothing waits to be sent
     Given nothing waits to be sent
     When she opens Activity

@@ -15,6 +15,28 @@ Feature: Record income, savings, money received and borrowing
     When Priya adds "Savings" of 100,000
     Then "Left to spend" drops by 100,000
 
+  # Saves her the extra "Savings" entry she used to add by hand after every payout.
+  Scenario: Income can go straight to savings
+    When Priya adds "Investment Income" of 800 with "Add to savings" switched on
+    Then October income shows 800
+    But "Left to spend" does not rise
+    And no separate "Savings" entry is needed
+
+  Scenario: A payout recorded from Upcoming Income can go straight to savings
+    Given "Post office" pays 1,850 a month
+    When Priya records the payout with "Add to savings" switched on
+    Then October income shows 1,850 but "Left to spend" does not rise
+    And "Post office" is marked as recorded for the month
+
+  Scenario: Add to savings can be switched off again
+    Given an income entry that went straight to savings
+    When Priya edits it and switches "Add to savings" off
+    Then "Left to spend" rises by its amount
+
+  Scenario: Add to savings is only offered for money that is income
+    When Priya chooses the types "Savings" or "Borrowed"
+    Then there is no "Add to savings" switch
+
   Scenario: Investment payouts are income
     When Priya adds "Investment Income" of 800 with note "Bond A"
     Then "Left to spend" rises by 800

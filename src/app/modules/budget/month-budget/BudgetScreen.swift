@@ -179,6 +179,14 @@ struct BudgetScreen: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.vertical, 10).padding(.horizontal, 12)
                     .background(Theme.tile, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    .overlay(alignment: .topTrailing) {
+                        if item.badge > 0 {
+                            Text("\(item.badge)").font(.system(size: 11, weight: .bold)).foregroundStyle(.white)
+                                .padding(.horizontal, 5).frame(minWidth: 17, minHeight: 17)
+                                .background(Theme.red, in: Capsule()).padding(8)
+                                .accessibilityIdentifier("\(item.id)Badge")
+                        }
+                    }
                 }
                 .buttonStyle(.plain)
                 .accessibilityIdentifier(item.id)
@@ -194,7 +202,7 @@ struct BudgetScreen: View {
             tiles.append(SummaryTile(id: "pendingRefundsTile", amount: pending.stillToCome, caption: "Pending refunds") { route = .pendingRefunds })
         }
         if !model.billsToSend.isEmpty {
-            tiles.append(SummaryTile(id: "pendingToSendTile", amount: sendTotal, caption: "Pending to send") { openingToSend = true })
+            tiles.append(SummaryTile(id: "pendingToSendTile", amount: sendTotal, caption: "Pending to send", badge: model.billsToSend.count) { openingToSend = true })
         }
         tiles.append(SummaryTile(id: "cashInHandTile", amount: model.cash?.balance ?? .zero, caption: "Cash in hand") { openingCash = true })
         tiles.append(SummaryTile(id: "amountToRepayTile", amount: model.amountToRepay?.total ?? .zero, caption: "Amount to repay") { openingRepay = true })
@@ -351,6 +359,7 @@ private struct SummaryTile {
     let id: String
     let amount: Money
     let caption: String
+    var badge = 0
     let action: () -> Void
 }
 

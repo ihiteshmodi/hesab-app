@@ -13,6 +13,10 @@ struct PayoutSchemesScreen: View {
     @State private var closing: PayoutScheme?
     @State private var reminder: String?
     @State private var errorMessage: String?
+    /// nil keeps the order the schemes were added in.
+    @State private var sort: SchemeSort?
+
+    private var schemes: [SchemeLine] { sort.map(model.payouts.sorted(by:)) ?? model.payouts.schemes }
 
     private func money(_ value: Money) -> String { hidden ? "••••••" : IndianMoneyFormat.string(value) }
 
@@ -26,7 +30,7 @@ struct PayoutSchemesScreen: View {
             }
             CardGroup(header: "Schemes", footer: model.payouts.schemes.isEmpty ? nil : "Touch and hold a scheme to edit it, record a payout or close it.") {
                 if model.payouts.schemes.isEmpty { Text("No schemes yet.").foregroundStyle(Theme.secondary).rowPadding() }
-                ForEach(model.payouts.schemes, id: \.scheme.id) { line in
+                ForEach(schemes, id: \.scheme.id) { line in
                     let scheme = line.scheme
                     HStack {
                         VStack(alignment: .leading, spacing: 1) {
@@ -65,6 +69,17 @@ struct PayoutSchemesScreen: View {
                     Button(hidden ? "Show" : "Hide", systemImage: hidden ? "eye" : "eye.slash") { toggleHidden() }
                         .accessibilityIdentifier("schemesEyeButton")
                 }
+            }
+            ToolbarItem(placement: .primaryAction) {
+                Menu {
+                    Picker("Sort by", selection: $sort) {
+                        Text("Order added").tag(SchemeSort?.none)
+                        ForEach(SchemeSort.allCases, id: \.self) { Text($0.title).tag(SchemeSort?.some($0)) }
+                    }
+                } label: {
+                    Label("Sort", systemImage: "arrow.up.arrow.down")
+                }
+                .accessibilityIdentifier("schemeSortMenu")
             }
             ToolbarItem(placement: .primaryAction) {
                 Button("Add Scheme", systemImage: "plus") { adding = true }.accessibilityIdentifier("addSchemeButton")
@@ -183,6 +198,7 @@ struct RecordPayoutSheet: View {
     @State private var amountText = ""
     @State private var date = Date()
     @State private var note = ""
+    @State private var toSavings = false
     @State private var errorMessage: String?
 
     var body: some View {
@@ -192,6 +208,7 @@ struct RecordPayoutSheet: View {
                     CardRow(title: "Scheme") { Text(scheme.name).foregroundStyle(Theme.secondary) }
                     TextField("Amount", text: $amountText).keyboardType(.decimalPad).rowPadding().accessibilityIdentifier("payoutAmountField")
                     FieldRow("Date received") { DatePicker("Date received", selection: $date, displayedComponents: .date).labelsHidden() }
+                    Toggle("Add to savings", isOn: $toSavings).rowPadding().accessibilityIdentifier("payoutToSavingsToggle")
                 }
                 if let errorMessage { Text(errorMessage).foregroundStyle(Theme.red).padding(.horizontal, 18) }
             }
@@ -206,7 +223,7 @@ struct RecordPayoutSheet: View {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
-                        errorMessage = model.recordPayout(scheme.id, amountText: amountText, on: CalendarDate(date))
+                        errorMessage = model.recordPayout(scheme.id, amountText: amountText, on: CalendarDate(date), toSavings: toSavings)
                         if errorMessage == nil { dismiss() }
                     }
                     .accessibilityIdentifier("savePayoutButton")

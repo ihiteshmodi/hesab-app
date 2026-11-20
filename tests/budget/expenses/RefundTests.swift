@@ -258,4 +258,26 @@ struct RefundTests {
 
         #expect(throws: ExpenseNotFound.self) { try app.markRefundable(99) }
     }
+
+    @Test func anExpenseCanBeReadByIdWhateverMonthItIsInOnceRefundedOrUnmarked() throws {
+        let app = try makeApp(today: "2026-10-30")
+        let old = try add(app, 1_200, named: "Ticket", on: "2026-08-09")
+        try app.markRefundable(old.id!)
+        try app.recordReceived(old.id!, .rupees(1_200))
+
+        let settled = try #require(try app.expense(old.id!))
+        #expect(settled.refund == .settled(received: .rupees(1_200)))
+
+        try app.undoSettlement(old.id!)
+        try app.unmarkRefundable(old.id!)
+        #expect(try app.expense(old.id!)?.refund == .notRefundable)
+    }
+
+    @Test func readingAnExpenseThatIsGoneGivesNothing() throws {
+        let app = try makeApp()
+        let order = try add(app, 600)
+        try app.deleteExpense(order.id!)
+
+        #expect(try app.expense(order.id!) == nil)
+    }
 }

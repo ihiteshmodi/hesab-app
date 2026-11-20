@@ -82,6 +82,40 @@ public struct PayoutOverview: Equatable, Sendable {
         self.investedTotal = investedTotal
         self.monthlyPayoutTotal = monthlyPayoutTotal
     }
+
+    /// Closed schemes always come last. Ties keep the name order so the list never shuffles.
+    public func sorted(by sort: SchemeSort) -> [SchemeLine] {
+        schemes.sorted { a, b in
+            if a.scheme.isClosed != b.scheme.isClosed { return !a.scheme.isClosed }
+            switch sort {
+            case .name: break
+            case .maturity:
+                switch (a.scheme.maturity, b.scheme.maturity) {
+                case let (x?, y?) where x != y: return x < y
+                case (_?, nil): return true
+                case (nil, _?): return false
+                default: break
+                }
+            case .invested where a.scheme.invested != b.scheme.invested: return a.scheme.invested > b.scheme.invested
+            case .payout where a.scheme.payoutAmount != b.scheme.payoutAmount: return a.scheme.payoutAmount > b.scheme.payoutAmount
+            default: break
+            }
+            return a.scheme.name.localizedCaseInsensitiveCompare(b.scheme.name) == .orderedAscending
+        }
+    }
+}
+
+public enum SchemeSort: String, CaseIterable, Sendable {
+    case name, maturity, invested, payout
+
+    public var title: String {
+        switch self {
+        case .name: "Name"
+        case .maturity: "Maturity"
+        case .invested: "Amount invested"
+        case .payout: "Payout amount"
+        }
+    }
 }
 
 public struct UpcomingIncomeItem: Equatable, Sendable {
@@ -370,12 +404,12 @@ public struct RecordPayout: Sendable {
 
     /// Creates the "Investment Income" entry and marks that month's payout as recorded.
     @discardableResult
-    public func callAsFunction(_ id: Int64, amount: Money?, on date: CalendarDate) throws -> IncomeEntry {
+    public func callAsFunction(_ id: Int64, amount: Money?, on date: CalendarDate, toSavings: Bool = false) throws -> IncomeEntry {
         guard let amount, amount > .zero else { throw PayoutSchemeError.amountMissingOrZero }
         let book = try store.book()
         guard let scheme = book.schemes.first(where: { $0.id == id }) else { throw PayoutSchemeError.notFound(id) }
         guard let expected = book.expectedPayout(scheme) else { throw PayoutSchemeError.closed }
-        let entry = try income.add(date: date, kind: .investmentIncome, amount: amount, note: scheme.name)
+        let entry = try income.add(date: date, kind: .investmentIncome, amount: amount, note: scheme.name, toSavings: toSavings)
         try store.schemes.record(schemeID: id, month: SchemeBook.monthKey(expected.yearMonth), incomeID: entry.id)
         return entry
     }
