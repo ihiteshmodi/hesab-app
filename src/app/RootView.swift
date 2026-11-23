@@ -60,7 +60,7 @@ struct RootView: View {
         .safeAreaInset(edge: .bottom, spacing: 0) { bar }
         .overlay {
             if drawerOpen {
-                MenuDrawer { item in
+                MenuDrawer(cardBillsBadge: model.unpaidCardBillsCount) { item in
                     drawerOpen = false
                     drawerRoute = item
                 } close: {

@@ -173,7 +173,145 @@ struct CardBillTests {
     @Test func errorsReadInPlainWords() {
         #expect(CardError.nameMissing.message == "Enter a name")
         #expect(CardError.nameTaken("Visa Card").message == "A card called Visa Card already exists")
+        #expect(CardError.invalidDueDay.message == "Enter a due day between 1 and 31.")
         #expect(CardError.nothingToPay(card: "Visa Card", month: "October 2026").message
             == "Nothing to pay for Visa Card in October 2026.")
+    }
+
+    // MARK: per-card due days, cutoff dates, carryover and unpaid count
+
+    @Test func eachCardFollowsItsOwnMonthlyDueDayAndShowsNewSpendAfterCutoff() throws {
+        let app = try makeApp(today: "2026-11-23")
+        let travel = try app.addCard(NewCard(name: "Travel Card", dueDay: 20))
+        try spend(app, on: .bank("Travel Card"), 462, date: "2026-11-15")
+        try spend(app, on: .bank("Travel Card"), 800, date: "2026-11-22")
+
+        let nov = try line(app, travel, month: .init(year: 2026, month: 11))
+
+        #expect(nov.cycleStart == day("2026-10-21"))
+        #expect(nov.cycleEnd == day("2026-11-20"))
+        #expect(nov.bill == .rupees(462))
+        #expect(nov.due == .rupees(462))
+        #expect(nov.newSpend == .rupees(800))
+    }
+
+    @Test func markingPaidUpToCutoffSettlesThroughThatDateAndKeepsNewerChargesForNextMonth() throws {
+        let app = try makeApp(today: "2026-11-23")
+        let travel = try app.addCard(NewCard(name: "Travel Card", dueDay: 20))
+        try spend(app, on: .bank("Travel Card"), 462, date: "2026-11-15")
+        try spend(app, on: .bank("Travel Card"), 800, date: "2026-11-22")
+        let nov = CalendarDate.YearMonth(year: 2026, month: 11)
+        let dec = CalendarDate.YearMonth(year: 2026, month: 12)
+
+        try app.markBillPaid(travel.id, nov, upTo: day("2026-11-20"))
+
+        let paidNov = try line(app, travel, month: nov)
+        #expect(paidNov.paid == .rupees(462))
+        #expect(paidNov.paidUpTo == day("2026-11-20"))
+        #expect(paidNov.due == .zero)
+        #expect(paidNov.newSpend == .rupees(800))
+
+        let decLine = try line(app, travel, month: dec)
+        #expect(decLine.bill == .rupees(800))
+        #expect(decLine.due == .rupees(800))
+    }
+
+    @Test func payingEarlyWithCustomCutoffMovesLaterChargesIntoNewSpendAndNextMonth() throws {
+        let app = try makeApp(today: "2026-11-23")
+        let travel = try app.addCard(NewCard(name: "Travel Card", dueDay: 20))
+        try spend(app, on: .bank("Travel Card"), 462, date: "2026-11-15")
+        try spend(app, on: .bank("Travel Card"), 300, date: "2026-11-19")
+        try spend(app, on: .bank("Travel Card"), 500, date: "2026-11-22")
+        let nov = CalendarDate.YearMonth(year: 2026, month: 11)
+        let dec = CalendarDate.YearMonth(year: 2026, month: 12)
+
+        #expect(try app.cardPaymentAmount(travel.id, nov, upTo: day("2026-11-18")) == .rupees(462))
+        try app.markBillPaid(travel.id, nov, upTo: day("2026-11-18"))
+
+        let paidNov = try line(app, travel, month: nov)
+        #expect(paidNov.paid == .rupees(462))
+        #expect(paidNov.cycleEnd == day("2026-11-18"))
+        #expect(paidNov.due == .zero)
+        #expect(paidNov.newSpend == .rupees(800))
+
+        let decLine = try line(app, travel, month: dec)
+        #expect(decLine.cycleStart == day("2026-11-19"))
+        #expect(decLine.bill == .rupees(800))
+        #expect(decLine.due == .rupees(800))
+    }
+
+    @Test func anUnpaidCycleCarriesOverIntoNextMonthAndPayingLaterClearsBoth() throws {
+        let app = try makeApp(today: "2026-11-23")
+        let travel = try app.addCard(NewCard(name: "Travel Card", dueDay: 20))
+        try spend(app, on: .bank("Travel Card"), 462, date: "2026-11-15")
+        try spend(app, on: .bank("Travel Card"), 800, date: "2026-11-22")
+        let nov = CalendarDate.YearMonth(year: 2026, month: 11)
+        let dec = CalendarDate.YearMonth(year: 2026, month: 12)
+
+        let decBefore = try line(app, travel, month: dec)
+        #expect(decBefore.carriedOver == .rupees(462))
+        #expect(decBefore.bill == .rupees(800))
+        #expect(decBefore.due == .rupees(1_262))
+
+        try app.markBillPaid(travel.id, dec, upTo: day("2026-12-20"))
+
+        #expect(try line(app, travel, month: dec).due == .zero)
+        #expect(try line(app, travel, month: nov).due == .zero)
+    }
+
+    @Test func unpaidCardCountTracksCurrentCycleBillsAndIgnoresPostCutoffSpendForNextMonth() throws {
+        let app = try makeApp(today: "2026-11-23")
+        let travel = try app.addCard(NewCard(name: "Travel Card", dueDay: 20))
+        _ = try app.addCard(NewCard(name: "Shopping Card", dueDay: 25))
+        try spend(app, on: .bank("Travel Card"), 462, date: "2026-11-15")
+        try spend(app, on: .bank("Travel Card"), 800, date: "2026-11-22")
+        try spend(app, on: .bank("Shopping Card"), 3_697, date: "2026-11-11")
+
+        #expect(try app.cardBills().unpaidCardCount == 2)
+
+        try app.markBillPaid(travel.id, .init(year: 2026, month: 11), upTo: day("2026-11-20"))
+
+        #expect(try app.cardBills().unpaidCardCount == 1)
+    }
+
+    @Test func dueDayValidatesAndClampsInShortMonths() throws {
+        let app = try makeApp(today: "2026-02-15")
+        #expect(throws: CardError.invalidDueDay) { try app.addCard(NewCard(name: "Bad", dueDay: 0)) }
+        #expect(throws: CardError.invalidDueDay) { try app.addCard(NewCard(name: "Bad", dueDay: 32)) }
+
+        let endCard = try app.addCard(NewCard(name: "Month End", dueDay: 31))
+        let feb = try line(app, endCard, month: .init(year: 2026, month: 2))
+        #expect(feb.cycleEnd == day("2026-02-28"))
+    }
+
+    @Test func aCardCanBeEditedAndRenamedKeepingItsExpensesAndUnusedCardsCanBeDeleted() throws {
+        let app = try makeApp(today: "2026-11-23")
+        let old = try app.addCard(NewCard(name: "Old Card"))
+        let unused = try app.addCard(NewCard(name: "Unused Card"))
+        try spend(app, on: .bank("Old Card"), 500, date: "2026-11-10")
+
+        let renamed = try app.updateCard(old.id, NewCard(name: "Everyday Card", dueDay: 15))
+
+        #expect(renamed.name == "Everyday Card")
+        #expect(renamed.dueDay == 15)
+        #expect(try line(app, renamed, month: .init(year: 2026, month: 11)).bill == .rupees(500))
+
+        try app.deleteCard(unused.id)
+        #expect(try !app.cards().contains { $0.id == unused.id })
+
+        #expect(throws: CardError.hasExpenses(name: "Everyday Card", count: 1)) {
+            try app.deleteCard(renamed.id)
+        }
+    }
+
+    @Test func cutoffDateOutsideTheCycleWindowIsRefused() throws {
+        let app = try makeApp(today: "2026-11-23")
+        let travel = try app.addCard(NewCard(name: "Travel Card", dueDay: 20))
+        try spend(app, on: .bank("Travel Card"), 462, date: "2026-11-15")
+        let nov = CalendarDate.YearMonth(year: 2026, month: 11)
+
+        #expect(throws: CardError.cutoffOutOfRange(min: day("2026-10-21"), max: day("2026-12-19"))) {
+            try app.markBillPaid(travel.id, nov, upTo: day("2026-10-01"))
+        }
     }
 }

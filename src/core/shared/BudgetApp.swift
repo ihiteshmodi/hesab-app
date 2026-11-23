@@ -29,8 +29,11 @@ public final class BudgetApp: Sendable {
     public let monthBudget: GetMonthBudget
     public let cashForecast: GetCashForecast
     public let addCard: AddCard
+    public let updateCard: UpdateCard
+    public let deleteCard: DeleteCard
     public let cards: GetCards
     public let cardBills: GetCardBills
+    public let cardPaymentAmount: GetCardPaymentAmount
     public let markBillPaid: MarkBillPaid
     public let unmarkBillPaid: UnmarkBillPaid
     public let exportData: ExportData
@@ -198,9 +201,12 @@ public final class BudgetApp: Sendable {
         monthBudget = GetMonthBudget(expenses: expenses, income: income, repayments: borrowingBook, settings: settingsBook, clock: clock)
         let cardBook = CardRepository(database: database)
         addCard = AddCard(cards: cardBook)
+        updateCard = UpdateCard(cards: cardBook)
+        deleteCard = DeleteCard(cards: cardBook, expenses: expenses)
         cards = GetCards(cards: cardBook)
         cardBills = GetCardBills(cards: cardBook, expenses: expenses, clock: clock)
-        markBillPaid = MarkBillPaid(cards: cardBook, bills: cardBills)
+        cardPaymentAmount = GetCardPaymentAmount(cards: cardBook, expenses: expenses)
+        markBillPaid = MarkBillPaid(cards: cardBook, expenses: expenses)
         unmarkBillPaid = UnmarkBillPaid(cards: cardBook)
         exportData = ExportData(database: database, clock: clock)
         prepareImport = PrepareImport(database: database)

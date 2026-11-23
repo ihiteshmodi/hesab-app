@@ -70,6 +70,7 @@ enum DrawerItem: String, CaseIterable, Hashable, Identifiable {
 
 /// The drawer that slides in from the left over a dimmed screen.
 struct MenuDrawer: View {
+    var cardBillsBadge = 0
     let choose: (DrawerItem) -> Void
     let close: () -> Void
 
@@ -83,6 +84,15 @@ struct MenuDrawer: View {
                             Image(systemName: item.icon).font(.system(size: 20)).frame(width: 30)
                             Text(item.title).font(.system(size: 18))
                             Spacer()
+                            if item == .cardBills, cardBillsBadge > 0 {
+                                Text("\(cardBillsBadge)")
+                                    .font(.system(size: 11, weight: .bold))
+                                    .foregroundStyle(.white)
+                                    .padding(.horizontal, 6)
+                                    .frame(minWidth: 19, minHeight: 19)
+                                    .background(Theme.red, in: Capsule())
+                                    .accessibilityIdentifier("cardBillsMenuBadge")
+                            }
                         }
                         .padding(.vertical, 12).padding(.horizontal, 4)
                         .contentShape(Rectangle())

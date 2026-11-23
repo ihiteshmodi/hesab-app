@@ -172,6 +172,7 @@ final class AddExpenseUITests: XCTestCase {
         app.buttons["saveExpenseButton"].tap()
 
         app.buttons["profileButton"].tap()
+        XCTAssertEqual(app.staticTexts["cardBillsMenuBadge"].label, "1")
         let link = app.buttons["cardBillsLink"]
         XCTAssertTrue(link.waitForExistence(timeout: 20))
         link.tap()
@@ -181,6 +182,9 @@ final class AddExpenseUITests: XCTestCase {
         XCTAssertEqual(app.staticTexts["cardTotalDue"].label, "₹1,200.00")
 
         app.buttons["cardPaidButton"].tap()
+        let confirm = app.buttons["confirmCardPaidButton"]
+        XCTAssertTrue(confirm.waitForExistence(timeout: 20))
+        confirm.tap()
 
         let paid = NSPredicate(format: "label == %@", "₹0.00")
         let cleared = XCTNSPredicateExpectation(predicate: paid, object: app.staticTexts["cardTotalDue"])

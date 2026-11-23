@@ -469,6 +469,15 @@ public final class AppDatabase: Sendable {
             }
         }
 
+        migrator.registerMigration("v27-card-cycles") { db in
+            try db.alter(table: "card") { table in
+                table.add(column: "due_day", .integer)
+            }
+            try db.alter(table: "card_bill_payment") { table in
+                table.add(column: "paid_up_to", .text)
+            }
+        }
+
         return migrator
     }
 }

@@ -12,6 +12,7 @@ final class BudgetViewModel {
     private(set) var cash: CashInHand?
     private(set) var cards: [Card] = []
     private(set) var cardBills: CardBills?
+    private(set) var unpaidCardBillsCount = 0
     private(set) var amountToRepay: AmountToRepay?
     private(set) var categories: [CategoryNode] = []
     private(set) var recentCategories: [CategoryChoice] = []
@@ -59,7 +60,9 @@ final class BudgetViewModel {
             ledgers = try app.ledgers()
             cash = try app.cashInHand()
             cards = try app.cards()
-            cardBills = try app.cardBills(for: cardMonth)
+            let currentCards = try app.cardBills()
+            unpaidCardBillsCount = currentCards.unpaidCardCount
+            cardBills = try cardMonth.map { try app.cardBills(for: $0) } ?? currentCards
             amountToRepay = try app.amountToRepay()
             categories = try app.categories()
             recentCategories = try app.recentCategories(limit: 3)
@@ -481,7 +484,24 @@ final class BudgetViewModel {
         reload()
     }
 
-    func addCard(name: String) -> String? { run { try app.addCard(NewCard(name: name)) } }
+    func addCard(name: String, dueDay: Int? = nil) -> String? { run { try app.addCard(NewCard(name: name, dueDay: dueDay)) } }
+    func updateCard(_ id: Int64, name: String, dueDay: Int?) -> String? { run { try app.updateCard(id, NewCard(name: name, dueDay: dueDay)) } }
+    func deleteCard(_ id: Int64) -> String? { run { try app.deleteCard(id) } }
+
+    func cardPaymentAmount(_ cardID: Int64, upTo: CalendarDate) -> Money? {
+        guard let month = cardBills?.month else { return nil }
+        return try? app.cardPaymentAmount(cardID, month, upTo: upTo)
+    }
+
+    func markCardBillPaid(_ cardID: Int64, upTo: CalendarDate) -> String? {
+        guard let month = cardBills?.month else { return nil }
+        return run { try app.markBillPaid(cardID, month, upTo: upTo) }
+    }
+
+    func unmarkCardBillPaid(_ cardID: Int64) -> String? {
+        guard let month = cardBills?.month else { return nil }
+        return run { try app.unmarkBillPaid(cardID, month) }
+    }
 
     func recordRepayment(_ borrowingID: Int64, amountText: String, on date: CalendarDate? = nil, fromCash: Bool? = nil) -> String? {
         run { try app.recordRepayment(borrowingID, MoneyInput.parse(amountText), on: date, fromCash: fromCash) }
@@ -531,11 +551,6 @@ final class BudgetViewModel {
 
     func confirmImport(_ preview: ImportPreview) -> String? {
         run { try app.confirmImport(preview, keepingPreviousIn: try CompositionRoot.backupsFolder()) }
-    }
-
-    func setBillPaid(_ cardID: Int64, paid: Bool) -> String? {
-        guard let month = cardBills?.month else { return nil }
-        return run { paid ? try app.markBillPaid(cardID, month) : try app.unmarkBillPaid(cardID, month) }
     }
 
     private func run(_ action: () throws -> Void) -> String? {

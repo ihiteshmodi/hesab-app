@@ -46,3 +46,50 @@ Feature: Card bills with a paid tick
   Scenario: A month with no card spending
     When she views Card Bills for September
     Then she sees "No card spending in September."
+
+  # Per-card monthly due days, paid-up-to cutoff dates, carryover and unpaid badge count.
+
+  Scenario: Each card follows its own monthly due day
+    Given "Travel Card" has due day 20
+    And expenses on "Travel Card" of 462 on 2026-11-15 and 800 on 2026-11-22
+    When Priya views Card Bills for November 2026 on 2026-11-23
+    Then "Travel Card" shows a November cycle bill of 462 due on 2026-11-20 and 800 new since 2026-11-20
+
+  Scenario: Marking paid up to a cutoff date settles through that date and keeps newer charges for next month
+    Given "Travel Card" has due day 20
+    And expenses on "Travel Card" of 462 on 2026-11-15 and 800 on 2026-11-22
+    When Priya marks "Travel Card" paid for November 2026 up to 2026-11-20
+    Then "Travel Card" shows 462 paid up to 2026-11-20, 0 due for November, and 800 new since 2026-11-20
+    When she switches Card Bills to December 2026
+    Then "Travel Card" shows 800 due for December
+
+  Scenario: Paying early with a custom cutoff date moves later charges into the new counter and next month
+    Given "Travel Card" has due day 20
+    And expenses on "Travel Card" of 462 on 2026-11-15, 300 on 2026-11-19 and 500 on 2026-11-22
+    When Priya marks "Travel Card" paid for November 2026 up to 2026-11-18
+    Then "Travel Card" shows 462 paid up to 2026-11-18, 0 due for November, and 800 new since 2026-11-18
+    When she switches Card Bills to December 2026
+    Then "Travel Card" shows 800 due for December
+
+  Scenario: An unpaid card bill carries over into the next month until settled
+    Given "Travel Card" has due day 20
+    And expenses on "Travel Card" of 462 on 2026-11-15 and 800 on 2026-11-22
+    When Priya switches Card Bills to December 2026 without paying November
+    Then "Travel Card" shows 462 carried over, an 800 December bill, and 1,262 total due
+    When she marks "Travel Card" paid for December 2026 up to 2026-12-20
+    Then both November and December show 0 due on "Travel Card"
+
+  Scenario: Unpaid card bills in the current cycle are counted for the red badge
+    Given today is 2026-11-23
+    And "Travel Card" (due day 20) has 462 on 2026-11-15 and 800 on 2026-11-22
+    And "Shopping Card" (due day 25) has 3,697 on 2026-11-11
+    Then the unpaid card bills count is 2
+    When Priya marks "Travel Card" paid for November 2026 up to 2026-11-20
+    Then the unpaid card bills count is 1 even though "Travel Card" has 800 accruing for December
+
+  Scenario: A card can be edited or deleted when unused, and renaming moves its expenses with it
+    Given "Old Card" has a 500 expense and "Unused Card" has none
+    When Priya renames "Old Card" to "Everyday Card" with due day 15
+    Then "Everyday Card" has due day 15 and still holds the 500 expense
+    And she can delete "Unused Card"
+    And deleting "Everyday Card" is refused because it has expenses on it

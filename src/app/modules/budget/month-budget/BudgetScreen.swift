@@ -70,9 +70,23 @@ struct BudgetScreen: View {
             }
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button("Menu", systemImage: "person.crop.circle.fill", action: openMenu)
-                        .accessibilityLabel("Account")
-                        .accessibilityIdentifier("profileButton")
+                    Button(action: openMenu) {
+                        Image(systemName: "person.crop.circle.fill")
+                            .overlay(alignment: .topTrailing) {
+                                if model.unpaidCardBillsCount > 0 {
+                                    Text("\(model.unpaidCardBillsCount)")
+                                        .font(.system(size: 10, weight: .bold))
+                                        .foregroundStyle(.white)
+                                        .padding(.horizontal, 4.5)
+                                        .frame(minWidth: 16, minHeight: 16)
+                                        .background(Theme.red, in: Capsule())
+                                        .offset(x: 7, y: -5)
+                                        .accessibilityHidden(true)
+                                }
+                            }
+                    }
+                    .accessibilityLabel(model.unpaidCardBillsCount > 0 ? "Account, \(model.unpaidCardBillsCount)" : "Account")
+                    .accessibilityIdentifier("profileButton")
                 }
                 ToolbarItem(placement: .primaryAction) {
                     Menu {
