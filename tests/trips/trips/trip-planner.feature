@@ -180,3 +180,13 @@ Feature: Trip planner
       | arrives before it leaves      | The leg can't arrive before it leaves.   |
       | leaves at 25:00               | Enter a time between 00:00 and 23:59     |
 
+  Scenario: An open trip with a plan shows its planned cost alongside net cost so far
+    Given an open trip "Manali trip" in INR with "Stay" 30,000 and "Flights" 22,000 planned and no expenses yet
+    When I view the Trips list
+    Then "Manali trip" shows 0 net cost so far and 52,000 planned alongside it
+
+  Scenario: A trip with nothing planned or still in planning mode has no secondary planned figure
+    Given an open trip with nothing planned, and a trip in planning mode with 15,000 planned
+    When I view the Trips list
+    Then neither shows a secondary planned figure beneath net cost so far
+

@@ -310,4 +310,28 @@ struct TripPlannerTests {
 
         #expect(try p.summary().plan.categoryProgress.isEmpty)
     }
+
+    // MARK: trips list planned cost
+
+    @Test func anOpenTripWithAPlanShowsItsPlannedTotalAlongsideNetCost() throws {
+        let app = try makeApp()
+        let trip = try app.createTrip(NewTrip(name: "Manali trip", category: "Lifestyle"))
+        try app.addTripPlanItem(trip.id, NewTripPlanItem(description: "Stay", amount: .rupees(30_000)))
+        try app.addTripPlanItem(trip.id, NewTripPlanItem(description: "Flights", amount: .rupees(22_000)))
+
+        let summary = try app.tripSummary(trip.id)
+
+        #expect(summary.netCost == .zero)
+        #expect(summary.plannedAlongsideNetCost == .rupees(52_000))
+    }
+
+    @Test func aPlanningModeTripOrATripWithNoPlanHasNoSecondaryPlannedFigure() throws {
+        let p = try planning(started: false)
+        try p.plan("Flights", idr: 6_000_000)
+        let app = try makeApp()
+        let unplanned = try app.createTrip(NewTrip(name: "Weekend drive", category: "Lifestyle"))
+
+        #expect(try p.summary().plannedAlongsideNetCost == nil)
+        #expect(try app.tripSummary(unplanned.id).plannedAlongsideNetCost == nil)
+    }
 }

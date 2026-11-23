@@ -209,6 +209,11 @@ final class NewFeaturesUITests: XCTestCase {
         XCTAssertEqual(app.staticTexts["tripPendingTotal"].label, "₹0.00")
         app.buttons["Expenses"].tap()
         XCTAssertEqual(app.staticTexts["tripLedgerAmount"].label, "₹6,000.00")
+        let back = app.buttons["BackButton"]
+        XCTAssertTrue(back.waitForExistence(timeout: 20))
+        back.tap()
+        XCTAssertTrue(app.staticTexts["tripRowPlanned"].waitForExistence(timeout: 20))
+        XCTAssertEqual(app.staticTexts["tripRowPlanned"].label, "₹6,000.00")
     }
 
     @MainActor

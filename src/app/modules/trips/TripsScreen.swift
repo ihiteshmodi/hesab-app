@@ -37,35 +37,51 @@ struct TripsScreen: View {
             TripDetailScreen(model: model, tripID: summary.trip.id)
         } label: {
             VStack(alignment: .leading, spacing: 4) {
-                HStack {
-                    Text(summary.trip.name).font(.headline)
-                    if summary.trip.isSettled { StatusPill(text: "Settled", tone: .green) }
-                    if summary.trip.isPlanning { StatusPill(text: "Planning") }
-                    if model.dueCount(tripID: summary.trip.id) > 0 {
-                        Text("\(model.dueCount(tripID: summary.trip.id))").font(.system(size: 11, weight: .bold)).foregroundStyle(.white)
-                            .padding(.horizontal, 5).frame(minWidth: 17, minHeight: 17).background(Theme.red, in: Capsule())
-                            .accessibilityLabel("Payments due soon").accessibilityIdentifier("tripRowDueBadge")
+                HStack(alignment: .top, spacing: 12) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack(spacing: 6) {
+                            Text(summary.trip.name).font(.headline)
+                            if summary.trip.isSettled { StatusPill(text: "Settled", tone: .green) }
+                            if summary.trip.isPlanning { StatusPill(text: "Planning") }
+                            if model.dueCount(tripID: summary.trip.id) > 0 {
+                                Text("\(model.dueCount(tripID: summary.trip.id))").font(.system(size: 11, weight: .bold)).foregroundStyle(.white)
+                                    .padding(.horizontal, 5).frame(minWidth: 17, minHeight: 17).background(Theme.red, in: Capsule())
+                                    .accessibilityLabel("Payments due soon").accessibilityIdentifier("tripRowDueBadge")
+                            }
+                        }
+                        if let dates = TripDates.text(summary.trip) {
+                            Text(dates).font(.footnote).foregroundStyle(Theme.secondary).accessibilityIdentifier("tripDates")
+                        }
+                        if let due = model.tripDues.first(where: { $0.tripID == summary.trip.id }) {
+                            Text("\(due.title): \(dueText(due.dueDate, windowDays: model.preferences.upcomingWindowDays).text)")
+                                .font(.footnote).foregroundStyle(Theme.red)
+                        }
+                        Text((summary.trip.currency ?? "₹") + " · " + (summary.members.isEmpty ? "no people yet" : summary.members.map(\.name).joined(separator: ", ")))
+                            .font(.footnote).foregroundStyle(Theme.secondary)
                     }
-                    Spacer()
-                    VStack(alignment: .trailing) {
+                    Spacer(minLength: 8)
+                    VStack(alignment: .trailing, spacing: 5) {
                         if summary.trip.isPlanning {
-                            Text(model.tripText(summary.plan.plannedTotal, summary.trip)).monospacedDigit()
-                            Text("planned").font(.caption).foregroundStyle(Theme.secondary)
+                            VStack(alignment: .trailing, spacing: 0) {
+                                Text(model.tripText(summary.plan.plannedTotal, summary.trip)).monospacedDigit()
+                                Text("planned").font(.caption).foregroundStyle(Theme.secondary)
+                            }
                         } else {
-                            Text(IndianMoneyFormat.string(summary.netCost)).monospacedDigit()
-                            Text("net cost so far").font(.caption).foregroundStyle(Theme.secondary)
+                            VStack(alignment: .trailing, spacing: 0) {
+                                Text(IndianMoneyFormat.string(summary.netCost)).monospacedDigit()
+                                Text("net cost so far").font(.caption).foregroundStyle(Theme.secondary)
+                            }
+                            if let planned = summary.plannedAlongsideNetCost {
+                                VStack(alignment: .trailing, spacing: 0) {
+                                    Text(plannedText(planned, approx: summary))
+                                        .font(.footnote).monospacedDigit().foregroundStyle(Theme.secondary)
+                                        .accessibilityIdentifier("tripRowPlanned")
+                                    Text("planned").font(.caption).foregroundStyle(Theme.secondary)
+                                }
+                            }
                         }
                     }
                 }
-                if let dates = TripDates.text(summary.trip) {
-                    Text(dates).font(.footnote).foregroundStyle(Theme.secondary).accessibilityIdentifier("tripDates")
-                }
-                if let due = model.tripDues.first(where: { $0.tripID == summary.trip.id }) {
-                    Text("\(due.title): \(dueText(due.dueDate, windowDays: model.preferences.upcomingWindowDays).text)")
-                        .font(.footnote).foregroundStyle(Theme.red)
-                }
-                Text((summary.trip.currency ?? "₹") + " · " + (summary.members.isEmpty ? "no people yet" : summary.members.map(\.name).joined(separator: ", ")))
-                    .font(.footnote).foregroundStyle(Theme.secondary)
                 ForEach(summary.balances.filter { $0.owesMe != .zero }, id: \.person.id) { balance in
                     HStack {
                         Text(balance.owesMe > .zero ? "\(balance.person.name) owes" : "I owe \(balance.person.name)")
@@ -81,6 +97,11 @@ struct TripsScreen: View {
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier("tripRow")
+    }
+
+    private func plannedText(_ planned: Money, approx summary: TripSummary) -> String {
+        let text = model.tripText(planned, summary.trip)
+        return summary.trip.currency == nil ? text : "\(text) ≈ \(IndianMoneyFormat.string(summary.plan.plannedTotalHome))"
     }
 
     private func amountText(_ text: String, approx summary: TripSummary, _ balance: PersonBalance) -> String {

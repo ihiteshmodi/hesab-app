@@ -482,6 +482,11 @@ public struct TripSummary: Equatable, Sendable {
     public let spendByCategory: [CategorySpend]
     public let totals: [ParticipantTotal]
     public let plan: TripPlan
+
+    /// Shown beneath "net cost so far" on the Trips list once a trip has started and has a plan.
+    public var plannedAlongsideNetCost: Money? {
+        !trip.isPlanning && plan.plannedTotal > .zero ? plan.plannedTotal : nil
+    }
 }
 
 public struct StatementLine: Equatable, Sendable {
