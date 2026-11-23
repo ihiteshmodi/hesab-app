@@ -355,6 +355,65 @@ final class NewFeaturesUITests: XCTestCase {
         XCTAssertFalse(app.buttons["addInstalmentButton"].exists, "the instalment is still offered after it was added")
     }
 
+    // MARK: card bills
+
+    @MainActor
+    func testACardBillShowsMenuBadgeCarriesOverIntoNextMonthAndSettlesThroughPaySheet() {
+        let app = launchApp()
+
+        app.buttons["profileButton"].tap()
+        app.buttons["cardBillsLink"].tap()
+        let defaultCard = app.buttons["editCard-Credit Card"]
+        XCTAssertTrue(defaultCard.waitForExistence(timeout: 20))
+        defaultCard.tap()
+        app.buttons["deleteCardButton"].tap()
+        let confirmDelete = app.buttons["confirmDeleteCardButton"].firstMatch
+        XCTAssertTrue(confirmDelete.waitForExistence(timeout: 10))
+        confirmDelete.tap()
+        XCTAssertFalse(app.buttons["editCard-Credit Card"].waitForExistence(timeout: 3))
+
+        app.buttons["addCardButton"].tap()
+        type(app.textFields["cardNameField"], "Rewards Card")
+        app.buttons["saveCardButton"].tap()
+        XCTAssertTrue(app.buttons["editCard-Rewards Card"].waitForExistence(timeout: 20))
+        app.buttons["BackButton"].tap()
+
+        app.buttons["addMenu"].tap()
+        app.buttons["addExpenseButton"].tap()
+        type(app.textFields["amountField"], "1500")
+        type(app.textFields["descriptionField"], "Hotel stay")
+        app.buttons["categoryPicker"].tap()
+        app.buttons["Lifestyle"].tap()
+        app.buttons["paymentPicker"].tap()
+        app.buttons["Rewards Card"].tap()
+        app.buttons["saveExpenseButton"].tap()
+
+        let profile = app.buttons["profileButton"]
+        XCTAssertTrue(profile.waitForExistence(timeout: 20))
+        XCTAssertEqual(profile.label, "Account, 1")
+        profile.tap()
+        XCTAssertEqual(app.staticTexts["cardBillsMenuBadge"].label, "1")
+        app.buttons["cardBillsLink"].tap()
+        XCTAssertEqual(app.staticTexts["cardTotalDue"].label, "₹1,500.00")
+
+        // Flipping to next month carries the unpaid cycle balance forward.
+        app.buttons["nextCardMonth"].tap()
+        XCTAssertEqual(app.staticTexts["cardTotalDue"].label, "₹1,500.00")
+
+        // Paying the current cycle clears both months and removes the red menu badge.
+        app.buttons["previousCardMonth"].tap()
+        app.buttons["cardPaidButton"].tap()
+        XCTAssertEqual(app.staticTexts["cardCoveredAmount"].label, "₹1,500.00")
+        app.buttons["confirmCardPaidButton"].tap()
+        XCTAssertEqual(app.staticTexts["cardTotalDue"].label, "₹0.00")
+
+        app.buttons["nextCardMonth"].tap()
+        XCTAssertEqual(app.staticTexts["cardTotalDue"].label, "₹0.00")
+
+        app.buttons["BackButton"].tap()
+        XCTAssertEqual(app.buttons["profileButton"].label, "Account")
+    }
+
     // MARK: helpers
 
     @MainActor

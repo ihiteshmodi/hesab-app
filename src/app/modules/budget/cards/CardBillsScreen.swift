@@ -264,20 +264,22 @@ private struct CardFormSheet: View {
                 if let errorMessage {
                     Text(errorMessage).foregroundStyle(Theme.red).padding(.horizontal, 18).accessibilityIdentifier("cardError")
                 }
-                if let editing {
+                if editing != nil {
                     Button("Delete Card", role: .destructive) { confirmingDelete = true }
                         .buttonStyle(GreyButtonStyle(tint: Theme.red))
                         .accessibilityIdentifier("deleteCardButton")
-                        .confirmationDialog("Delete \(editing.name)?", isPresented: $confirmingDelete, titleVisibility: .visible) {
-                            Button("Delete Card", role: .destructive) {
-                                errorMessage = model.deleteCard(editing.id)
-                                if errorMessage == nil { dismiss() }
-                            }
-                            .accessibilityIdentifier("confirmDeleteCardButton")
-                        }
                 }
             }
             .cardNavigation(editing == nil ? "New Card" : "Edit Card")
+            .confirmationDialog("Delete \(editing?.name ?? "this card")?", isPresented: $confirmingDelete, titleVisibility: .visible) {
+                Button("Delete Card", role: .destructive) {
+                    if let editing {
+                        errorMessage = model.deleteCard(editing.id)
+                        if errorMessage == nil { dismiss() }
+                    }
+                }
+                .accessibilityIdentifier("confirmDeleteCardButton")
+            }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
