@@ -307,7 +307,6 @@ struct BudgetScreen: View {
 
     private var upcomingExpensesCard: some View {
         VStack(alignment: .leading, spacing: 0) {
-            if let forecast = model.forecast { ForecastChart(forecast: forecast) }
             CardCaption("Bills you add yourself · \(UpcomingWindow.caption(model.preferences.upcomingWindowDays))")
                 .padding(.bottom, 4)
             if model.upcoming.items.isEmpty {

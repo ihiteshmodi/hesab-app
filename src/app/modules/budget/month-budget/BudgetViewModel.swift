@@ -39,7 +39,6 @@ final class BudgetViewModel {
     private(set) var vsNormal = SpendingVsNormal(changes: [], hasHistory: false)
     private(set) var categoryTrends: [CategoryTrend] = []
     private(set) var tripDues: [TripDue] = []
-    private(set) var forecast: CashForecast?
     private(set) var netWorthHistory = NetWorthHistory(points: [])
     /// Shown on Activity until dismissed, for example "Added automatically: Internet 800".
     private(set) var notices: [String] = []
@@ -82,7 +81,6 @@ final class BudgetViewModel {
             monthlyTrend = try app.monthlyTrend(endingAt: reportMonth)
             vsNormal = try app.spendingVsNormal(for: reportMonth)
             categoryTrends = try app.categoryTrends(endingAt: reportMonth)
-            forecast = try app.cashForecast()
             tripDues = try app.tripDues()
             // A failed snapshot must never stop the screens from loading.
             try? app.recordNetWorth()

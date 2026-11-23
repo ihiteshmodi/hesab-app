@@ -57,6 +57,8 @@ final class ActivityAndBillsUITests: XCTestCase {
         fillBill(app, "Rent", "20000")
 
         XCTAssertTrue(app.descendants(matching: .any)["upcomingRow"].waitForExistence(timeout: 20))
+        XCTAssertFalse(app.descendants(matching: .any)["forecastChart"].exists, "the 30-day forecast chart should not appear in Upcoming Expenses")
+        XCTAssertFalse(app.staticTexts["forecastHeadline"].exists, "the forecast headline should not appear in Upcoming Expenses")
         app.buttons["addUpcomingBillButton"].tap()
         let save = app.buttons["saveExpenseButton"]
         XCTAssertTrue(save.waitForExistence(timeout: 20))

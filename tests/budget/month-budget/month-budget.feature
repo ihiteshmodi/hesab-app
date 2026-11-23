@@ -84,6 +84,12 @@ Feature: What is left to spend, and what was spent this month
     When she opens Activity
     Then she sees "Spending", "Upcoming Expenses" and "Upcoming Income"
 
+  Scenario: Upcoming Expenses lists upcoming bills directly without a 30-day forecast graph
+    Given a manual bill "Rent" of 20,000 is due within the upcoming window
+    When she switches Activity to "Upcoming Expenses"
+    Then she sees "Bills you add yourself" and "Rent"
+    And no 30-day forecast graph or "run short" headline is shown
+
   # Cash in hand and Amount to repay sit under Left to spend like Pending refunds, and always show.
   Scenario: Cash in hand and Amount to repay are tiles that open their screens
     Given 2 cash entries making 3,000 and one borrowing of 6,000 still to repay
