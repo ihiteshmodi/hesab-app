@@ -8,7 +8,7 @@ import Testing
 struct RealDatabaseTests {
     private static let export: URL = URL(fileURLWithPath: #filePath)
         .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
-        .appendingPathComponent("output/budget-2026-11-20.sqlite")
+        .appendingPathComponent("output/budget-2026-11-23.sqlite")
 
     private static var present: Bool { FileManager.default.fileExists(atPath: export.path) }
 
@@ -17,7 +17,7 @@ struct RealDatabaseTests {
         let scratch = FileManager.default.temporaryDirectory.appendingPathComponent("real-\(UUID().uuidString).sqlite")
         try FileManager.default.copyItem(at: Self.export, to: scratch)
         defer { try? FileManager.default.removeItem(at: scratch) }
-        let app = BudgetApp(database: try AppDatabase.inMemory(), clock: FixedDayClock(date: day("2026-11-20")))
+        let app = BudgetApp(database: try AppDatabase.inMemory(), clock: FixedDayClock(date: day("2026-11-23")))
 
         let source = try DatabaseQueue(path: scratch.path)
         let expenseRows = try source.read { try Int.fetchOne($0, sql: "SELECT COUNT(*) FROM expense") ?? 0 }
@@ -30,6 +30,7 @@ struct RealDatabaseTests {
         #expect(try app.spendingBreakdown(.allTime, by: .category).expenses.count == expenseRows)
         // Every screen's data loads on the migrated file.
         _ = try app.monthBudget()
+        _ = try app.cardBills()
         _ = try app.trips()
         _ = try app.payoutSchemes().sorted(by: .maturity)
         _ = try app.upcomingIncome()
